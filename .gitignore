@@ -1,0 +1,35 @@
+### Gradle ###
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+### IntelliJ IDEA ###
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+
+### Eclipse ###
+.settings/
+.project
+.classpath
+bin/
+
+### VS Code ###
+.vscode/
+
+### Java ###
+*.class
+*.log
+hs_err_pid*
+
+### Env / Secret ###
+*.env
+.env
+.env.local
+application-secret.yml
+
+### OS ###
+.DS_Store
+Thumbs.db

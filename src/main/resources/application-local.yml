@@ -1,0 +1,39 @@
+server:
+  port: 8080
+  servlet:
+    session:
+      timeout: 30m            # 세션 만료 시간
+      cookie:
+        name: JSESSIONID
+        http-only: true       # JS에서 쿠키 접근 차단
+        secure: false         # 운영(HTTPS)에서는 true
+        same-site: lax        # 크로스 사이트 요청 시 쿠키 정책
+
+spring:
+  # ===== Database (MySQL 예시. PostgreSQL 사용 시 아래 주석 참고) =====
+  datasource:
+    url: jdbc:mysql://localhost:3306/ditto?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
+    username: ditto
+    password: ditto1234
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    # --- PostgreSQL ---
+    # url: jdbc:postgresql://localhost:5432/ditto
+    # driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update        # local 전용. 운영은 validate 또는 none 권장
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        default_batch_fetch_size: 100
+    open-in-view: false
+
+# ===== Logging =====
+logging:
+  level:
+    root: INFO
+    com.ditto: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.springframework.security: DEBUG

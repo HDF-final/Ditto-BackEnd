@@ -1,0 +1,83 @@
+package com.ditto.security;
+
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
+import org.springframework.security.web.context.SecurityContextRepository;
+import org.springframework.web.cors.CorsConfigurationSource;
+
+import lombok.RequiredArgsConstructor;
+
+@Configuration
+@EnableWebSecurity
+@RequiredArgsConstructor
+public class SecurityConfig {
+
+    private final CorsConfigurationSource corsConfigurationSource;
+
+    /** 인증 없이 접근 가능한 공개 경로 */
+    private static final String[] PUBLIC_ENDPOINTS = {
+            "/api/v1/auth/**",
+            "/api/v1/courses/public/**",
+            "/api/v1/news/**",
+            "/api/v1/mobile/access-codes/verify",
+            "/swagger-ui/**",
+            "/v3/api-docs/**",
+            "/actuator/health"
+    };
+
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        http
+                .cors(cors -> cors.configurationSource(corsConfigurationSource))
+                // SPA(별도 오리진) + 세션 쿠키 조합. CSRF 방어는 SameSite 쿠키 정책으로 시작하고,
+                // 폼 기반 흐름이 생기면 CookieCsrfTokenRepository 적용을 검토한다.
+                .csrf(csrf -> csrf.disable())
+                .httpBasic(basic -> basic.disable())
+                .formLogin(form -> form.disable())
+                // 세션 기반 인증: 필요 시 세션 생성, 로그인 시 세션 고정 공격 방지를 위해 세션 ID 변경
+                .sessionManagement(session -> session
+                        .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
+                        .sessionFixation(fixation -> fixation.changeSessionId())
+                        .maximumSessions(1))
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
+                        .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
+                        .anyRequest().authenticated())
+                // 로그아웃: 세션 무효화 + 세션 쿠키 삭제
+                .logout(logout -> logout
+                        .logoutUrl("/api/v1/auth/logout")
+                        .invalidateHttpSession(true)
+                        .deleteCookies("JSESSIONID"));
+
+        return http.build();
+    }
+
+    /**
+     * 로그인 처리에 사용할 SecurityContext 저장소.
+     * AuthService 에서 인증 성공 후 이 저장소로 SecurityContext 를 HttpSession 에 저장한다.
+     */
+    @Bean
+    public SecurityContextRepository securityContextRepository() {
+        return new HttpSessionSecurityContextRepository();
+    }
+
+    /** AuthService 에서 이메일/비밀번호 인증에 사용 */
+    @Bean
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration configuration) throws Exception {
+        return configuration.getAuthenticationManager();
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+}

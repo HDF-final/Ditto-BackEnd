@@ -1,0 +1,55 @@
+package com.ditto.global.exception;
+
+import org.springframework.http.HttpStatus;
+
+import lombok.Getter;
+import lombok.RequiredArgsConstructor;
+
+/**
+ * 서비스 전역 에러 코드.
+ * HTTP 상태 + 비즈니스 코드 + 기본 메시지를 한 곳에서 관리한다.
+ */
+@Getter
+@RequiredArgsConstructor
+public enum ErrorCode {
+
+    // ===== Common =====
+    INVALID_INPUT_VALUE(HttpStatus.BAD_REQUEST, "C001", "입력값이 올바르지 않습니다."),
+    METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "C002", "지원하지 않는 HTTP 메서드입니다."),
+    ENTITY_NOT_FOUND(HttpStatus.NOT_FOUND, "C003", "요청한 리소스를 찾을 수 없습니다."),
+    INTERNAL_SERVER_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "C004", "서버 내부 오류가 발생했습니다."),
+    INVALID_TYPE_VALUE(HttpStatus.BAD_REQUEST, "C005", "요청 타입이 올바르지 않습니다."),
+    MISSING_REQUEST_PARAMETER(HttpStatus.BAD_REQUEST, "C006", "필수 요청 파라미터가 누락되었습니다."),
+
+    // ===== Auth / Security =====
+    UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "A001", "로그인이 필요합니다."),
+    INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "A002", "이메일 또는 비밀번호가 올바르지 않습니다."),
+    SESSION_EXPIRED(HttpStatus.UNAUTHORIZED, "A003", "세션이 만료되었습니다. 다시 로그인해 주세요."),
+    ACCESS_DENIED(HttpStatus.FORBIDDEN, "A004", "접근 권한이 없습니다."),
+
+    // ===== User =====
+    USER_NOT_FOUND(HttpStatus.NOT_FOUND, "U001", "사용자를 찾을 수 없습니다."),
+    DUPLICATE_EMAIL(HttpStatus.CONFLICT, "U002", "이미 가입된 이메일입니다."),
+
+    // ===== Course =====
+    COURSE_NOT_FOUND(HttpStatus.NOT_FOUND, "CR001", "코스를 찾을 수 없습니다."),
+    NOT_COURSE_OWNER(HttpStatus.FORBIDDEN, "CR002", "코스에 대한 권한이 없습니다."),
+    PLACE_NOT_FOUND(HttpStatus.NOT_FOUND, "CR003", "장소를 찾을 수 없습니다."),
+
+    // ===== Community =====
+    POST_NOT_FOUND(HttpStatus.NOT_FOUND, "CM001", "게시글을 찾을 수 없습니다."),
+    COMMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "CM002", "댓글을 찾을 수 없습니다."),
+    ALREADY_LIKED(HttpStatus.CONFLICT, "CM003", "이미 좋아요한 코스입니다."),
+
+    // ===== Navigation / Mobile =====
+    MAP_MANIFEST_NOT_FOUND(HttpStatus.NOT_FOUND, "N001", "지도 매니페스트를 찾을 수 없습니다."),
+    INVALID_ACCESS_CODE(HttpStatus.BAD_REQUEST, "N002", "유효하지 않은 접속 코드입니다."),
+
+    // ===== External (AI / OCR) =====
+    AI_SERVICE_ERROR(HttpStatus.BAD_GATEWAY, "E001", "AI 서비스 처리 중 오류가 발생했습니다."),
+    OCR_SERVICE_ERROR(HttpStatus.BAD_GATEWAY, "E002", "OCR 처리 중 오류가 발생했습니다.");
+
+    private final HttpStatus status;
+    private final String code;
+    private final String message;
+}

@@ -1,0 +1,27 @@
+spring:
+  profiles:
+    active: local
+  application:
+    name: ditto
+  jackson:
+    time-zone: Asia/Seoul
+    serialization:
+      write-dates-as-timestamps: false
+
+# SpringDoc OpenAPI (Swagger UI)
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+  api-docs:
+    path: /v3/api-docs
+
+# Actuator Health Check
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info
+  endpoint:
+    health:
+      show-details: when-authorized
