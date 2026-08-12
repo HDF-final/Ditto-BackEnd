@@ -313,40 +313,35 @@ Ditto-BackEnd/
     │   │   ├── DittoApplication.java      # 진입점 (TimeZone=Asia/Seoul 설정)
     │   │   │
     │   │   ├── controller/               # REST 엔드포인트 (요청/응답만 담당)
-    │   │   │   ├── auth/
-    │   │   │   ├── user/
-    │   │   │   ├── course/
-    │   │   │   ├── community/
-    │   │   │   ├── news/
-    │   │   │   ├── navigation/
-    │   │   │   └── admin/
+    │   │   │   ├── auth/         # 회원가입·로그인·로그아웃·세션확인
+    │   │   │   ├── user/         # 내 정보·국가/언어 설정
+    │   │   │   ├── aicourse/     # AI 코스 추천/생성/재추천
+    │   │   │   ├── course/       # 내 코스 + 공개 코스
+    │   │   │   ├── community/    # 좋아요·북마크·게시글·댓글
+    │   │   │   ├── news/         # 뉴스피드
+    │   │   │   ├── navigation/   # 실내 내비게이션·경로·OCR
+    │   │   │   ├── mobile/       # 모바일 접속 코드
+    │   │   │   └── admin/        # 관리자(국가/브랜드/키워드/트렌드/로그)
     │   │   │
-    │   │   ├── service/                  # 비즈니스 로직, 트랜잭션 경계
-    │   │   │   ├── auth/
-    │   │   │   ├── user/
-    │   │   │   ├── course/
-    │   │   │   ├── community/
-    │   │   │   ├── news/
-    │   │   │   ├── navigation/
-    │   │   │   └── admin/
+    │   │   ├── service/                  # 비즈니스 로직, 트랜잭션 경계 (controller와 동일 도메인)
+    │   │   │   ├── auth/  user/  aicourse/  course/  community/
+    │   │   │   └── news/  navigation/  mobile/  admin/
     │   │   │
     │   │   ├── repository/               # Spring Data JPA 인터페이스
-    │   │   │   ├── user/
-    │   │   │   ├── course/
-    │   │   │   └── ...
+    │   │   │   ├── user/  course/  community/  news/
+    │   │   │   └── navigation/  mobile/  admin/
     │   │   │
     │   │   ├── domain/                   # JPA 엔티티, 도메인 모델
     │   │   │   ├── user/User.java
-    │   │   │   ├── course/Course.java
-    │   │   │   ├── course/Place.java
-    │   │   │   ├── community/Post.java
+    │   │   │   ├── course/Course.java, Place.java
+    │   │   │   ├── community/Post.java, Comment.java
+    │   │   │   ├── news/ navigation/ mobile/ admin/
     │   │   │   └── common/BaseTimeEntity.java   # createdAt/updatedAt 공통
     │   │   │
-    │   │   ├── dto/                      # 요청/응답 DTO (도메인별 분리)
-    │   │   │   ├── auth/request/
-    │   │   │   ├── auth/response/
-    │   │   │   ├── course/request/
-    │   │   │   └── course/response/
+    │   │   ├── dto/                      # 요청/응답 DTO (도메인별 request/response 분리)
+    │   │   │   ├── auth/request/,  auth/response/
+    │   │   │   ├── user/, aicourse/, course/, community/
+    │   │   │   └── news/, navigation/, mobile/, admin/  (각 request/·response/)
     │   │   │
     │   │   ├── global/                   # 전역 공통 관심사
     │   │   │   ├── common/
