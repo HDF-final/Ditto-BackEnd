@@ -78,6 +78,8 @@ public interface CourseMapper {
 
     List<Long> findPlaceIdsByCourseId(@Param("courseId") Long courseId);
 
+    int markVisitOrdersForReorder(@Param("courseId") Long courseId);
+
     int reorderPlaces(@Param("courseId") Long courseId,
                       @Param("orderedPlaceIds") List<Long> orderedPlaceIds);
 

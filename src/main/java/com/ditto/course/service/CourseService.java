@@ -107,6 +107,7 @@ public class CourseService {
                 : course.getDescription();
         courseMapper.updateInfo(courseId, name, description);
         if (!orderedPlaceIds.isEmpty()) {
+            courseMapper.markVisitOrdersForReorder(courseId);
             courseMapper.reorderPlaces(courseId, orderedPlaceIds);
         }
         return new UpdateCourseResponse(courseId, name, orderedPlaceIds);
