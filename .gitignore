@@ -28,7 +28,6 @@ hs_err_pid*
 *.env
 .env
 .env.local
-application-secret.yml
 src/main/resources/application-local-private.yml
 
 ### Local Docker / Database ###
@@ -38,6 +37,8 @@ Dockerfile
 .docker/
 src/main/resources/sql/
 *.sql
+
+
 
 ### OS ###
 .DS_Store

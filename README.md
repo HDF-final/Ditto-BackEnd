@@ -162,6 +162,7 @@ public enum ErrorCode {
     COURSE_NOT_FOUND(HttpStatus.NOT_FOUND, "CR001", "코스를 찾을 수 없습니다."),
     NOT_COURSE_OWNER(HttpStatus.FORBIDDEN, "CR002", "코스에 대한 권한이 없습니다."),
     PLACE_NOT_FOUND(HttpStatus.NOT_FOUND, "CR003", "장소를 찾을 수 없습니다."),
+    DUPLICATE_PLACE_IN_COURSE(HttpStatus.BAD_REQUEST, "CR004", "코스에 같은 장소가 중복되어 있습니다."),
 
     // Community
     POST_NOT_FOUND(HttpStatus.NOT_FOUND, "CM001", "게시글을 찾을 수 없습니다."),
@@ -301,7 +302,7 @@ public class GlobalExceptionHandler {
 
 ## 프로젝트 구조
 
-표준 레이어드 아키텍처를 따릅니다. `controller → service → repository`로 흐르고, 도메인 간 공통 관심사는 `global`, 설정은 `config`, 보안은 `security`에 둡니다.
+도메인형 패키지 구조(Package by Feature)를 따릅니다. 각 비즈니스 도메인(`auth`, `user`, `course`, `community`, `news`, `navigation`, `mobile`, `admin`, `aicourse`, `country`) 이하에 `controller`, `service`, `repository`, `domain`, `dto`를 두고, 도메인 간 공통 관심사는 `global`, 설정은 `config`, 보안은 `security`에 둡니다.
 
 ```text
 Ditto-BackEnd/
@@ -313,36 +314,37 @@ Ditto-BackEnd/
     │   ├── java/com/ditto/
     │   │   ├── DittoApplication.java      # 진입점 (TimeZone=Asia/Seoul 설정)
     │   │   │
-    │   │   ├── controller/               # REST 엔드포인트 (요청/응답만 담당)
-    │   │   │   ├── auth/         # 회원가입·로그인·로그아웃·세션확인
-    │   │   │   ├── user/         # 내 정보·국가/언어 설정
-    │   │   │   ├── aicourse/     # AI 코스 추천/생성/재추천
-    │   │   │   ├── course/       # 내 코스 + 공개 코스
-    │   │   │   ├── community/    # 좋아요·북마크·게시글·댓글
-    │   │   │   ├── news/         # 뉴스피드
-    │   │   │   ├── navigation/   # 실내 내비게이션·경로·OCR
-    │   │   │   ├── mobile/       # 모바일 접속 코드
-    │   │   │   └── admin/        # 관리자(국가/브랜드/키워드/트렌드/로그)
+    │   │   ├── auth/                     # 인증 도메인 (회원가입·로그인·로그아웃·세션)
+    │   │   │   ├── controller/
+    │   │   │   ├── service/
+    │   │   │   └── dto/ (request/·response/)
     │   │   │
-    │   │   ├── service/                  # 비즈니스 로직, 트랜잭션 경계 (controller와 동일 도메인)
-    │   │   │   ├── auth/  user/  aicourse/  course/  community/
-    │   │   │   └── news/  navigation/  mobile/  admin/
+    │   │   ├── user/                     # 사용자 도메인 (내 정보·설정)
+    │   │   │   ├── controller/  service/  repository/  domain/  dto/
     │   │   │
-    │   │   ├── repository/               # MyBatis @Mapper 인터페이스
-    │   │   │   ├── user/  course/  community/  news/
-    │   │   │   └── navigation/  mobile/  admin/
+    │   │   ├── aicourse/                 # AI 코스 추천 도메인
+    │   │   │   ├── controller/  service/  dto/
     │   │   │
-    │   │   ├── domain/                   # 도메인 객체 (MyBatis 매핑 대상)
-    │   │   │   ├── user/User.java
-    │   │   │   ├── course/Course.java, Place.java
-    │   │   │   ├── community/Post.java, Comment.java
-    │   │   │   ├── news/ navigation/ mobile/ admin/
-    │   │   │   └── common/BaseTime.java   # createdAt/updatedAt 공통
+    │   │   ├── course/                   # 코스 도메인 (내 코스 + 공개 코스)
+    │   │   │   ├── controller/  service/  repository/  domain/  dto/
     │   │   │
-    │   │   ├── dto/                      # 요청/응답 DTO (도메인별 request/response 분리)
-    │   │   │   ├── auth/request/,  auth/response/
-    │   │   │   ├── user/, aicourse/, course/, community/
-    │   │   │   └── news/, navigation/, mobile/, admin/  (각 request/·response/)
+    │   │   ├── community/                # 커뮤니티 도메인 (게시글·댓글·좋아요·북마크)
+    │   │   │   ├── controller/  service/  repository/  domain/  dto/
+    │   │   │
+    │   │   ├── news/                     # 뉴스피드 도메인
+    │   │   │   ├── controller/  service/  repository/  domain/  dto/
+    │   │   │
+    │   │   ├── navigation/               # 실내 내비게이션 도메인
+    │   │   │   ├── controller/  service/  repository/  domain/  dto/
+    │   │   │
+    │   │   ├── mobile/                   # 모바일 접속 코드 도메인
+    │   │   │   ├── controller/  service/  repository/  domain/  dto/
+    │   │   │
+    │   │   ├── admin/                    # 관리자 도메인
+    │   │   │   ├── controller/  service/  repository/  domain/  dto/
+    │   │   │
+    │   │   ├── country/                  # 국가 정보 도메인
+    │   │   │   └── repository/
     │   │   │
     │   │   ├── global/                   # 전역 공통 관심사
     │   │   │   ├── common/
@@ -371,12 +373,14 @@ Ditto-BackEnd/
         └── java/com/ditto/
 ```
 
-레이어 규칙:
+레이어 및 구조 규칙:
 
+- 각 비즈니스 기능은 해당 도메인 패키지(`com.ditto.<domain>`) 하위에 작성합니다.
 - **controller**: HTTP 요청/응답 변환만 담당합니다. 비즈니스 로직을 넣지 않고, 반환은 항상 `ApiResponse<T>`로 감쌉니다.
 - **service**: 실제 로직과 트랜잭션 경계입니다. 도메인 예외(`BusinessException`)를 던집니다.
 - **repository**: `@Mapper` 인터페이스만 둡니다. SQL은 `resources/mapper/**/*.xml`(또는 애너테이션)에 둡니다.
-- **domain**: MyBatis가 매핑하는 도메인 객체. `dto`와 절대 섞지 않으며, 컨트롤러 응답으로 직접 반환하지 않습니다.
+- **domain**: MyBatis가 매핑하는 도메인 객체/엔티티/이넘. `dto`와 절대 섞지 않으며, 컨트롤러 응답으로 직접 반환하지 않습니다.
+- **dto**: 요청/응답 DTO. `request`와 `response` subpackage로 분리합니다.
 - **global / config / security**: 도메인에 종속되지 않는 공통 코드입니다.
 
 ## API 명세
@@ -416,6 +420,43 @@ Ditto-BackEnd/
 | 기능 | Method | Endpoint | 인증 |
 | --- | --- | --- | --- |
 | 내 코스 생성·저장 | `POST` | `/api/v1/courses` | O |
+
+수동 모드 「빈 코스로 시작하기」는 `name`·`placeIds` 없이 호출하면 된다. `placeIds`를 넘기면 DB `place` 테이블에 있는 ID만 담는다.
+
+요청 예시:
+
+```json
+{
+  "name": "나의 더현대 코스",
+  "description": "오후 반나절 코스",
+  "placeIds": [11, 22, 33]
+}
+```
+
+빈 코스:
+
+```json
+{}
+```
+
+성공 응답:
+
+```json
+{
+  "success": true,
+  "code": "SUCCESS",
+  "message": "성공",
+  "data": {
+    "courseId": 100,
+    "name": "나의 더현대 코스",
+    "places": [
+      { "placeId": 11, "order": 1 },
+      { "placeId": 22, "order": 2 },
+      { "placeId": 33, "order": 3 }
+    ]
+  }
+}
+```
 | 내 코스 목록 조회 | `GET` | `/api/v1/courses/my` | O |
 | 내 코스 정보·방문 순서 수정 | `PUT` | `/api/v1/courses/{courseId}` | O |
 | 내 코스 삭제 | `DELETE` | `/api/v1/courses/{courseId}` | O |
@@ -520,7 +561,9 @@ public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
             .maximumSessions(1))
         .authorizeHttpRequests(auth -> auth
             .requestMatchers("/api/v1/auth/**", "/api/v1/courses/public/**",
-                             "/api/v1/news/**", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                             "/api/v1/news/**",
+                             "/swagger-ui.html", "/swagger-ui.html/**", "/swagger-ui/**",
+                             "/v3/api-docs", "/v3/api-docs/**").permitAll()
             .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
             .anyRequest().authenticated())
         .logout(logout -> logout
@@ -719,9 +762,14 @@ cd Ditto-BackEnd
 # - Oracle: 스키마(ditto) 및 테이블 생성 (MyBatis는 자동 DDL 없음 — SQL 스크립트로 관리)
 # - PostgreSQL(RAG): CREATE DATABASE ditto_rag; CREATE EXTENSION IF NOT EXISTS vector;
 
+# 비밀 설정
+cp .env.example .env   # Windows: copy .env.example .env
+
 # 실행 (local 프로파일)
 ./gradlew bootRun
 ```
+
+로컬 기동은 Swagger·도메인 API 확인용입니다. Bedrock 임베딩과 pgvector VectorStore 자동설정은 RAG가 붙기 전까지 `none`이라 AWS/PostgreSQL 없이 서버가 뜹니다. Oracle은 `.env`의 `ORACLE_*`로 연결합니다.
 
 Windows PowerShell에서는 다음을 사용합니다.
 
@@ -747,45 +795,44 @@ Windows PowerShell에서는 다음을 사용합니다.
 
 ## 환경 설정 예시
 
-`application.yml`에서 공통 설정과 활성 프로파일을 지정하고, 민감/환경별 값은 `application-local.yml`에 둡니다. 실제 비밀 값(운영 DB 비밀번호 등)은 Git에 커밋하지 않습니다.
+`application.yml`에 구조만 두고, DB 계정·비밀번호는 프로젝트 루트 `.env`에 둡니다. `.env`는 Git에 커밋하지 않습니다. 처음에는 `.env.example`을 복사합니다.
 
-### `application-local.yml`
+```bash
+copy .env.example .env
+```
+
+### `.env`
+
+```env
+ORACLE_JDBC_URL=jdbc:oracle:thin:@//localhost:1521/XEPDB1
+ORACLE_USERNAME=DITTO
+ORACLE_PASSWORD=CHANGE_ME
+POSTGRES_JDBC_URL=jdbc:postgresql://localhost:5432/ditto_rag
+POSTGRES_USERNAME=ditto
+POSTGRES_PASSWORD=CHANGE_ME
+```
+
+### `application.yml` (비밀 없음)
 
 ```yaml
-server:
-  port: 8080
-  servlet:
-    session:
-      timeout: 30m            # 세션 만료 시간
-      cookie:
-        name: JSESSIONID
-        http-only: true
-        secure: false         # 운영(HTTPS)에서는 true
-        same-site: lax
-
 spring:
-  # 이중 DataSource (config/persistence 의 @Configuration 에서 바인딩)
   datasource:
-    oracle:                 # 메인 DB
-      jdbc-url: jdbc:oracle:thin:@localhost:1521/XEPDB1
-      username: ditto
-      password: ditto1234
+    oracle:
+      jdbc-url: ${ORACLE_JDBC_URL}
+      username: ${ORACLE_USERNAME}
+      password: ${ORACLE_PASSWORD}
       driver-class-name: oracle.jdbc.OracleDriver
-    postgres:               # RAG 벡터 저장 (pgvector)
-      jdbc-url: jdbc:postgresql://localhost:5432/ditto_rag
-      username: ditto
-      password: ditto1234
-      driver-class-name: org.postgresql.Driver
 
   ai:                       # Spring AI — AWS Bedrock (자격증명은 IAM 역할/기본 체인)
+    # RAG 빈이 붙기 전까지 임베딩·pgvector 자동설정을 끈다.
+    # (Titan + Cohere 빈이 동시에 뜨면 VectorStore 기동이 실패한다)
+    model:
+      embedding: none
+    vectorstore:
+      type: none
     bedrock:
       aws:
         region: ap-northeast-2
-    vectorstore:
-      pgvector:
-        initialize-schema: true
-        index-type: hnsw
-        distance-type: cosine_distance
 
 mybatis:
   mapper-locations: classpath:mapper/**/*.xml

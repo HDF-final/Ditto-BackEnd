@@ -11,7 +11,7 @@
 
 - Use Java 17 (JDK 17) and Spring Boot 3.x. Do not downgrade the Boot major version or the Java toolchain.
 - Use Gradle as the build tool. Commit `build.gradle` and `settings.gradle`; do not switch to Maven.
-- Persist data with **MyBatis** (no Spring Data JPA / Hibernate). The main business DB is **Oracle**; a separate **PostgreSQL (pgvector)** datasource backs RAG. Configure both datasources in `application-local.yml`.
+- Persist data with **MyBatis** (no Spring Data JPA / Hibernate). The main business DB is **Oracle**; a separate **PostgreSQL (pgvector)** datasource backs RAG. Datasource *keys* live in `application.yml` (`${ORACLE_*}`); secrets live in `.env` (never commit `.env`).
 - Use **Spring AI** with **AWS Bedrock** for LLM/embedding features. Authenticate via AWS credentials (IAM role / default credential chain), never an API key committed to the repo.
 - Secure endpoints with Spring Security using **server-side session authentication** (`HttpSession` + `JSESSIONID` cookie). Do not introduce JWT or token-based auth unless the user explicitly changes this decision.
 - Document APIs with SpringDoc OpenAPI 3. Keep Swagger annotations accurate when endpoints change.
@@ -23,7 +23,7 @@
 - Follow the layered flow `controller → service → repository`. Do not skip layers or put business logic in controllers.
 - **controller**: HTTP request/response only. Always return `ApiResponse<T>`. No transactions, no persistence logic.
 - **service**: business logic and transaction boundary. Throw `BusinessException` with an `ErrorCode`.
-- **repository**: MyBatis `@Mapper` interfaces only; keep SQL in `src/main/resources/mapper/**/*.xml` (or annotations). No JPA.
+- **repository**: MyBatis `@Mapper` interfaces only; keep **all** SQL in `src/main/resources/mapper/**/*.xml`. Do **not** use SQL annotations (`@Select`/`@Insert`/`@Update`/`@Delete`/`@Options`). The interface declares method signatures only. No JPA.
 - **domain**: plain domain objects mapped by MyBatis. Never expose a domain object directly as a controller request or response body.
 - **global / config / security**: cross-cutting concerns that do not depend on a single domain.
 - Keep new code inside the matching domain package (`auth`, `user`, `course`, `community`, `news`, `navigation`, `admin`).
@@ -33,7 +33,7 @@
 - Base URL is `/api/v1`. Group endpoints by domain and keep them RESTful.
 - Every response uses the common format: success wraps data in `ApiResponse<T>`; failure returns `ErrorResponse`.
 - Do not create ad-hoc response shapes. Extend `ApiResponse` / `ErrorResponse` instead.
-- Separate Request and Response DTOs. Prefer `record` DTOs with Bean Validation on requests.
+- Separate Request and Response DTOs. Do **not** use Java `record`; write plain classes with Lombok (`@Getter`, `@AllArgsConstructor`, `@Builder`, etc.). Use Bean Validation on requests. This applies to all DTOs and to MyBatis mapper parameter/result types.
 - Validate all external input with Bean Validation; do not trust request bodies or params.
 
 ## Exception handling
@@ -44,7 +44,7 @@
 
 ## Data and security
 
-- Keep secrets (DB password, etc.) in `application-local.yml` or environment variables. Never commit real secrets.
+- Keep secrets (DB password, etc.) in `.env` or environment variables. Never commit `.env` or put credentials in YAML.
 - Do not log session IDs, passwords, or personal data. Use `@Slf4j`, never `System.out.println`.
 - Hash passwords with the configured `PasswordEncoder` (BCrypt). Never store plaintext credentials.
 - Authenticate via `HttpSession`: after login, save the `SecurityContext` to the session; rely on the `JSESSIONID` cookie for subsequent requests. Do not add JWT/token logic.
@@ -55,6 +55,8 @@
 
 ## Persistence conventions
 
+- Write every mapper's SQL in an XML file under `src/main/resources/mapper/` (namespace = the mapper interface FQN); never inline SQL with annotations.
+- Do not use `record` for mapper parameter/result types. Use Lombok classes so MyBatis maps via setters (`resultType` + `map-underscore-to-camel-case`) instead of `<constructor>`/`<arg>` boilerplate.
 - Use snake_case for table and column names; singular nouns for tables. Rely on MyBatis `map-underscore-to-camel-case` for snake_case ↔ camelCase mapping.
 - Annotate service classes with `@Transactional(readOnly = true)` by default and `@Transactional` on write methods. With two datasources, each has its own `DataSourceTransactionManager`; target the right one explicitly.
 - Do not open `@Setter` on domain objects; change state through meaningful domain methods.

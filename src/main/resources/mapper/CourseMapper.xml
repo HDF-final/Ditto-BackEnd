@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ditto.course.repository.CourseMapper">
+
+    <select id="findById" resultType="com.ditto.course.domain.Course">
+        SELECT course_id,
+               user_id,
+               source_course_id,
+               name,
+               description,
+               creation_type,
+               share_code,
+               view_count,
+               created_at,
+               updated_at,
+               deleted_at
+          FROM course
+         WHERE course_id = #{courseId}
+           AND deleted_at IS NULL
+    </select>
+
+    <select id="countByShareCode" resultType="int">
+        SELECT COUNT(*)
+          FROM course
+         WHERE share_code = #{shareCode}
+    </select>
+
+    <insert id="insert"
+            parameterType="com.ditto.course.repository.CourseMapper$CourseInsertCommand"
+            useGeneratedKeys="true"
+            keyProperty="courseId"
+            keyColumn="course_id">
+        INSERT INTO course (
+            user_id,
+            source_course_id,
+            name,
+            description,
+            creation_type,
+            share_code,
+            view_count,
+            created_at
+        ) VALUES (
+            #{userId},
+            #{sourceCourseId},
+            #{name},
+            #{description},
+            #{creationType},
+            #{shareCode},
+            0,
+            SYSTIMESTAMP
+        )
+    </insert>
+
+    <insert id="insertPlace"
+            parameterType="com.ditto.course.repository.CourseMapper$CoursePlaceInsertCommand">
+        INSERT INTO course_place (
+            course_id,
+            place_id,
+            visit_order,
+            recommendation_reason,
+            visit_status
+        ) VALUES (
+            #{courseId},
+            #{placeId},
+            #{visitOrder},
+            #{recommendationReason},
+            #{visitStatus}
+        )
+    </insert>
+
+</mapper>

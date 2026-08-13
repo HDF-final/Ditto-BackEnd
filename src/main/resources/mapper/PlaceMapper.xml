@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ditto.course.repository.PlaceMapper">
+
+    <select id="findExistingIds" resultType="java.lang.Long">
+        SELECT place_id
+          FROM place
+         WHERE place_id IN
+        <foreach collection="placeIds" item="placeId" open="(" separator="," close=")">
+            #{placeId}
+        </foreach>
+    </select>
+
+    <select id="findByIds" resultType="com.ditto.course.repository.PlaceMapper$PlaceRow">
+        SELECT p.place_id,
+               p.name,
+               p.description,
+               f.floor_code AS floor,
+               JSON_VALUE(c.name, '$.ko') AS category,
+               p.image_url,
+               p.business_hours,
+               p.place_type
+          FROM place p
+          JOIN floor f ON f.floor_id = p.floor_id
+          LEFT JOIN category c ON c.category_id = p.category_id
+         WHERE p.place_id IN
+        <foreach collection="placeIds" item="placeId" open="(" separator="," close=")">
+            #{placeId}
+        </foreach>
+    </select>
+
+</mapper>
