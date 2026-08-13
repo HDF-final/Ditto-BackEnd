@@ -204,10 +204,10 @@
 
     <update id="updateInfo">
         UPDATE course
-           SET name = #{name},
-               description = #{description},
+           SET name = #{name,jdbcType=VARCHAR},
+               description = #{description,jdbcType=VARCHAR},
                updated_at = SYSTIMESTAMP
-         WHERE course_id = #{courseId}
+         WHERE course_id = #{courseId,jdbcType=NUMERIC}
            AND deleted_at IS NULL
     </update>
 
@@ -217,6 +217,18 @@
          WHERE course_id = #{courseId}
          ORDER BY visit_order
     </select>
+
+    <!--
+      Oracle은 (course_id, visit_order) 유니크 제약을 행별로 검사한다.
+      1↔2처럼 방문 순서를 한 번에 교환하면 CASE UPDATE 중간 상태에서 충돌하므로,
+      먼저 기존 순서를 음수 임시 영역으로 옮긴 뒤 최종 양수 순서를 적용한다.
+    -->
+    <update id="markVisitOrdersForReorder">
+        UPDATE course_place
+           SET visit_order = -visit_order
+         WHERE course_id = #{courseId}
+           AND visit_order &gt; 0
+    </update>
 
     <update id="reorderPlaces">
         UPDATE course_place

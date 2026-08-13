@@ -439,6 +439,7 @@ class CourseServiceTest {
                 new UpdateCourseRequest("새 이름", "새 설명", List.of(33L, 11L, 22L)));
 
         verify(courseMapper).updateInfo(5L, "새 이름", "새 설명");
+        verify(courseMapper).markVisitOrdersForReorder(5L);
         verify(courseMapper).reorderPlaces(5L, List.of(33L, 11L, 22L));
         assertThat(response.getCourseId()).isEqualTo(5L);
         assertThat(response.getName()).isEqualTo("새 이름");
@@ -456,6 +457,8 @@ class CourseServiceTest {
                 new UpdateCourseRequest(null, null, List.of(22L, 11L)));
 
         verify(courseMapper).updateInfo(5L, "기존 이름", "기존 설명");
+        verify(courseMapper).markVisitOrdersForReorder(5L);
+        verify(courseMapper).reorderPlaces(5L, List.of(22L, 11L));
         assertThat(response.getName()).isEqualTo("기존 이름");
         assertThat(response.getOrderedPlaceIds()).containsExactly(22L, 11L);
     }

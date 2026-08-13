@@ -556,6 +556,8 @@ HTTP로 호출하고 응답을 `ApiResponse`로 감싸 돌려줄 뿐입니다. �
 
 | 기능 | Method | Endpoint | 인증 |
 | --- | --- | --- | --- |
+| 길찾기 가능 장소 목록 조회 | `GET` | `/api/v1/places/navigation` | X |
+| 장소 길찾기 식별자 조회 | `GET` | `/api/v1/places/{placeId}/navigation` | X |
 | 지도 매니페스트 조회 | `GET` | `/api/v1/navigation/maps/{mapId}/manifest` | X |
 | 층별 내비게이션 데이터 조회 | `GET` | `/api/v1/navigation/maps/{mapId}/floors/{floor}` | X |
 | 코스 이동 경로 계산 | `POST` | `/api/v1/navigation/courses/{courseId}/route` | O |
