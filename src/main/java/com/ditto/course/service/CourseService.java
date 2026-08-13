@@ -17,10 +17,12 @@ import com.ditto.course.domain.VisitStatus;
 import com.ditto.course.dto.request.CreateCourseRequest;
 import com.ditto.course.dto.response.CreateCourseResponse;
 import com.ditto.course.dto.response.CreateCourseResponse.PlaceOrderResponse;
+import com.ditto.course.dto.response.MyCourseSummaryResponse;
 import com.ditto.course.repository.CourseMapper;
 import com.ditto.course.repository.CourseMapper.CourseInsertCommand;
 import com.ditto.course.repository.CourseMapper.CoursePlaceInsertCommand;
 import com.ditto.course.repository.PlaceMapper;
+import com.ditto.global.common.response.PageResponse;
 import com.ditto.global.exception.BusinessException;
 import com.ditto.global.exception.ErrorCode;
 
@@ -35,6 +37,8 @@ public class CourseService {
     private static final String SHARE_CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     private static final int SHARE_CODE_LENGTH = 8;
     private static final int SHARE_CODE_MAX_RETRY = 5;
+    private static final int DEFAULT_PAGE_SIZE = 20;
+    private static final int MAX_PAGE_SIZE = 100;
 
     private final CourseMapper courseMapper;
     private final PlaceMapper placeMapper;
@@ -46,6 +50,19 @@ public class CourseService {
     public Course requireCourse(Long courseId) {
         return courseMapper.findById(courseId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.COURSE_NOT_FOUND));
+    }
+
+    /**
+     * 로그인 사용자의 코스 목록을 최신 생성순으로 페이징 조회한다.
+     */
+    public PageResponse<MyCourseSummaryResponse> getMyCourses(Long userId, int page, int size) {
+        int safePage = Math.max(page, 0);
+        int safeSize = (size <= 0) ? DEFAULT_PAGE_SIZE : Math.min(size, MAX_PAGE_SIZE);
+        int offset = safePage * safeSize;
+
+        List<MyCourseSummaryResponse> content = courseMapper.findSummariesByUserId(userId, offset, safeSize);
+        long totalElements = courseMapper.countByUserId(userId);
+        return new PageResponse<>(content, safePage, totalElements);
     }
 
     /**

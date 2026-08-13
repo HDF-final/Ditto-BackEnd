@@ -26,10 +26,12 @@ import com.ditto.course.domain.VisitStatus;
 import com.ditto.course.domain.Course;
 import com.ditto.course.dto.request.CreateCourseRequest;
 import com.ditto.course.dto.response.CreateCourseResponse;
+import com.ditto.course.dto.response.MyCourseSummaryResponse;
 import com.ditto.course.repository.CourseMapper;
 import com.ditto.course.repository.CourseMapper.CourseInsertCommand;
 import com.ditto.course.repository.CourseMapper.CoursePlaceInsertCommand;
 import com.ditto.course.repository.PlaceMapper;
+import com.ditto.global.common.response.PageResponse;
 import com.ditto.global.exception.BusinessException;
 import com.ditto.global.exception.ErrorCode;
 
@@ -145,5 +147,38 @@ class CourseServiceTest {
 
         assertThat(course.isOwnedBy(USER_ID)).isTrue();
         assertThat(course.isOwnedBy(99L)).isFalse();
+    }
+
+    @Test
+    @DisplayName("내 코스 목록을 content·page·totalElements 로 반환한다")
+    void getMyCourses() {
+        MyCourseSummaryResponse item = new MyCourseSummaryResponse();
+        item.setCourseId(100L);
+        item.setName("나의 더현대 코스");
+        item.setPlaceCount(3);
+        given(courseMapper.findSummariesByUserId(USER_ID, 0, 20)).willReturn(List.of(item));
+        given(courseMapper.countByUserId(USER_ID)).willReturn(1L);
+
+        PageResponse<MyCourseSummaryResponse> response = courseService.getMyCourses(USER_ID, 0, 20);
+
+        assertThat(response.getPage()).isZero();
+        assertThat(response.getTotalElements()).isEqualTo(1);
+        assertThat(response.getContent()).hasSize(1);
+        assertThat(response.getContent().get(0).getCourseId()).isEqualTo(100L);
+        assertThat(response.getContent().get(0).getName()).isEqualTo("나의 더현대 코스");
+        assertThat(response.getContent().get(0).getPlaceCount()).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("size 가 0 이하면 기본 크기(20)로 보정하고 offset 을 page*size 로 계산한다")
+    void getMyCoursesClampsPaging() {
+        given(courseMapper.findSummariesByUserId(USER_ID, 40, 20)).willReturn(List.of());
+        given(courseMapper.countByUserId(USER_ID)).willReturn(0L);
+
+        PageResponse<MyCourseSummaryResponse> response = courseService.getMyCourses(USER_ID, 2, 0);
+
+        assertThat(response.getPage()).isEqualTo(2);
+        assertThat(response.getContent()).isEmpty();
+        verify(courseMapper).findSummariesByUserId(USER_ID, 40, 20);
     }
 }

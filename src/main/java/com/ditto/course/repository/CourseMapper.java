@@ -1,11 +1,13 @@
 package com.ditto.course.repository;
 
+import java.util.List;
 import java.util.Optional;
 
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 import com.ditto.course.domain.Course;
+import com.ditto.course.dto.response.MyCourseSummaryResponse;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -20,6 +22,13 @@ public interface CourseMapper {
     Optional<Course> findById(@Param("courseId") Long courseId);
 
     int countByShareCode(@Param("shareCode") String shareCode);
+
+    List<MyCourseSummaryResponse> findSummariesByUserId(
+            @Param("userId") Long userId,
+            @Param("offset") int offset,
+            @Param("size") int size);
+
+    long countByUserId(@Param("userId") Long userId);
 
     int insert(CourseInsertCommand command);
 
