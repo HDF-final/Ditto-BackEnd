@@ -14,7 +14,13 @@ spring:
 
   # ===== Spring AI (AWS Bedrock) =====
   # 자격증명은 파일/깃에 넣지 않는다. IAM 역할 또는 기본 자격증명 체인(env/프로파일) 사용.
+  # RAG/임베딩은 RagDataSourceConfig 가 아직 TODO 이고 모델도 미정이다.
+  # 모델이 정해지고 RAG 빈을 붙일 때 embedding / vectorstore 의 none 을 해제한다.
   ai:
+    model:
+      embedding: none
+    vectorstore:
+      type: none
     bedrock:
       aws:
         region: ap-northeast-2
@@ -22,13 +28,13 @@ spring:
         chat:
           options:
             model: ""          # 사용할 Bedrock 모델 ID (미정 — 결정 후 채움)
-    # pgvector VectorStore 는 위 postgres datasource 에 연결한다(@Configuration 에서 JdbcTemplate 주입). TODO
-    vectorstore:
-      pgvector:
-        initialize-schema: true
-        index-type: hnsw
-        distance-type: cosine_distance
-        # dimensions: 임베딩 모델 차원에 맞춰 설정 (예: Titan Text Embeddings v2 = 1024)
+    # pgvector VectorStore 는 postgres datasource 에 연결한다(@Configuration 에서 JdbcTemplate 주입). TODO
+    # type: none 이므로 아래 옵션은 아직 적용되지 않는다.
+    #   pgvector:
+    #     initialize-schema: true
+    #     index-type: hnsw
+    #     distance-type: cosine_distance
+    #     dimensions: 1024   # 예: Titan Text Embeddings v2
 
 # ===== MyBatis =====
 mybatis:

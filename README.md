@@ -561,7 +561,9 @@ public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
             .maximumSessions(1))
         .authorizeHttpRequests(auth -> auth
             .requestMatchers("/api/v1/auth/**", "/api/v1/courses/public/**",
-                             "/api/v1/news/**", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                             "/api/v1/news/**",
+                             "/swagger-ui.html", "/swagger-ui.html/**", "/swagger-ui/**",
+                             "/v3/api-docs", "/v3/api-docs/**").permitAll()
             .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
             .anyRequest().authenticated())
         .logout(logout -> logout
@@ -767,6 +769,8 @@ cp .env.example .env   # Windows: copy .env.example .env
 ./gradlew bootRun
 ```
 
+로컬 기동은 Swagger·도메인 API 확인용입니다. Bedrock 임베딩과 pgvector VectorStore 자동설정은 RAG가 붙기 전까지 `none`이라 AWS/PostgreSQL 없이 서버가 뜹니다. Oracle은 `.env`의 `ORACLE_*`로 연결합니다.
+
 Windows PowerShell에서는 다음을 사용합니다.
 
 ```bash
@@ -820,14 +824,15 @@ spring:
       driver-class-name: oracle.jdbc.OracleDriver
 
   ai:                       # Spring AI — AWS Bedrock (자격증명은 IAM 역할/기본 체인)
+    # RAG 빈이 붙기 전까지 임베딩·pgvector 자동설정을 끈다.
+    # (Titan + Cohere 빈이 동시에 뜨면 VectorStore 기동이 실패한다)
+    model:
+      embedding: none
+    vectorstore:
+      type: none
     bedrock:
       aws:
         region: ap-northeast-2
-    vectorstore:
-      pgvector:
-        initialize-schema: true
-        index-type: hnsw
-        distance-type: cosine_distance
 
 mybatis:
   mapper-locations: classpath:mapper/**/*.xml
