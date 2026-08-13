@@ -41,6 +41,7 @@ public enum ErrorCode {
     NOT_COURSE_OWNER(HttpStatus.FORBIDDEN, "CR002", "코스에 대한 권한이 없습니다."),
     PLACE_NOT_FOUND(HttpStatus.NOT_FOUND, "CR003", "장소를 찾을 수 없습니다."),
     DUPLICATE_PLACE_IN_COURSE(HttpStatus.BAD_REQUEST, "CR004", "코스에 같은 장소가 중복되어 있습니다."),
+    COURSE_NOT_PUBLIC(HttpStatus.FORBIDDEN, "CR005", "공개된 코스만 복사할 수 있습니다."),
 
     // ===== Community =====
     POST_NOT_FOUND(HttpStatus.NOT_FOUND, "CM001", "게시글을 찾을 수 없습니다."),

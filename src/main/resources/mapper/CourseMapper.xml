@@ -144,6 +144,40 @@
         )
     </insert>
 
+    <insert id="copyPlacesFromCourse">
+        INSERT INTO course_place (
+            course_id,
+            place_id,
+            visit_order,
+            recommendation_reason,
+            visit_status,
+            visited_at
+        )
+        SELECT #{createdCourseId,jdbcType=NUMERIC},
+               place_id,
+               visit_order,
+               recommendation_reason,
+               #{visitStatus,jdbcType=VARCHAR},
+               NULL
+          FROM course_place
+         WHERE course_id = #{sourceCourseId,jdbcType=NUMERIC}
+         ORDER BY visit_order
+    </insert>
+
+    <select id="existsPublicPostByCourseId" resultType="boolean">
+        SELECT CASE
+                   WHEN EXISTS (
+                       SELECT 1
+                         FROM post p
+                        WHERE p.course_id = #{courseId}
+                          AND p.deleted_at IS NULL
+                   )
+                   THEN 1
+                   ELSE 0
+               END
+          FROM dual
+    </select>
+
     <update id="softDelete">
         UPDATE course
            SET deleted_at = SYSTIMESTAMP,

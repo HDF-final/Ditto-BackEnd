@@ -61,6 +61,13 @@ public interface CourseMapper {
 
     int insertPlace(CoursePlaceInsertCommand command);
 
+    int copyPlacesFromCourse(
+            @Param("sourceCourseId") Long sourceCourseId,
+            @Param("createdCourseId") Long createdCourseId,
+            @Param("visitStatus") String visitStatus);
+
+    boolean existsPublicPostByCourseId(@Param("courseId") Long courseId);
+
     int softDelete(@Param("courseId") Long courseId);
 
     int updateInfo(@Param("courseId") Long courseId,

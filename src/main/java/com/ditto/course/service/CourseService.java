@@ -17,6 +17,7 @@ import com.ditto.course.domain.VisitStatus;
 import com.ditto.course.dto.request.AddCoursePlaceRequest;
 import com.ditto.course.dto.request.CreateCourseRequest;
 import com.ditto.course.dto.response.AddCoursePlaceResponse;
+import com.ditto.course.dto.response.CopyCourseResponse;
 import com.ditto.course.dto.request.UpdateCourseRequest;
 import com.ditto.course.dto.response.CreateCourseResponse;
 import com.ditto.course.dto.response.CreateCourseResponse.PlaceOrderResponse;
@@ -144,6 +145,34 @@ public class CourseService {
     }
 
     /**
+     * 공개 원본 코스를 로그인 사용자의 내 코스로 복사한다.
+     * 복사 가능 코스는 SYSTEM 기본 제공 코스 또는 유효한 공개 게시글에 연결된 코스다.
+     */
+    @Transactional
+    public CopyCourseResponse copyPublicCourse(Long userId, Long sourceCourseId) {
+        Course sourceCourse = requireCourse(sourceCourseId);
+        validatePublicCourse(sourceCourse);
+
+        String copiedName = sourceCourse.getName() + " Copy";
+        CourseInsertCommand command = new CourseInsertCommand();
+        command.setUserId(userId);
+        command.setSourceCourseId(sourceCourseId);
+        command.setName(copiedName);
+        command.setDescription(sourceCourse.getDescription());
+        command.setCreationType(CourseCreationType.COPIED.name());
+        command.setShareCode(generateUniqueShareCode());
+        courseMapper.insert(command);
+
+        courseMapper.copyPlacesFromCourse(sourceCourseId, command.getCourseId(), VisitStatus.PENDING.name());
+
+        return CopyCourseResponse.builder()
+                .sourceCourseId(sourceCourseId)
+                .createdCourseId(command.getCourseId())
+                .name(copiedName)
+                .build();
+    }
+
+    /**
      * 내 코스의 지정된 순서에 장소를 추가한다.
      */
     @Transactional
@@ -237,6 +266,16 @@ public class CourseService {
         if (!course.isOwnedBy(userId)) {
             throw new BusinessException(ErrorCode.NOT_COURSE_OWNER);
         }
+    }
+
+    private void validatePublicCourse(Course course) {
+        if (CourseCreationType.SYSTEM.name().equals(course.getCreationType())) {
+            return;
+        }
+        if (courseMapper.existsPublicPostByCourseId(course.getCourseId())) {
+            return;
+        }
+        throw new BusinessException(ErrorCode.COURSE_NOT_PUBLIC);
     }
 
     private void validatePlaceNotInCourse(Long courseId, Long placeId) {
