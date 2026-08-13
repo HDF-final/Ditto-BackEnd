@@ -36,6 +36,16 @@ spring:
     #     distance-type: cosine_distance
     #     dimensions: 1024   # 예: Titan Text Embeddings v2
 
+# ===== AI 추천 엔진 (외부 서비스) =====
+# 지금은 로컬 파이썬 서비스. AWS Lambda 로 이전하면 base-url 만 바꾼다 — 자바 코드는 그대로다.
+ditto:
+  ai-engine:
+    base-url: ${AI_ENGINE_BASE_URL:http://127.0.0.1:8000}
+    chat-path: /chat
+    connect-timeout: 5s
+    # 첫 요청은 BGE-m3 적재(약 2GB)가 붙고, 한 턴에 LLM 을 2~3회 호출한다.
+    read-timeout: 120s
+
 # ===== MyBatis =====
 mybatis:
   mapper-locations: classpath:mapper/**/*.xml
