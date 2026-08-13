@@ -1,11 +1,13 @@
 package com.ditto.course.repository;
 
+import java.util.List;
 import java.util.Optional;
 
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 import com.ditto.course.domain.Course;
+import com.ditto.course.dto.response.MyCourseSummaryResponse;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -33,9 +35,28 @@ public interface CourseMapper {
 
     int incrementMarkedVisitOrders(@Param("courseId") Long courseId);
 
+    List<MyCourseSummaryResponse> findSummariesByUserId(
+            @Param("userId") Long userId,
+            @Param("offset") int offset,
+            @Param("size") int size);
+
+    long countByUserId(@Param("userId") Long userId);
+
+
     int insert(CourseInsertCommand command);
 
     int insertPlace(CoursePlaceInsertCommand command);
+
+    int softDelete(@Param("courseId") Long courseId);
+
+    int updateInfo(@Param("courseId") Long courseId,
+                   @Param("name") String name,
+                   @Param("description") String description);
+
+    List<Long> findPlaceIdsByCourseId(@Param("courseId") Long courseId);
+
+    int reorderPlaces(@Param("courseId") Long courseId,
+                      @Param("orderedPlaceIds") List<Long> orderedPlaceIds);
 
     @Getter
     @Setter

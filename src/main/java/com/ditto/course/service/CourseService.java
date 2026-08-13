@@ -17,12 +17,16 @@ import com.ditto.course.domain.VisitStatus;
 import com.ditto.course.dto.request.AddCoursePlaceRequest;
 import com.ditto.course.dto.request.CreateCourseRequest;
 import com.ditto.course.dto.response.AddCoursePlaceResponse;
+import com.ditto.course.dto.request.UpdateCourseRequest;
 import com.ditto.course.dto.response.CreateCourseResponse;
 import com.ditto.course.dto.response.CreateCourseResponse.PlaceOrderResponse;
+import com.ditto.course.dto.response.MyCourseSummaryResponse;
+import com.ditto.course.dto.response.UpdateCourseResponse;
 import com.ditto.course.repository.CourseMapper;
 import com.ditto.course.repository.CourseMapper.CourseInsertCommand;
 import com.ditto.course.repository.CourseMapper.CoursePlaceInsertCommand;
 import com.ditto.course.repository.PlaceMapper;
+import com.ditto.global.common.response.PageResponse;
 import com.ditto.global.exception.BusinessException;
 import com.ditto.global.exception.ErrorCode;
 
@@ -37,6 +41,8 @@ public class CourseService {
     private static final String SHARE_CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
     private static final int SHARE_CODE_LENGTH = 8;
     private static final int SHARE_CODE_MAX_RETRY = 5;
+    private static final int DEFAULT_PAGE_SIZE = 20;
+    private static final int MAX_PAGE_SIZE = 100;
 
     private final CourseMapper courseMapper;
     private final PlaceMapper placeMapper;
@@ -48,6 +54,62 @@ public class CourseService {
     public Course requireCourse(Long courseId) {
         return courseMapper.findById(courseId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.COURSE_NOT_FOUND));
+    }
+
+    /**
+     * 로그인 사용자의 코스 목록을 최신 생성순으로 페이징 조회한다.
+     */
+    public PageResponse<MyCourseSummaryResponse> getMyCourses(Long userId, int page, int size) {
+        int safePage = Math.max(page, 0);
+        int safeSize = (size <= 0) ? DEFAULT_PAGE_SIZE : Math.min(size, MAX_PAGE_SIZE);
+        int offset = safePage * safeSize;
+
+        List<MyCourseSummaryResponse> content = courseMapper.findSummariesByUserId(userId, offset, safeSize);
+        long totalElements = courseMapper.countByUserId(userId);
+        return new PageResponse<>(content, safePage, totalElements);
+    }
+
+    /**
+     * 내 코스의 정보(이름·설명)와 방문 순서를 수정한다. 본인 코스만 가능하며,
+     * orderedPlaceIds 는 코스에 속한 장소 전체를 바뀐 순서대로 담아야 한다(배열 순서 = visit_order).
+     */
+    @Transactional
+    public UpdateCourseResponse update(Long userId, Long courseId, UpdateCourseRequest request) {
+        Course course = requireCourse(courseId);
+        if (!course.isOwnedBy(userId)) {
+            throw new BusinessException(ErrorCode.NOT_COURSE_OWNER);
+        }
+
+        List<Long> orderedPlaceIds = normalizePlaceIds(request.getOrderedPlaceIds());
+        validateReorderTargetsCourse(courseId, orderedPlaceIds);
+
+        String name = resolveName(request.getName());
+        courseMapper.updateInfo(courseId, name, trimToNull(request.getDescription()));
+        if (!orderedPlaceIds.isEmpty()) {
+            courseMapper.reorderPlaces(courseId, orderedPlaceIds);
+        }
+        return new UpdateCourseResponse(courseId, name, orderedPlaceIds);
+    }
+
+    /** orderedPlaceIds 가 코스에 속한 장소 전체와 정확히 같은 집합인지 검증한다(추가·누락 금지). */
+    private void validateReorderTargetsCourse(Long courseId, List<Long> orderedPlaceIds) {
+        Set<Long> current = new HashSet<>(courseMapper.findPlaceIdsByCourseId(courseId));
+        if (!current.equals(new HashSet<>(orderedPlaceIds))) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE,
+                    "코스에 속한 장소 전체를 순서대로 전달해야 합니다.");
+        }
+    }
+
+    /**
+     * 내 코스를 삭제한다(soft delete). 본인 소유 코스만 삭제할 수 있다.
+     */
+    @Transactional
+    public void delete(Long userId, Long courseId) {
+        Course course = requireCourse(courseId);
+        if (!course.isOwnedBy(userId)) {
+            throw new BusinessException(ErrorCode.NOT_COURSE_OWNER);
+        }
+        courseMapper.softDelete(courseId);
     }
 
     /**

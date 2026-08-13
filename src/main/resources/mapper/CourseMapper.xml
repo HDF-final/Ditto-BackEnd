@@ -53,6 +53,27 @@
            AND visit_order &lt; 0
     </update>
 
+    <select id="findSummariesByUserId"
+            resultType="com.ditto.course.dto.response.MyCourseSummaryResponse">
+        SELECT c.course_id,
+               c.name,
+               (SELECT COUNT(*)
+                  FROM course_place cp
+                 WHERE cp.course_id = c.course_id) AS place_count
+          FROM course c
+         WHERE c.user_id = #{userId}
+           AND c.deleted_at IS NULL
+         ORDER BY c.created_at DESC
+         OFFSET #{offset} ROWS FETCH NEXT #{size} ROWS ONLY
+    </select>
+
+    <select id="countByUserId" resultType="long">
+        SELECT COUNT(*)
+          FROM course
+         WHERE user_id = #{userId}
+           AND deleted_at IS NULL
+    </select>
+
     <insert id="insert"
             parameterType="com.ditto.course.repository.CourseMapper$CourseInsertCommand"
             useGeneratedKeys="true"
@@ -95,5 +116,43 @@
             #{visitStatus,jdbcType=VARCHAR}
         )
     </insert>
+
+    <update id="softDelete">
+        UPDATE course
+           SET deleted_at = SYSTIMESTAMP,
+               updated_at = SYSTIMESTAMP
+         WHERE course_id = #{courseId}
+           AND deleted_at IS NULL
+    </update>
+
+    <update id="updateInfo">
+        UPDATE course
+           SET name = #{name},
+               description = #{description},
+               updated_at = SYSTIMESTAMP
+         WHERE course_id = #{courseId}
+           AND deleted_at IS NULL
+    </update>
+
+    <select id="findPlaceIdsByCourseId" resultType="long">
+        SELECT place_id
+          FROM course_place
+         WHERE course_id = #{courseId}
+         ORDER BY visit_order
+    </select>
+
+    <update id="reorderPlaces">
+        UPDATE course_place
+           SET visit_order = CASE place_id
+        <foreach collection="orderedPlaceIds" item="placeId" index="idx">
+               WHEN #{placeId} THEN #{idx} + 1
+        </foreach>
+           END
+         WHERE course_id = #{courseId}
+           AND place_id IN
+        <foreach collection="orderedPlaceIds" item="placeId" open="(" separator="," close=")">
+               #{placeId}
+        </foreach>
+    </update>
 
 </mapper>
