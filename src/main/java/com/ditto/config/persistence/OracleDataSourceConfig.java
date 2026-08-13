@@ -1,21 +1,37 @@
 package com.ditto.config.persistence;
 
+import javax.sql.DataSource;
+
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
+
+import com.zaxxer.hikari.HikariDataSource;
 
 /**
- * 메인 DB(Oracle) MyBatis 설정 — 구조 골격.
- *
- * <p>TODO: 아래 순서로 빈을 정의한다.
- * <ol>
- *   <li>{@code @Primary DataSource} — {@code @ConfigurationProperties("spring.datasource.oracle")}
- *       + {@code DataSourceBuilder} (Hikari, jdbc-url 바인딩)</li>
- *   <li>{@code SqlSessionFactory} — {@code SqlSessionFactoryBean} 에 위 DataSource +
- *       mapper-locations({@code classpath:mapper/**}) 주입</li>
- *   <li>{@code @MapperScan(basePackages = "com.ditto", sqlSessionFactoryRef = "oracleSqlSessionFactory")}</li>
- *   <li>{@code DataSourceTransactionManager} ({@code @Primary})</li>
- * </ol>
+ * 메인 DB(Oracle) DataSource. MyBatis 는 이 {@code @Primary} DataSource 를 사용한다.
+ * 접속 정보는 {@link OracleDataSourceProperties} ({@code spring.datasource.oracle.*}) 에서 읽는다.
  */
 @Configuration
+@EnableConfigurationProperties(OracleDataSourceProperties.class)
 public class OracleDataSourceConfig {
-    // TODO: 위 주석의 빈 정의를 채운다. (JPA 미사용 — MyBatis 기반)
+
+    @Bean
+    @Primary
+    public DataSource oracleDataSource(OracleDataSourceProperties properties) {
+        HikariDataSource dataSource = new HikariDataSource();
+        dataSource.setJdbcUrl(properties.getJdbcUrl());
+        dataSource.setUsername(properties.getUsername());
+        dataSource.setPassword(properties.getPassword());
+        dataSource.setDriverClassName(properties.getDriverClassName());
+        return dataSource;
+    }
+
+    @Bean
+    @Primary
+    public DataSourceTransactionManager oracleTransactionManager(DataSource oracleDataSource) {
+        return new DataSourceTransactionManager(oracleDataSource);
+    }
 }
