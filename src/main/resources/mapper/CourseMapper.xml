@@ -98,4 +98,34 @@
            AND deleted_at IS NULL
     </update>
 
+    <update id="updateInfo">
+        UPDATE course
+           SET name = #{name},
+               description = #{description},
+               updated_at = SYSTIMESTAMP
+         WHERE course_id = #{courseId}
+           AND deleted_at IS NULL
+    </update>
+
+    <select id="findPlaceIdsByCourseId" resultType="long">
+        SELECT place_id
+          FROM course_place
+         WHERE course_id = #{courseId}
+         ORDER BY visit_order
+    </select>
+
+    <update id="reorderPlaces">
+        UPDATE course_place
+           SET visit_order = CASE place_id
+        <foreach collection="orderedPlaceIds" item="placeId" index="idx">
+               WHEN #{placeId} THEN #{idx} + 1
+        </foreach>
+           END
+         WHERE course_id = #{courseId}
+           AND place_id IN
+        <foreach collection="orderedPlaceIds" item="placeId" open="(" separator="," close=")">
+               #{placeId}
+        </foreach>
+    </update>
+
 </mapper>

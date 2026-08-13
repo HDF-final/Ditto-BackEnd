@@ -36,6 +36,15 @@ public interface CourseMapper {
 
     int softDelete(@Param("courseId") Long courseId);
 
+    int updateInfo(@Param("courseId") Long courseId,
+                   @Param("name") String name,
+                   @Param("description") String description);
+
+    List<Long> findPlaceIdsByCourseId(@Param("courseId") Long courseId);
+
+    int reorderPlaces(@Param("courseId") Long courseId,
+                      @Param("orderedPlaceIds") List<Long> orderedPlaceIds);
+
     @Getter
     @Setter
     class CourseInsertCommand {
