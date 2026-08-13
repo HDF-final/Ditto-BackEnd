@@ -11,7 +11,8 @@
 
 - Use Java 17 (JDK 17) and Spring Boot 3.x. Do not downgrade the Boot major version or the Java toolchain.
 - Use Gradle as the build tool. Commit `build.gradle` and `settings.gradle`; do not switch to Maven.
-- Persist data with Spring Data JPA. Use MySQL or PostgreSQL as configured in `application-local.yml`.
+- Persist data with **MyBatis** (no Spring Data JPA / Hibernate). The main business DB is **Oracle**; a separate **PostgreSQL (pgvector)** datasource backs RAG. Configure both datasources in `application-local.yml`.
+- Use **Spring AI** with **AWS Bedrock** for LLM/embedding features. Authenticate via AWS credentials (IAM role / default credential chain), never an API key committed to the repo.
 - Secure endpoints with Spring Security using **server-side session authentication** (`HttpSession` + `JSESSIONID` cookie). Do not introduce JWT or token-based auth unless the user explicitly changes this decision.
 - Document APIs with SpringDoc OpenAPI 3. Keep Swagger annotations accurate when endpoints change.
 - Use Lombok for boilerplate. Do not hand-roll getters/builders that Lombok already provides.
@@ -22,8 +23,8 @@
 - Follow the layered flow `controller → service → repository`. Do not skip layers or put business logic in controllers.
 - **controller**: HTTP request/response only. Always return `ApiResponse<T>`. No transactions, no persistence logic.
 - **service**: business logic and transaction boundary. Throw `BusinessException` with an `ErrorCode`.
-- **repository**: Spring Data JPA interfaces only.
-- **domain**: JPA entities. Never expose an entity directly as a controller request or response body.
+- **repository**: MyBatis `@Mapper` interfaces only; keep SQL in `src/main/resources/mapper/**/*.xml` (or annotations). No JPA.
+- **domain**: plain domain objects mapped by MyBatis. Never expose a domain object directly as a controller request or response body.
 - **global / config / security**: cross-cutting concerns that do not depend on a single domain.
 - Keep new code inside the matching domain package (`auth`, `user`, `course`, `community`, `news`, `navigation`, `admin`).
 
@@ -50,14 +51,15 @@
 - Keep the session cookie `HttpOnly` and `SameSite`; use `Secure` cookies over HTTPS in production. Enable CORS with credentials and an explicit origin allowlist (no `*`).
 - Regenerate the session ID on login (session fixation protection). Invalidate the session and clear `JSESSIONID` on logout.
 - Update the public-endpoint allowlist in `SecurityConfig` deliberately; default new endpoints to authenticated.
-- Keep `spring.jpa.open-in-view: false`; load data inside the service transaction.
+- Keep all persistence access inside the service transaction; do not leak Mapper calls or DB access into controllers or views.
 
 ## Persistence conventions
 
-- Use snake_case for table and column names; singular nouns for entities.
-- Annotate service classes with `@Transactional(readOnly = true)` by default and `@Transactional` on write methods.
-- Do not open `@Setter` on entities; change state through meaningful domain methods.
-- `ddl-auto: update` is local-only. Never use it against a shared or production database (`validate` / `none`).
+- Use snake_case for table and column names; singular nouns for tables. Rely on MyBatis `map-underscore-to-camel-case` for snake_case ↔ camelCase mapping.
+- Annotate service classes with `@Transactional(readOnly = true)` by default and `@Transactional` on write methods. With two datasources, each has its own `DataSourceTransactionManager`; target the right one explicitly.
+- Do not open `@Setter` on domain objects; change state through meaningful domain methods.
+- MyBatis does not create schema. Manage tables with SQL migration scripts; never rely on auto-DDL against a shared or production database.
+- Keep the two datasources isolated: Oracle mappers scan the business domain packages; the PostgreSQL/pgvector datasource is dedicated to RAG (Spring AI `VectorStore`).
 
 ## Dependency policy
 
