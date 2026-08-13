@@ -33,6 +33,7 @@ import lombok.RequiredArgsConstructor;
 @Tag(name = "Course", description = "내 코스 API")
 @RestController
 @RequiredArgsConstructor
+@RequestMapping("/api/v1/courses")
 public class CourseController {
 
     private final CourseService courseService;
@@ -41,7 +42,7 @@ public class CourseController {
             summary = "내 코스 생성·저장",
             description = "로그인한 사용자의 코스를 저장합니다. 장소 없이 호출하면 수동 모드의 빈 코스로 시작하며, "
                     + "placeIds 는 DB place 테이블에 있는 장소만 담을 수 있습니다.")
-    @PostMapping("/api/v1/courses")
+    @PostMapping
     @ResponseStatus(HttpStatus.OK)
     public ApiResponse<CreateCourseResponse> create(@Valid @RequestBody(required = false) CreateCourseRequest request) {
         CreateCourseRequest body = request == null
@@ -92,7 +93,7 @@ public class CourseController {
             summary = "내 코스에 장소 추가",
             description = "로그인한 사용자의 내 코스 지정 순서에 장소를 추가합니다. "
                     + "장소는 DB place 테이블에 존재해야 하며, 같은 코스에 이미 담긴 장소는 다시 추가할 수 없습니다.")
-    @PostMapping("/api/users/me/courses/{courseId}/places")
+    @PostMapping("/courses/{courseId}/places")
     @ResponseStatus(HttpStatus.OK)
     public ApiResponse<AddCoursePlaceResponse> addPlace(
             @PathVariable Long courseId,
