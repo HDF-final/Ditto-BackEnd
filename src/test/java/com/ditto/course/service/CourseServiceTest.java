@@ -25,8 +25,10 @@ import com.ditto.course.domain.CourseCreationType;
 import com.ditto.course.domain.VisitStatus;
 import com.ditto.course.domain.Course;
 import com.ditto.course.dto.request.CreateCourseRequest;
+import com.ditto.course.dto.request.UpdateCourseRequest;
 import com.ditto.course.dto.response.CreateCourseResponse;
 import com.ditto.course.dto.response.MyCourseSummaryResponse;
+import com.ditto.course.dto.response.UpdateCourseResponse;
 import com.ditto.course.repository.CourseMapper;
 import com.ditto.course.repository.CourseMapper.CourseInsertCommand;
 import com.ditto.course.repository.CourseMapper.CoursePlaceInsertCommand;
@@ -218,5 +220,55 @@ class CourseServiceTest {
                 .isEqualTo(ErrorCode.COURSE_NOT_FOUND);
 
         verify(courseMapper, never()).softDelete(any());
+    }
+
+    @Test
+    @DisplayName("본인 코스의 정보와 방문 순서를 수정한다")
+    void updateCourse() {
+        Course course = Course.of(5L, USER_ID, null, "옛 이름", null, "MANUAL", "ABCD1234");
+        given(courseMapper.findById(5L)).willReturn(Optional.of(course));
+        given(courseMapper.findPlaceIdsByCourseId(5L)).willReturn(List.of(11L, 22L, 33L));
+
+        UpdateCourseResponse response = courseService.update(USER_ID, 5L,
+                new UpdateCourseRequest("새 이름", "새 설명", List.of(33L, 11L, 22L)));
+
+        verify(courseMapper).updateInfo(5L, "새 이름", "새 설명");
+        verify(courseMapper).reorderPlaces(5L, List.of(33L, 11L, 22L));
+        assertThat(response.getCourseId()).isEqualTo(5L);
+        assertThat(response.getName()).isEqualTo("새 이름");
+        assertThat(response.getOrderedPlaceIds()).containsExactly(33L, 11L, 22L);
+    }
+
+    @Test
+    @DisplayName("본인 코스가 아니면 NOT_COURSE_OWNER 로 거부하고 수정하지 않는다")
+    void rejectUpdateWhenNotOwner() {
+        Course course = Course.of(5L, 999L, null, "남의 코스", null, "MANUAL", "ABCD1234");
+        given(courseMapper.findById(5L)).willReturn(Optional.of(course));
+
+        assertThatThrownBy(() -> courseService.update(USER_ID, 5L,
+                new UpdateCourseRequest("새 이름", null, List.of(1L))))
+                .isInstanceOf(BusinessException.class)
+                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.NOT_COURSE_OWNER);
+
+        verify(courseMapper, never()).updateInfo(any(), any(), any());
+        verify(courseMapper, never()).reorderPlaces(any(), any());
+    }
+
+    @Test
+    @DisplayName("코스에 속한 장소 집합과 다르면(누락·추가) 순서 수정을 거절한다")
+    void rejectUpdateWhenPlaceSetMismatch() {
+        Course course = Course.of(5L, USER_ID, null, "코스", null, "MANUAL", "ABCD1234");
+        given(courseMapper.findById(5L)).willReturn(Optional.of(course));
+        given(courseMapper.findPlaceIdsByCourseId(5L)).willReturn(List.of(11L, 22L, 33L));
+
+        assertThatThrownBy(() -> courseService.update(USER_ID, 5L,
+                new UpdateCourseRequest("새 이름", null, List.of(11L, 22L))))
+                .isInstanceOf(BusinessException.class)
+                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
+
+        verify(courseMapper, never()).updateInfo(any(), any(), any());
+        verify(courseMapper, never()).reorderPlaces(any(), any());
     }
 }

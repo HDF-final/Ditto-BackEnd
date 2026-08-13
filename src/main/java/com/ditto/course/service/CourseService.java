@@ -15,9 +15,11 @@ import com.ditto.course.domain.Course;
 import com.ditto.course.domain.CourseCreationType;
 import com.ditto.course.domain.VisitStatus;
 import com.ditto.course.dto.request.CreateCourseRequest;
+import com.ditto.course.dto.request.UpdateCourseRequest;
 import com.ditto.course.dto.response.CreateCourseResponse;
 import com.ditto.course.dto.response.CreateCourseResponse.PlaceOrderResponse;
 import com.ditto.course.dto.response.MyCourseSummaryResponse;
+import com.ditto.course.dto.response.UpdateCourseResponse;
 import com.ditto.course.repository.CourseMapper;
 import com.ditto.course.repository.CourseMapper.CourseInsertCommand;
 import com.ditto.course.repository.CourseMapper.CoursePlaceInsertCommand;
@@ -63,6 +65,37 @@ public class CourseService {
         List<MyCourseSummaryResponse> content = courseMapper.findSummariesByUserId(userId, offset, safeSize);
         long totalElements = courseMapper.countByUserId(userId);
         return new PageResponse<>(content, safePage, totalElements);
+    }
+
+    /**
+     * 내 코스의 정보(이름·설명)와 방문 순서를 수정한다. 본인 코스만 가능하며,
+     * orderedPlaceIds 는 코스에 속한 장소 전체를 바뀐 순서대로 담아야 한다(배열 순서 = visit_order).
+     */
+    @Transactional
+    public UpdateCourseResponse update(Long userId, Long courseId, UpdateCourseRequest request) {
+        Course course = requireCourse(courseId);
+        if (!course.isOwnedBy(userId)) {
+            throw new BusinessException(ErrorCode.NOT_COURSE_OWNER);
+        }
+
+        List<Long> orderedPlaceIds = normalizePlaceIds(request.getOrderedPlaceIds());
+        validateReorderTargetsCourse(courseId, orderedPlaceIds);
+
+        String name = resolveName(request.getName());
+        courseMapper.updateInfo(courseId, name, trimToNull(request.getDescription()));
+        if (!orderedPlaceIds.isEmpty()) {
+            courseMapper.reorderPlaces(courseId, orderedPlaceIds);
+        }
+        return new UpdateCourseResponse(courseId, name, orderedPlaceIds);
+    }
+
+    /** orderedPlaceIds 가 코스에 속한 장소 전체와 정확히 같은 집합인지 검증한다(추가·누락 금지). */
+    private void validateReorderTargetsCourse(Long courseId, List<Long> orderedPlaceIds) {
+        Set<Long> current = new HashSet<>(courseMapper.findPlaceIdsByCourseId(courseId));
+        if (!current.equals(new HashSet<>(orderedPlaceIds))) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE,
+                    "코스에 속한 장소 전체를 순서대로 전달해야 합니다.");
+        }
     }
 
     /**

@@ -3,6 +3,7 @@ package com.ditto.course.controller;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -12,8 +13,10 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.ditto.course.dto.request.CreateCourseRequest;
+import com.ditto.course.dto.request.UpdateCourseRequest;
 import com.ditto.course.dto.response.CreateCourseResponse;
 import com.ditto.course.dto.response.MyCourseSummaryResponse;
+import com.ditto.course.dto.response.UpdateCourseResponse;
 import com.ditto.course.service.CourseService;
 import com.ditto.global.common.response.ApiResponse;
 import com.ditto.global.common.response.PageResponse;
@@ -69,5 +72,18 @@ public class CourseController {
             @PathVariable Long courseId) {
         courseService.delete(SecurityUtils.requireUserId(), courseId);
         return ApiResponse.success();
+    }
+
+    @Operation(
+            summary = "내 코스 정보·방문 순서 수정",
+            description = "로그인한 사용자 본인 코스의 이름·설명을 수정하고, orderedPlaceIds 순서대로 방문 순서를 재정렬합니다. "
+                    + "orderedPlaceIds 는 코스에 속한 장소 전체여야 합니다.")
+    @PatchMapping("/{courseId}")
+    public ApiResponse<UpdateCourseResponse> update(
+            @Parameter(description = "수정할 코스 ID", example = "100")
+            @PathVariable Long courseId,
+            @Valid @RequestBody UpdateCourseRequest request) {
+        return ApiResponse.success("성공",
+                courseService.update(SecurityUtils.requireUserId(), courseId, request));
     }
 }
