@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ditto.navigation.repository.PlaceNavigationMapper">
+
+    <sql id="navigationPlaceColumns">
+        p.place_id,
+        p.navigation_key,
+        p.name,
+        f.floor_code
+    </sql>
+
+    <select id="findAllNavigable"
+            resultType="com.ditto.navigation.repository.PlaceNavigationMapper$PlaceNavigationRow">
+        SELECT <include refid="navigationPlaceColumns" />
+          FROM place p
+          JOIN floor f ON f.floor_id = p.floor_id
+         WHERE p.navigation_key IS NOT NULL
+         ORDER BY p.place_id
+    </select>
+
+    <select id="findByPlaceId"
+            resultType="com.ditto.navigation.repository.PlaceNavigationMapper$PlaceNavigationRow">
+        SELECT <include refid="navigationPlaceColumns" />
+          FROM place p
+          JOIN floor f ON f.floor_id = p.floor_id
+         WHERE p.place_id = #{placeId}
+           AND p.navigation_key IS NOT NULL
+    </select>
+
+</mapper>
