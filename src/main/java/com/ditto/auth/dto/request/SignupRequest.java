@@ -1,22 +1,29 @@
 package com.ditto.auth.dto.request;
 
-import jakarta.validation.Valid;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
-public record SignupRequest(
-        @NotBlank String userEmail,
-        @NotBlank String password,
-        @NotBlank String name,
-        @NotBlank String nickname,
-        @NotBlank String phone,
-        @Valid @NotNull AddressRequest address,
-        @NotBlank String role) {
+@Getter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+@JsonIgnoreProperties(ignoreUnknown = false)
+public class SignupRequest {
 
-    public record AddressRequest(
-            @NotBlank String bcode,
-            @NotBlank String jibunAddress,
-            @NotBlank String roadAddress,
-            @NotBlank String detail) {
-    }
+    @NotBlank
+    private String userEmail;
+
+    @NotBlank
+    private String password;
+
+    @NotBlank
+    private String name;
+
+    @NotBlank
+    private String countryCode;
 }

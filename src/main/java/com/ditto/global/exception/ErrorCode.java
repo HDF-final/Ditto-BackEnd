@@ -30,8 +30,6 @@ public enum ErrorCode {
     // ===== Signup =====
     DUPLICATE_SIGNUP_EMAIL(HttpStatus.BAD_REQUEST, "S001", "이미 존재하는 이메일입니다."),
     INVALID_EMAIL_FORMAT(HttpStatus.BAD_REQUEST, "S002", "이메일 형식이 올바르지 않습니다."),
-    DUPLICATE_NICKNAME(HttpStatus.BAD_REQUEST, "S003", "이미 존재하는 닉네임입니다."),
-    INVALID_NICKNAME_FORMAT(HttpStatus.BAD_REQUEST, "S004", "닉네임 형식이 올바르지 않습니다."),
     DEFAULT_COUNTRY_NOT_FOUND(HttpStatus.INTERNAL_SERVER_ERROR, "S005", "기본 국가 정보를 찾을 수 없습니다."),
 
     // ===== User =====

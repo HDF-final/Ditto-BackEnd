@@ -1,6 +1,13 @@
 package com.ditto.auth.dto.response;
 
-public record SignupResponse(
-        String userEmail,
-        String role) {
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+
+@Getter
+@Builder
+@AllArgsConstructor
+public class SignupResponse {
+
+    private final String userEmail;
 }

@@ -2,36 +2,58 @@ package com.ditto.config.persistence;
 
 import javax.sql.DataSource;
 
-import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.apache.ibatis.session.SqlSessionFactory;
+import org.mybatis.spring.SqlSessionFactoryBean;
+import org.mybatis.spring.annotation.MapperScan;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.jdbc.DataSourceBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
+import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
+import org.springframework.transaction.PlatformTransactionManager;
 
 import com.zaxxer.hikari.HikariDataSource;
 
 /**
- * 메인 DB(Oracle) DataSource. MyBatis 는 이 {@code @Primary} DataSource 를 사용한다.
- * 접속 정보는 {@link OracleDataSourceProperties} ({@code spring.datasource.oracle.*}) 에서 읽는다.
+ * 메인 DB(Oracle) MyBatis 및 DataSource 설정.
  */
 @Configuration
-@EnableConfigurationProperties(OracleDataSourceProperties.class)
+@MapperScan(
+        basePackages = {
+                "com.ditto.country.repository",
+                "com.ditto.user.repository"
+        },
+        sqlSessionFactoryRef = "oracleSqlSessionFactory")
 public class OracleDataSourceConfig {
 
-    @Bean
     @Primary
-    public DataSource oracleDataSource(OracleDataSourceProperties properties) {
-        HikariDataSource dataSource = new HikariDataSource();
-        dataSource.setJdbcUrl(properties.getJdbcUrl());
-        dataSource.setUsername(properties.getUsername());
-        dataSource.setPassword(properties.getPassword());
-        dataSource.setDriverClassName(properties.getDriverClassName());
-        return dataSource;
+    @Bean(name = "oracleDataSource")
+    @ConfigurationProperties("spring.datasource.oracle")
+    public DataSource oracleDataSource() {
+        return DataSourceBuilder.create().type(HikariDataSource.class).build();
     }
 
-    @Bean
     @Primary
-    public DataSourceTransactionManager oracleTransactionManager(DataSource oracleDataSource) {
+    @Bean(name = "oracleSqlSessionFactory")
+    public SqlSessionFactory oracleSqlSessionFactory(DataSource oracleDataSource) throws Exception {
+        SqlSessionFactoryBean sessionFactoryBean = new SqlSessionFactoryBean();
+        sessionFactoryBean.setDataSource(oracleDataSource);
+
+        org.apache.ibatis.session.Configuration mybatisConfig = new org.apache.ibatis.session.Configuration();
+        mybatisConfig.setMapUnderscoreToCamelCase(true);
+        sessionFactoryBean.setConfiguration(mybatisConfig);
+
+        PathMatchingResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
+        sessionFactoryBean.setMapperLocations(resolver.getResources("classpath*:mapper/**/*.xml"));
+
+        return sessionFactoryBean.getObject();
+    }
+
+    @Primary
+    @Bean(name = "transactionManager")
+    public PlatformTransactionManager oracleTransactionManager(DataSource oracleDataSource) {
         return new DataSourceTransactionManager(oracleDataSource);
     }
 }

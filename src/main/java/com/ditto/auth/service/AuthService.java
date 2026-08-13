@@ -9,13 +9,12 @@ import org.springframework.transaction.annotation.Transactional;
 import com.ditto.auth.dto.request.SignupRequest;
 import com.ditto.auth.dto.response.SignupResponse;
 import com.ditto.country.repository.CountryMapper;
-import com.ditto.country.repository.CountryMapper.CountryRow;
+import com.ditto.country.repository.CountryRow;
 import com.ditto.global.exception.BusinessException;
 import com.ditto.global.exception.ErrorCode;
-import com.ditto.user.domain.UserRole;
 import com.ditto.user.domain.UserStatus;
 import com.ditto.user.repository.UserMapper;
-import com.ditto.user.repository.UserMapper.SignupUserCommand;
+import com.ditto.user.repository.SignupUserCommand;
 
 import lombok.RequiredArgsConstructor;
 
@@ -25,8 +24,6 @@ import lombok.RequiredArgsConstructor;
 public class AuthService {
 
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
-    private static final Pattern NICKNAME_PATTERN = Pattern.compile("^[a-z0-9]{4,10}$");
-    private static final String DEFAULT_COUNTRY_CODE = "KR";
 
     private final UserMapper userMapper;
     private final CountryMapper countryMapper;
@@ -34,31 +31,25 @@ public class AuthService {
 
     @Transactional
     public SignupResponse signup(SignupRequest request) {
-        validateEmail(request.userEmail());
-        validateNickname(request.nickname());
-        validateDuplicate(request.userEmail(), request.nickname());
+        validateEmail(request.getUserEmail());
+        validateDuplicateEmail(request.getUserEmail());
 
-        CountryRow country = countryMapper.findActiveByCode(DEFAULT_COUNTRY_CODE)
+        CountryRow country = countryMapper.findActiveByCode(request.getCountryCode())
                 .orElseThrow(() -> new BusinessException(ErrorCode.DEFAULT_COUNTRY_NOT_FOUND));
-        UserRole role = resolveSignupRole(request.role());
 
-        SignupUserCommand command = new SignupUserCommand(
-                country.countryId(),
-                request.name(),
-                request.userEmail(),
-                request.nickname(),
-                request.phone(),
-                passwordEncoder.encode(request.password()),
-                request.address().bcode(),
-                request.address().jibunAddress(),
-                request.address().roadAddress(),
-                request.address().detail(),
-                role.name(),
-                country.defaultLanguageCode(),
-                UserStatus.ACTIVE.name());
+        SignupUserCommand command = SignupUserCommand.builder()
+                .countryId(country.getCountryId())
+                .name(request.getName())
+                .email(request.getUserEmail())
+                .passwordHash(passwordEncoder.encode(request.getPassword()))
+                .preferredLanguageCode(country.getDefaultLanguageCode())
+                .status(UserStatus.ACTIVE.name())
+                .build();
 
         userMapper.insert(command);
-        return new SignupResponse(request.userEmail(), role.name());
+        return SignupResponse.builder()
+                .userEmail(request.getUserEmail())
+                .build();
     }
 
     private void validateEmail(String email) {
@@ -67,26 +58,9 @@ public class AuthService {
         }
     }
 
-    private void validateNickname(String nickname) {
-        if (!NICKNAME_PATTERN.matcher(nickname).matches()) {
-            throw new BusinessException(ErrorCode.INVALID_NICKNAME_FORMAT);
-        }
-    }
-
-    private void validateDuplicate(String email, String nickname) {
+    private void validateDuplicateEmail(String email) {
         if (userMapper.countByEmail(email) > 0) {
             throw new BusinessException(ErrorCode.DUPLICATE_SIGNUP_EMAIL);
-        }
-        if (userMapper.countByNickname(nickname) > 0) {
-            throw new BusinessException(ErrorCode.DUPLICATE_NICKNAME);
-        }
-    }
-
-    private UserRole resolveSignupRole(String role) {
-        try {
-            return UserRole.fromSignupRole(role);
-        } catch (IllegalArgumentException e) {
-            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
         }
     }
 

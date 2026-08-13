@@ -25,7 +25,7 @@ public class AuthController {
 
     private final AuthService authService;
 
-    @Operation(summary = "회원가입", description = "이메일과 닉네임 중복 여부를 확인하고 신규 회원을 생성합니다.")
+    @Operation(summary = "회원가입", description = "이메일 중복 여부를 확인하고 신규 회원을 생성합니다.")
     @PostMapping("/signup")
     @ResponseStatus(HttpStatus.OK)
     public ApiResponse<SignupResponse> signup(@Valid @RequestBody SignupRequest request) {
