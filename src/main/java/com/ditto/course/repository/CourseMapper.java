@@ -34,6 +34,8 @@ public interface CourseMapper {
 
     int insertPlace(CoursePlaceInsertCommand command);
 
+    int softDelete(@Param("courseId") Long courseId);
+
     @Getter
     @Setter
     class CourseInsertCommand {

@@ -66,6 +66,18 @@ public class CourseService {
     }
 
     /**
+     * 내 코스를 삭제한다(soft delete). 본인 소유 코스만 삭제할 수 있다.
+     */
+    @Transactional
+    public void delete(Long userId, Long courseId) {
+        Course course = requireCourse(courseId);
+        if (!course.isOwnedBy(userId)) {
+            throw new BusinessException(ErrorCode.NOT_COURSE_OWNER);
+        }
+        courseMapper.softDelete(courseId);
+    }
+
+    /**
      * 내 코스를 생성한다. placeIds 가 비어 있으면 프론트 수동 모드의 빈 코스로 저장한다.
      * 장소는 {@code place} 테이블에 있는 ID 만 허용한다.
      */

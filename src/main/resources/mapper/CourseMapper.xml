@@ -90,4 +90,12 @@
         )
     </insert>
 
+    <update id="softDelete">
+        UPDATE course
+           SET deleted_at = SYSTIMESTAMP,
+               updated_at = SYSTIMESTAMP
+         WHERE course_id = #{courseId}
+           AND deleted_at IS NULL
+    </update>
+
 </mapper>
