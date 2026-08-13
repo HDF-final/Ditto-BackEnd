@@ -27,8 +27,6 @@ hs_err_pid*
 ### Env / Secret ###
 *.env
 .env
-.env.local
-application-secret.yml
 
 ### OS ###
 .DS_Store
