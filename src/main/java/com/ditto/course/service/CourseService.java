@@ -14,7 +14,9 @@ import org.springframework.util.StringUtils;
 import com.ditto.course.domain.Course;
 import com.ditto.course.domain.CourseCreationType;
 import com.ditto.course.domain.VisitStatus;
+import com.ditto.course.dto.request.AddCoursePlaceRequest;
 import com.ditto.course.dto.request.CreateCourseRequest;
+import com.ditto.course.dto.response.AddCoursePlaceResponse;
 import com.ditto.course.dto.request.UpdateCourseRequest;
 import com.ditto.course.dto.response.CreateCourseResponse;
 import com.ditto.course.dto.response.CreateCourseResponse.PlaceOrderResponse;
@@ -135,6 +137,46 @@ public class CourseService {
         return new CreateCourseResponse(command.getCourseId(), name, toPlaceOrders(placeIds));
     }
 
+    /**
+     * 내 코스의 지정된 순서에 장소를 추가한다.
+     */
+    @Transactional
+    public AddCoursePlaceResponse addPlace(Long userId, Long courseId, AddCoursePlaceRequest request) {
+        if (request == null || request.getPlaceId() == null) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "장소 ID가 올바르지 않습니다.");
+        }
+        if (request.getPosition() == null) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "장소 순서가 올바르지 않습니다.");
+        }
+
+        Course course = requireCourse(courseId);
+        validateCourseOwner(course, userId);
+        validatePlacesExist(List.of(request.getPlaceId()));
+        validatePlaceNotInCourse(courseId, request.getPlaceId());
+
+        int position = request.getPosition();
+        int maxVisitOrder = courseMapper.findMaxVisitOrder(courseId);
+        validateInsertPosition(position, maxVisitOrder);
+
+        if (position <= maxVisitOrder) {
+            courseMapper.markVisitOrdersForShift(courseId, position);
+            courseMapper.incrementMarkedVisitOrders(courseId);
+        }
+
+        courseMapper.insertPlace(new CoursePlaceInsertCommand(
+                courseId,
+                request.getPlaceId(),
+                position,
+                null,
+                VisitStatus.PENDING.name()));
+
+        return AddCoursePlaceResponse.builder()
+                .courseId(courseId)
+                .placeId(request.getPlaceId())
+                .position(position)
+                .build();
+    }
+
     private List<Long> normalizePlaceIds(List<Long> placeIds) {
         if (placeIds == null || placeIds.isEmpty()) {
             return List.of();
@@ -160,6 +202,24 @@ public class CourseService {
         Set<Long> existing = new LinkedHashSet<>(placeMapper.findExistingIds(placeIds));
         if (existing.size() != placeIds.size()) {
             throw new BusinessException(ErrorCode.PLACE_NOT_FOUND);
+        }
+    }
+
+    private void validateCourseOwner(Course course, Long userId) {
+        if (!course.isOwnedBy(userId)) {
+            throw new BusinessException(ErrorCode.NOT_COURSE_OWNER);
+        }
+    }
+
+    private void validatePlaceNotInCourse(Long courseId, Long placeId) {
+        if (courseMapper.countPlaceInCourse(courseId, placeId) > 0) {
+            throw new BusinessException(ErrorCode.DUPLICATE_PLACE_IN_COURSE);
+        }
+    }
+
+    private void validateInsertPosition(int position, int maxVisitOrder) {
+        if (position > maxVisitOrder + 1) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "장소 순서가 올바르지 않습니다.");
         }
     }
 

@@ -23,12 +23,25 @@ public interface CourseMapper {
 
     int countByShareCode(@Param("shareCode") String shareCode);
 
+    int countPlaceInCourse(
+            @Param("courseId") Long courseId,
+            @Param("placeId") Long placeId);
+
+    int findMaxVisitOrder(@Param("courseId") Long courseId);
+
+    int markVisitOrdersForShift(
+            @Param("courseId") Long courseId,
+            @Param("position") int position);
+
+    int incrementMarkedVisitOrders(@Param("courseId") Long courseId);
+
     List<MyCourseSummaryResponse> findSummariesByUserId(
             @Param("userId") Long userId,
             @Param("offset") int offset,
             @Param("size") int size);
 
     long countByUserId(@Param("userId") Long userId);
+
 
     int insert(CourseInsertCommand command);
 

@@ -460,9 +460,33 @@ Ditto-BackEnd/
 | 내 코스 목록 조회 | `GET` | `/api/v1/courses/my` | O |
 | 내 코스 정보·방문 순서 수정 | `PUT` | `/api/v1/courses/{courseId}` | O |
 | 내 코스 삭제 | `DELETE` | `/api/v1/courses/{courseId}` | O |
-| 내 코스에 장소 추가 | `POST` | `/api/v1/courses/{courseId}/places` | O |
+| 내 코스에 장소 추가 | `POST` | `/api/users/me/courses/{courseId}/places` | O |
 | 내 코스에서 장소 삭제 | `DELETE` | `/api/v1/courses/{courseId}/places/{placeId}` | O |
 | 공개 코스를 내 코스로 복사 | `POST` | `/api/v1/courses/{courseId}/copy` | O |
+
+내 코스에 장소 추가 요청:
+
+```json
+{
+  "placeId": 44,
+  "position": 2
+}
+```
+
+성공 응답:
+
+```json
+{
+  "success": true,
+  "code": "SUCCESS",
+  "message": "성공",
+  "data": {
+    "courseId": 100,
+    "placeId": 44,
+    "position": 2
+  }
+}
+```
 
 ### 공개 코스 · 커뮤니티 (Public Course & Community) — `/api/v1/courses/public`, `/api/v1/community`
 

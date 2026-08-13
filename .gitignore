@@ -29,6 +29,7 @@ hs_err_pid*
 .env
 .env.local
 src/main/resources/application-local-private.yml
+src/main/resources/application-*-private.yml
 
 ### Local Docker / Database ###
 docker-compose.yml
