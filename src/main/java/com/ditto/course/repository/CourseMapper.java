@@ -7,6 +7,7 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 import com.ditto.course.domain.Course;
+import com.ditto.course.dto.response.CoursePlaceResponse;
 import com.ditto.course.dto.response.MyCourseSummaryResponse;
 
 import lombok.AllArgsConstructor;
@@ -56,6 +57,7 @@ public interface CourseMapper {
 
     long countByUserId(@Param("userId") Long userId);
 
+    List<CoursePlaceResponse> findPlacesByCourseId(@Param("courseId") Long courseId);
 
     int insert(CourseInsertCommand command);
 

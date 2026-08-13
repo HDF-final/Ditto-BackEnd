@@ -8,6 +8,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -28,6 +29,8 @@ import com.ditto.course.dto.response.AddCoursePlaceResponse;
 import com.ditto.course.dto.response.CopyCourseResponse;
 import com.ditto.course.dto.request.CreateCourseRequest;
 import com.ditto.course.dto.request.UpdateCourseRequest;
+import com.ditto.course.dto.response.CourseDetailResponse;
+import com.ditto.course.dto.response.CoursePlaceResponse;
 import com.ditto.course.dto.response.CreateCourseResponse;
 import com.ditto.course.dto.response.MyCourseSummaryResponse;
 import com.ditto.course.dto.response.UpdateCourseResponse;
@@ -160,6 +163,92 @@ class CourseServiceTest {
         assertThat(response.getPage()).isEqualTo(2);
         assertThat(response.getContent()).isEmpty();
         verify(courseMapper).findSummariesByUserId(USER_ID, 40, 20);
+    }
+
+    @Test
+    @DisplayName("본인 소유 코스 상세를 방문 순서와 함께 조회한다")
+    void getDetailForOwnCourse() {
+        Course course = Course.of(5L, USER_ID, null, "나의 코스", "설명", "MANUAL", "ABCD1234");
+        CoursePlaceResponse firstPlace = new CoursePlaceResponse(
+                11L, "템버린즈", "1F", 1, "향수 브랜드", VisitStatus.PENDING.name(), null);
+        CoursePlaceResponse secondPlace = new CoursePlaceResponse(
+                22L, "설화수", "1F", 2, "같은 층", VisitStatus.VISITED.name(), LocalDateTime.now());
+        given(courseMapper.findById(5L)).willReturn(Optional.of(course));
+        given(courseMapper.findPlacesByCourseId(5L)).willReturn(List.of(firstPlace, secondPlace));
+
+        CourseDetailResponse response = courseService.getDetail(USER_ID, 5L);
+
+        assertThat(response.getCourseId()).isEqualTo(5L);
+        assertThat(response.getName()).isEqualTo("나의 코스");
+        assertThat(response.getDescription()).isEqualTo("설명");
+        assertThat(response.getCreationType()).isEqualTo("MANUAL");
+        assertThat(response.getShareCode()).isEqualTo("ABCD1234");
+        assertThat(response.getPlaces()).extracting(CoursePlaceResponse::getVisitOrder)
+                .containsExactly(1, 2);
+        assertThat(response.getPlaces().get(0).getPlaceId()).isEqualTo(11L);
+        assertThat(response.getPlaces().get(0).getName()).isEqualTo("템버린즈");
+        assertThat(response.getPlaces().get(0).getFloorCode()).isEqualTo("1F");
+        assertThat(response.getPlaces().get(0).getRecommendationReason()).isEqualTo("향수 브랜드");
+        assertThat(response.getPlaces().get(0).getVisitStatus()).isEqualTo(VisitStatus.PENDING.name());
+        assertThat(response.getPlaces().get(0).getVisitedAt()).isNull();
+        verify(courseMapper, never()).existsPublicPostByCourseId(5L);
+    }
+
+    @Test
+    @DisplayName("SYSTEM 기본 코스 상세를 조회한다")
+    void getDetailForSystemCourse() {
+        Course course = Course.of(3L, null, null, "K-뷰티 코스", "기본 코스", "SYSTEM", "KBEAUTY01");
+        given(courseMapper.findById(3L)).willReturn(Optional.of(course));
+        given(courseMapper.findPlacesByCourseId(3L)).willReturn(List.of());
+
+        CourseDetailResponse response = courseService.getDetail(USER_ID, 3L);
+
+        assertThat(response.getCourseId()).isEqualTo(3L);
+        assertThat(response.getCreationType()).isEqualTo(CourseCreationType.SYSTEM.name());
+        assertThat(response.getPlaces()).isEmpty();
+        verify(courseMapper, never()).existsPublicPostByCourseId(3L);
+    }
+
+    @Test
+    @DisplayName("유효한 공개 게시글에 연결된 코스 상세를 조회한다")
+    void getDetailForCourseLinkedToPublicPost() {
+        Course course = Course.of(8L, 99L, null, "커뮤니티 코스", "공개", "MANUAL", "POST0001");
+        given(courseMapper.findById(8L)).willReturn(Optional.of(course));
+        given(courseMapper.existsPublicPostByCourseId(8L)).willReturn(true);
+        given(courseMapper.findPlacesByCourseId(8L)).willReturn(List.of());
+
+        CourseDetailResponse response = courseService.getDetail(USER_ID, 8L);
+
+        assertThat(response.getCourseId()).isEqualTo(8L);
+        assertThat(response.getPlaces()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("없는 코스 상세 조회는 COURSE_NOT_FOUND")
+    void rejectGetDetailWhenCourseNotFound() {
+        given(courseMapper.findById(404L)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> courseService.getDetail(USER_ID, 404L))
+                .isInstanceOf(BusinessException.class)
+                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.COURSE_NOT_FOUND);
+
+        verify(courseMapper, never()).findPlacesByCourseId(any());
+    }
+
+    @Test
+    @DisplayName("다른 사용자의 비공개 코스 상세 조회는 거부한다")
+    void rejectGetDetailWhenPrivateCourseOwnedByOtherUser() {
+        Course course = Course.of(8L, 99L, null, "비공개 코스", null, "MANUAL", "PRIVATE1");
+        given(courseMapper.findById(8L)).willReturn(Optional.of(course));
+        given(courseMapper.existsPublicPostByCourseId(8L)).willReturn(false);
+
+        assertThatThrownBy(() -> courseService.getDetail(USER_ID, 8L))
+                .isInstanceOf(BusinessException.class)
+                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.NOT_COURSE_OWNER);
+
+        verify(courseMapper, never()).findPlacesByCourseId(any());
     }
 
     @Test

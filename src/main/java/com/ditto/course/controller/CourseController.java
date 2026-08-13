@@ -17,6 +17,7 @@ import com.ditto.course.dto.request.CreateCourseRequest;
 import com.ditto.course.dto.response.AddCoursePlaceResponse;
 import com.ditto.course.dto.response.CopyCourseResponse;
 import com.ditto.course.dto.request.UpdateCourseRequest;
+import com.ditto.course.dto.response.CourseDetailResponse;
 import com.ditto.course.dto.response.CreateCourseResponse;
 import com.ditto.course.dto.response.MyCourseSummaryResponse;
 import com.ditto.course.dto.response.UpdateCourseResponse;
@@ -64,6 +65,17 @@ public class CourseController {
             @RequestParam(defaultValue = "20") int size) {
         return ApiResponse.success("성공",
                 courseService.getMyCourses(SecurityUtils.requireUserId(), page, size));
+    }
+
+    @Operation(
+            summary = "코스 상세·방문 장소 조회",
+            description = "조회 가능한 코스의 상세 정보와 방문 장소 목록을 visitOrder 오름차순으로 조회합니다.")
+    @GetMapping("/{courseId}")
+    public ApiResponse<CourseDetailResponse> getDetail(
+            @Parameter(description = "조회할 코스 ID", example = "3")
+            @PathVariable Long courseId) {
+        return ApiResponse.success("성공",
+                courseService.getDetail(SecurityUtils.requireUserId(), courseId));
     }
 
     @Operation(

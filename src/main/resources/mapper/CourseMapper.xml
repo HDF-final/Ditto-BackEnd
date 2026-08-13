@@ -101,6 +101,22 @@
            AND deleted_at IS NULL
     </select>
 
+    <select id="findPlacesByCourseId"
+            resultType="com.ditto.course.dto.response.CoursePlaceResponse">
+        SELECT p.place_id,
+               p.name,
+               f.floor_code,
+               cp.visit_order,
+               cp.recommendation_reason,
+               cp.visit_status,
+               cp.visited_at
+          FROM course_place cp
+          JOIN place p ON p.place_id = cp.place_id
+          JOIN floor f ON f.floor_id = p.floor_id
+         WHERE cp.course_id = #{courseId}
+         ORDER BY cp.visit_order ASC
+    </select>
+
     <insert id="insert"
             parameterType="com.ditto.course.repository.CourseMapper$CourseInsertCommand"
             useGeneratedKeys="true"

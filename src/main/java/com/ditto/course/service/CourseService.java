@@ -19,6 +19,8 @@ import com.ditto.course.dto.request.CreateCourseRequest;
 import com.ditto.course.dto.response.AddCoursePlaceResponse;
 import com.ditto.course.dto.response.CopyCourseResponse;
 import com.ditto.course.dto.request.UpdateCourseRequest;
+import com.ditto.course.dto.response.CourseDetailResponse;
+import com.ditto.course.dto.response.CoursePlaceResponse;
 import com.ditto.course.dto.response.CreateCourseResponse;
 import com.ditto.course.dto.response.CreateCourseResponse.PlaceOrderResponse;
 import com.ditto.course.dto.response.MyCourseSummaryResponse;
@@ -68,6 +70,18 @@ public class CourseService {
         List<MyCourseSummaryResponse> content = courseMapper.findSummariesByUserId(userId, offset, safeSize);
         long totalElements = courseMapper.countByUserId(userId);
         return new PageResponse<>(content, safePage, totalElements);
+    }
+
+    /**
+     * 조회 가능한 코스의 상세 정보와 방문 장소를 조회한다.
+     * 조회 가능 조건은 본인 소유, SYSTEM 기본 코스, 유효한 공개 게시글 연결 코스다.
+     */
+    public CourseDetailResponse getDetail(Long userId, Long courseId) {
+        Course course = requireCourse(courseId);
+        validateReadableCourse(course, userId);
+
+        List<CoursePlaceResponse> places = courseMapper.findPlacesByCourseId(courseId);
+        return CourseDetailResponse.from(course, places);
     }
 
     /**
@@ -276,6 +290,19 @@ public class CourseService {
             return;
         }
         throw new BusinessException(ErrorCode.COURSE_NOT_PUBLIC);
+    }
+
+    private void validateReadableCourse(Course course, Long userId) {
+        if (course.isOwnedBy(userId)) {
+            return;
+        }
+        if (CourseCreationType.SYSTEM.name().equals(course.getCreationType())) {
+            return;
+        }
+        if (courseMapper.existsPublicPostByCourseId(course.getCourseId())) {
+            return;
+        }
+        throw new BusinessException(ErrorCode.NOT_COURSE_OWNER);
     }
 
     private void validatePlaceNotInCourse(Long courseId, Long placeId) {
