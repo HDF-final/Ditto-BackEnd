@@ -23,13 +23,14 @@
 | Language | Java 17 (JDK 17) | 애플리케이션 코드 |
 | Framework | Spring Boot 3.3.x | 애플리케이션 구동, 자동 설정 |
 | Web | Spring Web (MVC) | REST API, 요청/응답 처리 |
-| Persistence | Spring Data JPA / Hibernate | 도메인 영속화, ORM |
+| Persistence | MyBatis | SQL 매핑 기반 영속화 |
+| AI | Spring AI (AWS Bedrock) | LLM·임베딩, RAG |
 | Security | Spring Security (세션 기반) | 인증·인가, 세션 로그인 |
 | Validation | Bean Validation | 요청 DTO 유효성 검증 |
 | Docs | SpringDoc OpenAPI 3 | Swagger UI, API 문서 자동화 |
 | Convenience | Lombok | 보일러플레이트 제거 |
 | Build | Gradle | 빌드, 의존성 관리 |
-| Database | MySQL 8 / PostgreSQL 16 | 관계형 데이터 저장 |
+| Database | Oracle (메인) / PostgreSQL + pgvector (RAG) | 관계형 데이터 · 벡터 저장 |
 
 설치된 정확한 버전은 [build.gradle](./build.gradle)을 기준으로 합니다.
 
@@ -327,16 +328,16 @@ Ditto-BackEnd/
     │   │   │   ├── auth/  user/  aicourse/  course/  community/
     │   │   │   └── news/  navigation/  mobile/  admin/
     │   │   │
-    │   │   ├── repository/               # Spring Data JPA 인터페이스
+    │   │   ├── repository/               # MyBatis @Mapper 인터페이스
     │   │   │   ├── user/  course/  community/  news/
     │   │   │   └── navigation/  mobile/  admin/
     │   │   │
-    │   │   ├── domain/                   # JPA 엔티티, 도메인 모델
+    │   │   ├── domain/                   # 도메인 객체 (MyBatis 매핑 대상)
     │   │   │   ├── user/User.java
     │   │   │   ├── course/Course.java, Place.java
     │   │   │   ├── community/Post.java, Comment.java
     │   │   │   ├── news/ navigation/ mobile/ admin/
-    │   │   │   └── common/BaseTimeEntity.java   # createdAt/updatedAt 공통
+    │   │   │   └── common/BaseTime.java   # createdAt/updatedAt 공통
     │   │   │
     │   │   ├── dto/                      # 요청/응답 DTO (도메인별 request/response 분리)
     │   │   │   ├── auth/request/,  auth/response/
@@ -354,7 +355,8 @@ Ditto-BackEnd/
     │   │   │
     │   │   ├── config/                   # 스프링 설정
     │   │   │   ├── SwaggerConfig.java
-    │   │   │   └── CorsConfig.java
+    │   │   │   ├── CorsConfig.java
+    │   │   │   └── persistence/           # 이중 DataSource(Oracle/Postgres) + MyBatis 설정
     │   │   │
     │   │   └── security/                 # 인증·인가 (세션 기반)
     │   │       ├── SecurityConfig.java
@@ -363,7 +365,8 @@ Ditto-BackEnd/
     │   │
     │   └── resources/
     │       ├── application.yml           # 공통 설정 + 프로파일 지정
-    │       └── application-local.yml     # 로컬 DB/세션/로깅
+    │       ├── application-local.yml     # 로컬 DB/세션/로깅/Spring AI
+    │       └── mapper/                   # MyBatis 매퍼 XML
     └── test/
         └── java/com/ditto/
 ```
@@ -372,8 +375,8 @@ Ditto-BackEnd/
 
 - **controller**: HTTP 요청/응답 변환만 담당합니다. 비즈니스 로직을 넣지 않고, 반환은 항상 `ApiResponse<T>`로 감쌉니다.
 - **service**: 실제 로직과 트랜잭션 경계입니다. 도메인 예외(`BusinessException`)를 던집니다.
-- **repository**: `JpaRepository`를 확장한 인터페이스만 둡니다.
-- **domain**: JPA 엔티티. `dto`와 절대 섞지 않으며, 엔티티를 컨트롤러 응답으로 직접 반환하지 않습니다.
+- **repository**: `@Mapper` 인터페이스만 둡니다. SQL은 `resources/mapper/**/*.xml`(또는 애너테이션)에 둡니다.
+- **domain**: MyBatis가 매핑하는 도메인 객체. `dto`와 절대 섞지 않으며, 컨트롤러 응답으로 직접 반환하지 않습니다.
 - **global / config / security**: 도메인에 종속되지 않는 공통 코드입니다.
 
 ## API 명세
@@ -619,10 +622,10 @@ public record CourseDetailResponse(
 @Transactional(readOnly = true)
 public class CourseService {
 
-    private final CourseRepository courseRepository;
+    private final CourseMapper courseMapper;
 
     public CourseDetailResponse getCourse(Long courseId) {
-        Course course = courseRepository.findById(courseId)
+        Course course = courseMapper.findById(courseId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.COURSE_NOT_FOUND));
         return CourseDetailResponse.from(course);
     }
@@ -638,7 +641,7 @@ public class CourseService {
 
 - 컨트롤러 반환은 항상 `ApiResponse<T>`.
 - 예외는 `BusinessException` + `ErrorCode`로만 던집니다(임의 `RuntimeException` 금지).
-- 엔티티는 `@Setter`를 열지 않고 의미 있는 도메인 메서드로 상태를 변경합니다.
+- 도메인 객체는 `@Setter`를 열지 않고 의미 있는 도메인 메서드로 상태를 변경합니다.
 - `Optional`은 반환에만 쓰고 필드로 두지 않습니다.
 
 ## 커밋 컨벤션 & Git Flow
@@ -703,7 +706,8 @@ ex) feat/#23
 
 - JDK 17 (Temurin 등 배포판 권장)
 - Gradle (프로젝트의 Gradle Wrapper `./gradlew` 사용 권장)
-- MySQL 8 또는 PostgreSQL 16 (로컬 실행)
+- Oracle (메인 DB) + PostgreSQL(pgvector 확장, RAG용) 로컬 실행
+- AWS 자격증명 (Spring AI Bedrock 사용 시 — IAM 역할 또는 기본 자격증명 체인)
 
 ### 설치 및 실행
 
@@ -711,8 +715,9 @@ ex) feat/#23
 git clone https://github.com/HDF-final/Ditto-BackEnd.git
 cd Ditto-BackEnd
 
-# 로컬 DB 스키마 생성 (MySQL 예시)
-# CREATE DATABASE ditto DEFAULT CHARACTER SET utf8mb4;
+# 로컬 DB 준비
+# - Oracle: 스키마(ditto) 및 테이블 생성 (MyBatis는 자동 DDL 없음 — SQL 스크립트로 관리)
+# - PostgreSQL(RAG): CREATE DATABASE ditto_rag; CREATE EXTENSION IF NOT EXISTS vector;
 
 # 실행 (local 프로파일)
 ./gradlew bootRun
@@ -759,30 +764,40 @@ server:
         same-site: lax
 
 spring:
+  # 이중 DataSource (config/persistence 의 @Configuration 에서 바인딩)
   datasource:
-    url: jdbc:mysql://localhost:3306/ditto?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
-    username: ditto
-    password: ditto1234
-    driver-class-name: com.mysql.cj.jdbc.Driver
-    # PostgreSQL 사용 시
-    # url: jdbc:postgresql://localhost:5432/ditto
-    # driver-class-name: org.postgresql.Driver
+    oracle:                 # 메인 DB
+      jdbc-url: jdbc:oracle:thin:@localhost:1521/XEPDB1
+      username: ditto
+      password: ditto1234
+      driver-class-name: oracle.jdbc.OracleDriver
+    postgres:               # RAG 벡터 저장 (pgvector)
+      jdbc-url: jdbc:postgresql://localhost:5432/ditto_rag
+      username: ditto
+      password: ditto1234
+      driver-class-name: org.postgresql.Driver
 
-  jpa:
-    hibernate:
-      ddl-auto: update       # local 전용. 운영은 validate / none 권장
-    show-sql: true
-    properties:
-      hibernate:
-        format_sql: true
-        default_batch_fetch_size: 100
-    open-in-view: false
+  ai:                       # Spring AI — AWS Bedrock (자격증명은 IAM 역할/기본 체인)
+    bedrock:
+      aws:
+        region: ap-northeast-2
+    vectorstore:
+      pgvector:
+        initialize-schema: true
+        index-type: hnsw
+        distance-type: cosine_distance
+
+mybatis:
+  mapper-locations: classpath:mapper/**/*.xml
+  type-aliases-package: com.ditto
+  configuration:
+    map-underscore-to-camel-case: true
 
 logging:
   level:
     root: INFO
     com.ditto: DEBUG
-    org.hibernate.SQL: DEBUG
+    org.mybatis: DEBUG
 ```
 
 ## 기타 기본 설정

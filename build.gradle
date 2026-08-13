@@ -25,13 +25,21 @@ repositories {
 
 ext {
     springdocVersion = '2.6.0'
+    springAiVersion = '1.0.0'
+    mybatisStarterVersion = '3.0.4'
+}
+
+dependencyManagement {
+    imports {
+        mavenBom "org.springframework.ai:spring-ai-bom:${springAiVersion}"
+    }
 }
 
 dependencies {
     // Spring Web
     implementation 'org.springframework.boot:spring-boot-starter-web'
-    // Spring Data JPA
-    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    // MyBatis (영속화)
+    implementation "org.mybatis.spring.boot:mybatis-spring-boot-starter:${mybatisStarterVersion}"
     // Spring Security
     implementation 'org.springframework.boot:spring-boot-starter-security'
     // Validation
@@ -50,9 +58,14 @@ dependencies {
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
 
-    // Database Driver (택 1: 프로젝트 DB에 맞춰 사용)
-    runtimeOnly 'com.mysql:mysql-connector-j'
-    // runtimeOnly 'org.postgresql:postgresql'
+    // Database Drivers (이중 datasource)
+    runtimeOnly 'com.oracle.database.jdbc:ojdbc11'   // 메인 DB (Oracle)
+    runtimeOnly 'org.postgresql:postgresql'          // RAG 벡터 저장 (PostgreSQL + pgvector)
+
+    // Spring AI — AWS Bedrock(채팅/임베딩) + pgvector VectorStore
+    implementation 'org.springframework.ai:spring-ai-starter-model-bedrock-converse'
+    implementation 'org.springframework.ai:spring-ai-starter-model-bedrock'
+    implementation 'org.springframework.ai:spring-ai-starter-vector-store-pgvector'
 
     // Test
     testImplementation 'org.springframework.boot:spring-boot-starter-test'

@@ -10,30 +10,52 @@ server:
         same-site: lax        # 크로스 사이트 요청 시 쿠키 정책
 
 spring:
-  # ===== Database (MySQL 예시. PostgreSQL 사용 시 아래 주석 참고) =====
+  # ===== 이중 DataSource =====
+  # 단일 datasource 자동설정을 쓰지 않는다. 아래 값을 config/persistence 의 @Configuration 에서
+  # @ConfigurationProperties 로 바인딩해 각각 HikariDataSource + SqlSessionFactory 를 만든다. (TODO)
   datasource:
-    url: jdbc:mysql://localhost:3306/ditto?serverTimezone=Asia/Seoul&characterEncoding=UTF-8
-    username: ditto
-    password: ditto1234
-    driver-class-name: com.mysql.cj.jdbc.Driver
-    # --- PostgreSQL ---
-    # url: jdbc:postgresql://localhost:5432/ditto
-    # driver-class-name: org.postgresql.Driver
+    # 메인 DB (Oracle) — 업무 도메인 영속화 (MyBatis)
+    oracle:
+      jdbc-url: jdbc:oracle:thin:@localhost:1521/XEPDB1
+      username: ditto
+      password: ditto1234
+      driver-class-name: oracle.jdbc.OracleDriver
+    # RAG 벡터 저장 (PostgreSQL + pgvector)
+    postgres:
+      jdbc-url: jdbc:postgresql://localhost:5432/ditto_rag
+      username: ditto
+      password: ditto1234
+      driver-class-name: org.postgresql.Driver
 
-  jpa:
-    hibernate:
-      ddl-auto: update        # local 전용. 운영은 validate 또는 none 권장
-    show-sql: true
-    properties:
-      hibernate:
-        format_sql: true
-        default_batch_fetch_size: 100
-    open-in-view: false
+  # ===== Spring AI (AWS Bedrock) =====
+  # 자격증명은 파일/깃에 넣지 않는다. IAM 역할 또는 기본 자격증명 체인(env/프로파일) 사용.
+  ai:
+    bedrock:
+      aws:
+        region: ap-northeast-2
+      converse:
+        chat:
+          options:
+            model: ""          # 사용할 Bedrock 모델 ID (미정 — 결정 후 채움)
+    # pgvector VectorStore 는 위 postgres datasource 에 연결한다(@Configuration 에서 JdbcTemplate 주입). TODO
+    vectorstore:
+      pgvector:
+        initialize-schema: true
+        index-type: hnsw
+        distance-type: cosine_distance
+        # dimensions: 임베딩 모델 차원에 맞춰 설정 (예: Titan Text Embeddings v2 = 1024)
+
+# ===== MyBatis =====
+mybatis:
+  mapper-locations: classpath:mapper/**/*.xml
+  type-aliases-package: com.ditto
+  configuration:
+    map-underscore-to-camel-case: true   # snake_case ↔ camelCase 매핑
 
 # ===== Logging =====
 logging:
   level:
     root: INFO
     com.ditto: DEBUG
-    org.hibernate.SQL: DEBUG
+    org.mybatis: DEBUG
     org.springframework.security: DEBUG
