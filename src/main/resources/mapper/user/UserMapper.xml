@@ -9,6 +9,32 @@
          WHERE email = #{_parameter}
     </select>
 
+    <select id="findActiveByEmail" parameterType="string" resultType="com.ditto.user.repository.UserRow">
+        SELECT user_id,
+               name,
+               email,
+               password_hash,
+               preferred_language_code,
+               status
+          FROM app_user
+         WHERE email = #{_parameter}
+           AND status = 'ACTIVE'
+           AND deleted_at IS NULL
+    </select>
+
+    <select id="findActiveById" parameterType="long" resultType="com.ditto.user.repository.UserRow">
+        SELECT user_id,
+               name,
+               email,
+               password_hash,
+               preferred_language_code,
+               status
+          FROM app_user
+         WHERE user_id = #{_parameter}
+           AND status = 'ACTIVE'
+           AND deleted_at IS NULL
+    </select>
+
     <insert id="insert" parameterType="com.ditto.user.repository.SignupUserCommand">
         INSERT INTO app_user (
             country_id,

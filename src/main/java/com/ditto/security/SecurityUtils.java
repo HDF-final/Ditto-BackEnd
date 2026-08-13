@@ -19,7 +19,7 @@ public final class SecurityUtils {
         }
         Object principal = authentication.getPrincipal();
         if (principal instanceof AuthUser authUser) {
-            return authUser.userId();
+            return authUser.getUserId();
         }
         throw new BusinessException(ErrorCode.UNAUTHORIZED);
     }

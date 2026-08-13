@@ -1,8 +1,20 @@
 package com.ditto.security;
 
+import java.io.Serializable;
+
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+
 /**
  * 세션 {@code SecurityContext} 에 저장되는 인증 주체.
- * 로그인 구현 시 Authentication principal 로 이 객체를 넣는다.
  */
-public record AuthUser(Long userId, String email, String role) {
+@Getter
+@AllArgsConstructor
+public class AuthUser implements Serializable {
+
+    private static final long serialVersionUID = 1L;
+
+    private final Long userId;
+    private final String email;
+    private final String role;
 }
