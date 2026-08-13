@@ -407,13 +407,43 @@ Ditto-BackEnd/
 | 내 정보 조회 | `GET` | `/api/v1/users/me` | O |
 | 국가·언어 설정 변경 | `PATCH` | `/api/v1/users/me/preferences` | O |
 
-### AI 코스 (AI Course) — `/api/v1/ai/courses`
+### AI 코스 (AI Course) — `/api/v1/ai`
 
-| 기능 | Method | Endpoint | 인증 |
-| --- | --- | --- | --- |
-| AI 코스 추천 대화 | `POST` | `/api/v1/ai/courses/chat` | O |
-| AI 맞춤 코스 생성 | `POST` | `/api/v1/ai/courses/generate` | O |
-| AI 코스 재추천 | `POST` | `/api/v1/ai/courses/{courseId}/regenerate` | O |
+| 기능 | Method | Endpoint | 인증 | 상태 |
+| --- | --- | --- | --- | --- |
+| AI 코스 추천 대화 · 맞춤 생성 · 재추천 | `POST` | `/api/v1/ai/course-recommendations/chat` | O | 구현됨 |
+
+**엔드포인트는 하나입니다.** 맞춤 생성·대화로 다듬기·재추천이 전부 같은 호출입니다.
+차이는 `sessionId`를 싣느냐뿐입니다.
+
+| 하고 싶은 것 | 보내는 값 |
+| --- | --- |
+| 맞춤 코스 생성 (첫 요청) | `sessionId` 없이 `message`만 |
+| 대화로 다듬기 | 받은 `sessionId` + `"좀 더 저렴한 걸로"` |
+| 재추천 | 받은 `sessionId` + `"다시 짜줘"` |
+
+```
+요청  {"sessionId": "Op3uskz8Gpo"|생략, "message": "카리나가 좋아하는 브랜드 구경하고 밥도 먹고 싶어"}
+응답  data: {"sessionId": "Op3uskz8Gpo", "reply": "...", "turn": 1,
+             "places": [{"navigationKey": "1F_STORE_0035",
+                         "placeName": "프라다", "reason": "카리나가 2024년부터 ..."}]}
+```
+
+**결과물은 장소마다의 `navigationKey`와 `reason`입니다.** 클라이언트는 `navigationKey`로
+실내지도에서 장소를 찾습니다. 추천 코스는 DB에 저장하지 않으므로 Oracle `place_id`는
+싣지 않습니다. 조건에 맞는 장소가 없으면 `places`는 빈 배열입니다.
+
+추천 로직은 이 서버에 없습니다. 외부 **AI 엔진**(현재 로컬 파이썬 서비스, 이후 AWS Lambda)을
+HTTP로 호출하고 응답을 `ApiResponse`로 감싸 돌려줄 뿐입니다. 엔진을 옮길 때 바뀌는 것은
+`ditto.ai-engine.base-url` 한 줄이고 자바 코드는 그대로입니다.
+
+엔진 장애·타임아웃은 `E001`(502)로 변환됩니다. 한 턴에 **수십 초**가 걸리므로
+클라이언트 타임아웃을 넉넉히 잡아야 합니다 (실측 40~45초).
+
+> 엔진으로 보내는 본문은 반드시 `Content-Length`가 붙어야 합니다. 청크 전송으로 보내면
+> 엔진 쪽 `http.server`가 본문을 0바이트로 읽어 **에러 없이 빈 메시지**를 처리합니다.
+> `AiEngineClient`가 본문을 `byte[]`로 직렬화하는 이유입니다. AWS API Gateway도
+> 청크 전송을 받지 않으므로 Lambda 이전 후에도 동일합니다.
 
 ### 내 코스 (My Course) — `/api/v1/courses`
 
@@ -831,9 +861,19 @@ copy .env.example .env
 ORACLE_JDBC_URL=jdbc:oracle:thin:@//localhost:1521/XEPDB1
 ORACLE_USERNAME=DITTO
 ORACLE_PASSWORD=CHANGE_ME
-POSTGRES_JDBC_URL=jdbc:postgresql://localhost:5432/ditto_rag
-POSTGRES_USERNAME=ditto
-POSTGRES_PASSWORD=CHANGE_ME
+
+# Gemini API
+GEMINI_API_KEY=CHANGE_ME
+
+# AI 엔진 base URL (생략 시 http://127.0.0.1:8000)
+AI_ENGINE_BASE_URL=http://127.0.0.1:8000
+
+# AWS RDS PostgreSQL (RAG 계층)
+PG_HOST=CHANGE_ME.rds.amazonaws.com
+PG_USER=postgres
+PG_PASSWORD=CHANGE_ME
+PG_DATABASE=postgres
+PG_SSLMODE=require
 ```
 
 ### `application.yml` (비밀 없음)
