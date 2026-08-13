@@ -301,7 +301,7 @@ public class GlobalExceptionHandler {
 
 ## 프로젝트 구조
 
-표준 레이어드 아키텍처를 따릅니다. `controller → service → repository`로 흐르고, 도메인 간 공통 관심사는 `global`, 설정은 `config`, 보안은 `security`에 둡니다.
+도메인형 패키지 구조(Package by Feature)를 따릅니다. 각 비즈니스 도메인(`auth`, `user`, `course`, `community`, `news`, `navigation`, `mobile`, `admin`, `aicourse`, `country`) 이하에 `controller`, `service`, `repository`, `domain`, `dto`를 두고, 도메인 간 공통 관심사는 `global`, 설정은 `config`, 보안은 `security`에 둡니다.
 
 ```text
 Ditto-BackEnd/
@@ -313,36 +313,37 @@ Ditto-BackEnd/
     │   ├── java/com/ditto/
     │   │   ├── DittoApplication.java      # 진입점 (TimeZone=Asia/Seoul 설정)
     │   │   │
-    │   │   ├── controller/               # REST 엔드포인트 (요청/응답만 담당)
-    │   │   │   ├── auth/         # 회원가입·로그인·로그아웃·세션확인
-    │   │   │   ├── user/         # 내 정보·국가/언어 설정
-    │   │   │   ├── aicourse/     # AI 코스 추천/생성/재추천
-    │   │   │   ├── course/       # 내 코스 + 공개 코스
-    │   │   │   ├── community/    # 좋아요·북마크·게시글·댓글
-    │   │   │   ├── news/         # 뉴스피드
-    │   │   │   ├── navigation/   # 실내 내비게이션·경로·OCR
-    │   │   │   ├── mobile/       # 모바일 접속 코드
-    │   │   │   └── admin/        # 관리자(국가/브랜드/키워드/트렌드/로그)
+    │   │   ├── auth/                     # 인증 도메인 (회원가입·로그인·로그아웃·세션)
+    │   │   │   ├── controller/
+    │   │   │   ├── service/
+    │   │   │   └── dto/ (request/·response/)
     │   │   │
-    │   │   ├── service/                  # 비즈니스 로직, 트랜잭션 경계 (controller와 동일 도메인)
-    │   │   │   ├── auth/  user/  aicourse/  course/  community/
-    │   │   │   └── news/  navigation/  mobile/  admin/
+    │   │   ├── user/                     # 사용자 도메인 (내 정보·설정)
+    │   │   │   ├── controller/  service/  repository/  domain/  dto/
     │   │   │
-    │   │   ├── repository/               # MyBatis @Mapper 인터페이스
-    │   │   │   ├── user/  course/  community/  news/
-    │   │   │   └── navigation/  mobile/  admin/
+    │   │   ├── aicourse/                 # AI 코스 추천 도메인
+    │   │   │   ├── controller/  service/  dto/
     │   │   │
-    │   │   ├── domain/                   # 도메인 객체 (MyBatis 매핑 대상)
-    │   │   │   ├── user/User.java
-    │   │   │   ├── course/Course.java, Place.java
-    │   │   │   ├── community/Post.java, Comment.java
-    │   │   │   ├── news/ navigation/ mobile/ admin/
-    │   │   │   └── common/BaseTime.java   # createdAt/updatedAt 공통
+    │   │   ├── course/                   # 코스 도메인 (내 코스 + 공개 코스)
+    │   │   │   ├── controller/  service/  repository/  domain/  dto/
     │   │   │
-    │   │   ├── dto/                      # 요청/응답 DTO (도메인별 request/response 분리)
-    │   │   │   ├── auth/request/,  auth/response/
-    │   │   │   ├── user/, aicourse/, course/, community/
-    │   │   │   └── news/, navigation/, mobile/, admin/  (각 request/·response/)
+    │   │   ├── community/                # 커뮤니티 도메인 (게시글·댓글·좋아요·북마크)
+    │   │   │   ├── controller/  service/  repository/  domain/  dto/
+    │   │   │
+    │   │   ├── news/                     # 뉴스피드 도메인
+    │   │   │   ├── controller/  service/  repository/  domain/  dto/
+    │   │   │
+    │   │   ├── navigation/               # 실내 내비게이션 도메인
+    │   │   │   ├── controller/  service/  repository/  domain/  dto/
+    │   │   │
+    │   │   ├── mobile/                   # 모바일 접속 코드 도메인
+    │   │   │   ├── controller/  service/  repository/  domain/  dto/
+    │   │   │
+    │   │   ├── admin/                    # 관리자 도메인
+    │   │   │   ├── controller/  service/  repository/  domain/  dto/
+    │   │   │
+    │   │   ├── country/                  # 국가 정보 도메인
+    │   │   │   └── repository/
     │   │   │
     │   │   ├── global/                   # 전역 공통 관심사
     │   │   │   ├── common/
@@ -371,12 +372,14 @@ Ditto-BackEnd/
         └── java/com/ditto/
 ```
 
-레이어 규칙:
+레이어 및 구조 규칙:
 
+- 각 비즈니스 기능은 해당 도메인 패키지(`com.ditto.<domain>`) 하위에 작성합니다.
 - **controller**: HTTP 요청/응답 변환만 담당합니다. 비즈니스 로직을 넣지 않고, 반환은 항상 `ApiResponse<T>`로 감쌉니다.
 - **service**: 실제 로직과 트랜잭션 경계입니다. 도메인 예외(`BusinessException`)를 던집니다.
 - **repository**: `@Mapper` 인터페이스만 둡니다. SQL은 `resources/mapper/**/*.xml`(또는 애너테이션)에 둡니다.
-- **domain**: MyBatis가 매핑하는 도메인 객체. `dto`와 절대 섞지 않으며, 컨트롤러 응답으로 직접 반환하지 않습니다.
+- **domain**: MyBatis가 매핑하는 도메인 객체/엔티티/이넘. `dto`와 절대 섞지 않으며, 컨트롤러 응답으로 직접 반환하지 않습니다.
+- **dto**: 요청/응답 DTO. `request`와 `response` subpackage로 분리합니다.
 - **global / config / security**: 도메인에 종속되지 않는 공통 코드입니다.
 
 ## API 명세
