@@ -27,6 +27,13 @@ public enum ErrorCode {
     SESSION_EXPIRED(HttpStatus.UNAUTHORIZED, "A003", "세션이 만료되었습니다. 다시 로그인해 주세요."),
     ACCESS_DENIED(HttpStatus.FORBIDDEN, "A004", "접근 권한이 없습니다."),
 
+    // ===== Signup =====
+    DUPLICATE_SIGNUP_EMAIL(HttpStatus.BAD_REQUEST, "S001", "이미 존재하는 이메일입니다."),
+    INVALID_EMAIL_FORMAT(HttpStatus.BAD_REQUEST, "S002", "이메일 형식이 올바르지 않습니다."),
+    DUPLICATE_NICKNAME(HttpStatus.BAD_REQUEST, "S003", "이미 존재하는 닉네임입니다."),
+    INVALID_NICKNAME_FORMAT(HttpStatus.BAD_REQUEST, "S004", "닉네임 형식이 올바르지 않습니다."),
+    DEFAULT_COUNTRY_NOT_FOUND(HttpStatus.INTERNAL_SERVER_ERROR, "S005", "기본 국가 정보를 찾을 수 없습니다."),
+
     // ===== User =====
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "U001", "사용자를 찾을 수 없습니다."),
     DUPLICATE_EMAIL(HttpStatus.CONFLICT, "U002", "이미 가입된 이메일입니다."),
