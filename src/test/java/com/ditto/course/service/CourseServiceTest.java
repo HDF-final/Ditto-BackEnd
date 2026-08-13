@@ -3,6 +3,7 @@ package com.ditto.course.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -10,6 +11,7 @@ import static org.mockito.Mockito.when;
 import java.util.List;
 import java.util.Optional;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -22,7 +24,6 @@ import com.ditto.course.domain.CourseCreationType;
 import com.ditto.course.domain.VisitStatus;
 import com.ditto.course.dto.request.AddCoursePlaceRequest;
 import com.ditto.course.dto.response.AddCoursePlaceResponse;
-import com.ditto.course.domain.Course;
 import com.ditto.course.dto.request.CreateCourseRequest;
 import com.ditto.course.dto.request.UpdateCourseRequest;
 import com.ditto.course.dto.response.CreateCourseResponse;
@@ -37,6 +38,8 @@ import com.ditto.global.exception.ErrorCode;
 
 @ExtendWith(MockitoExtension.class)
 class CourseServiceTest {
+
+    private static final Long USER_ID = 7L;
 
     @Mock
     private CourseMapper courseMapper;
@@ -192,6 +195,37 @@ class CourseServiceTest {
                 .isEqualTo(ErrorCode.COURSE_NOT_FOUND);
 
         verify(courseMapper, never()).softDelete(any());
+    }
+
+    @Test
+    @DisplayName("내 코스에서 장소를 삭제하고 뒤쪽 방문 순서를 앞으로 당긴다")
+    void deletePlaceFromOwnCourse() {
+        Course course = Course.of(5L, USER_ID, null, "코스", null, "MANUAL", "ABCD1234");
+        given(courseMapper.findById(5L)).willReturn(Optional.of(course));
+        given(courseMapper.findVisitOrderByCourseAndPlace(5L, 22L)).willReturn(Optional.of(2));
+
+        courseService.deletePlace(USER_ID, 5L, 22L);
+
+        verify(courseMapper).deletePlace(5L, 22L);
+        verify(courseMapper).markVisitOrdersAfterDeleted(5L, 2);
+        verify(courseMapper).decrementMarkedVisitOrders(5L);
+    }
+
+    @Test
+    @DisplayName("코스에 없는 장소를 삭제하려 하면 C001 로 거절한다")
+    void rejectDeletePlaceWhenPlaceNotInCourse() {
+        Course course = Course.of(5L, USER_ID, null, "코스", null, "MANUAL", "ABCD1234");
+        given(courseMapper.findById(5L)).willReturn(Optional.of(course));
+        given(courseMapper.findVisitOrderByCourseAndPlace(5L, 999L)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> courseService.deletePlace(USER_ID, 5L, 999L))
+                .isInstanceOf(BusinessException.class)
+                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
+
+        verify(courseMapper, never()).deletePlace(any(), any());
+        verify(courseMapper, never()).markVisitOrdersAfterDeleted(any(), org.mockito.Mockito.anyInt());
+        verify(courseMapper, never()).decrementMarkedVisitOrders(any());
     }
 
     @Test

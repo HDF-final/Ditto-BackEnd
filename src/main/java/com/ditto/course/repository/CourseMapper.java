@@ -35,6 +35,20 @@ public interface CourseMapper {
 
     int incrementMarkedVisitOrders(@Param("courseId") Long courseId);
 
+    Optional<Integer> findVisitOrderByCourseAndPlace(
+            @Param("courseId") Long courseId,
+            @Param("placeId") Long placeId);
+
+    int deletePlace(
+            @Param("courseId") Long courseId,
+            @Param("placeId") Long placeId);
+
+    int markVisitOrdersAfterDeleted(
+            @Param("courseId") Long courseId,
+            @Param("deletedVisitOrder") int deletedVisitOrder);
+
+    int decrementMarkedVisitOrders(@Param("courseId") Long courseId);
+
     List<MyCourseSummaryResponse> findSummariesByUserId(
             @Param("userId") Long userId,
             @Param("offset") int offset,

@@ -177,6 +177,28 @@ public class CourseService {
                 .build();
     }
 
+    /**
+     * 내 코스에서 장소를 삭제하고 뒤쪽 방문 순서를 한 칸씩 앞으로 당긴다.
+     */
+    @Transactional
+    public void deletePlace(Long userId, Long courseId, Long placeId) {
+        if (courseId == null || placeId == null) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "요청을 처리할 수 없습니다.");
+        }
+
+        Course course = requireCourse(courseId);
+        validateCourseOwner(course, userId);
+
+        int deletedVisitOrder = courseMapper.findVisitOrderByCourseAndPlace(courseId, placeId)
+                .orElseThrow(() -> new BusinessException(
+                        ErrorCode.INVALID_INPUT_VALUE,
+                        "요청을 처리할 수 없습니다."));
+
+        courseMapper.deletePlace(courseId, placeId);
+        courseMapper.markVisitOrdersAfterDeleted(courseId, deletedVisitOrder);
+        courseMapper.decrementMarkedVisitOrders(courseId);
+    }
+
     private List<Long> normalizePlaceIds(List<Long> placeIds) {
         if (placeIds == null || placeIds.isEmpty()) {
             return List.of();

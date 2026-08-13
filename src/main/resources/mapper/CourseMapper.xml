@@ -53,6 +53,33 @@
            AND visit_order &lt; 0
     </update>
 
+    <select id="findVisitOrderByCourseAndPlace" resultType="int">
+        SELECT MIN(visit_order)
+          FROM course_place
+         WHERE course_id = #{courseId}
+           AND place_id = #{placeId}
+    </select>
+
+    <delete id="deletePlace">
+        DELETE FROM course_place
+         WHERE course_id = #{courseId}
+           AND place_id = #{placeId}
+    </delete>
+
+    <update id="markVisitOrdersAfterDeleted">
+        UPDATE course_place
+           SET visit_order = -visit_order
+         WHERE course_id = #{courseId}
+           AND visit_order > #{deletedVisitOrder}
+    </update>
+
+    <update id="decrementMarkedVisitOrders">
+        UPDATE course_place
+           SET visit_order = ABS(visit_order) - 1
+         WHERE course_id = #{courseId}
+           AND visit_order &lt; 0
+    </update>
+
     <select id="findSummariesByUserId"
             resultType="com.ditto.course.dto.response.MyCourseSummaryResponse">
         SELECT c.course_id,

@@ -93,11 +93,23 @@ public class CourseController {
             summary = "내 코스에 장소 추가",
             description = "로그인한 사용자의 내 코스 지정 순서에 장소를 추가합니다. "
                     + "장소는 DB place 테이블에 존재해야 하며, 같은 코스에 이미 담긴 장소는 다시 추가할 수 없습니다.")
-    @PostMapping("/courses/{courseId}/places")
+    @PostMapping("/{courseId}/places")
     @ResponseStatus(HttpStatus.OK)
     public ApiResponse<AddCoursePlaceResponse> addPlace(
             @PathVariable Long courseId,
             @Valid @RequestBody AddCoursePlaceRequest request) {
         return ApiResponse.success("성공", courseService.addPlace(SecurityUtils.requireUserId(), courseId, request));
+    }
+
+    @Operation(
+            summary = "내 코스에서 장소 삭제",
+            description = "로그인한 사용자의 내 코스에서 지정한 장소를 삭제하고 남은 장소의 방문 순서를 앞으로 당깁니다.")
+    @DeleteMapping("/{courseId}/places/{placeId}")
+    @ResponseStatus(HttpStatus.OK)
+    public ApiResponse<Void> deletePlace(
+            @PathVariable Long courseId,
+            @PathVariable Long placeId) {
+        courseService.deletePlace(SecurityUtils.requireUserId(), courseId, placeId);
+        return ApiResponse.success("성공", null);
     }
 }
