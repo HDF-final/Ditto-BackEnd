@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.ditto.course.dto.request.AddCoursePlaceRequest;
 import com.ditto.course.dto.request.CreateCourseRequest;
 import com.ditto.course.dto.response.AddCoursePlaceResponse;
+import com.ditto.course.dto.response.CopyCourseResponse;
 import com.ditto.course.dto.request.UpdateCourseRequest;
 import com.ditto.course.dto.response.CreateCourseResponse;
 import com.ditto.course.dto.response.MyCourseSummaryResponse;
@@ -99,6 +100,17 @@ public class CourseController {
             @PathVariable Long courseId,
             @Valid @RequestBody AddCoursePlaceRequest request) {
         return ApiResponse.success("성공", courseService.addPlace(SecurityUtils.requireUserId(), courseId, request));
+    }
+
+    @Operation(
+            summary = "공개 코스를 내 코스로 복사",
+            description = "공개된 원본 코스를 로그인한 사용자의 내 코스로 복사합니다.")
+    @PostMapping("/{courseId}/copy")
+    @ResponseStatus(HttpStatus.OK)
+    public ApiResponse<CopyCourseResponse> copy(
+            @Parameter(description = "복사할 공개 코스 ID", example = "3")
+            @PathVariable Long courseId) {
+        return ApiResponse.success("성공", courseService.copyPublicCourse(SecurityUtils.requireUserId(), courseId));
     }
 
     @Operation(

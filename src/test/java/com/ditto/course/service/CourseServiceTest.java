@@ -18,18 +18,21 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.ditto.course.domain.Course;
 import com.ditto.course.domain.CourseCreationType;
 import com.ditto.course.domain.VisitStatus;
 import com.ditto.course.dto.request.AddCoursePlaceRequest;
 import com.ditto.course.dto.response.AddCoursePlaceResponse;
+import com.ditto.course.dto.response.CopyCourseResponse;
 import com.ditto.course.dto.request.CreateCourseRequest;
 import com.ditto.course.dto.request.UpdateCourseRequest;
 import com.ditto.course.dto.response.CreateCourseResponse;
 import com.ditto.course.dto.response.MyCourseSummaryResponse;
 import com.ditto.course.dto.response.UpdateCourseResponse;
 import com.ditto.course.repository.CourseMapper;
+import com.ditto.course.repository.CourseMapper.CourseInsertCommand;
 import com.ditto.course.repository.CourseMapper.CoursePlaceInsertCommand;
 import com.ditto.course.repository.PlaceMapper;
 import com.ditto.global.common.response.PageResponse;
@@ -195,6 +198,114 @@ class CourseServiceTest {
                 .isEqualTo(ErrorCode.COURSE_NOT_FOUND);
 
         verify(courseMapper, never()).softDelete(any());
+    }
+
+    @Test
+    @DisplayName("공개 코스를 내 코스로 복사한다")
+    void copyPublicCourse() {
+        Course sourceCourse = Course.of(3L, null, null, "K-MZ Course", "원본 설명", "SYSTEM", "KBEAUTY01");
+        given(courseMapper.findById(3L)).willReturn(Optional.of(sourceCourse));
+        given(courseMapper.insert(any(CourseInsertCommand.class))).willAnswer(invocation -> {
+            CourseInsertCommand command = invocation.getArgument(0);
+            command.setCourseId(101L);
+            return 1;
+        });
+
+        CopyCourseResponse response = courseService.copyPublicCourse(USER_ID, 3L);
+
+        ArgumentCaptor<CourseInsertCommand> captor = ArgumentCaptor.forClass(CourseInsertCommand.class);
+        verify(courseMapper).insert(captor.capture());
+        CourseInsertCommand saved = captor.getValue();
+        assertThat(saved.getUserId()).isEqualTo(USER_ID);
+        assertThat(saved.getSourceCourseId()).isEqualTo(3L);
+        assertThat(saved.getName()).isEqualTo("K-MZ Course Copy");
+        assertThat(saved.getDescription()).isEqualTo("원본 설명");
+        assertThat(saved.getCreationType()).isEqualTo(CourseCreationType.COPIED.name());
+        assertThat(saved.getShareCode()).isNotBlank();
+
+        verify(courseMapper, never()).existsPublicPostByCourseId(3L);
+        verify(courseMapper).copyPlacesFromCourse(3L, 101L, VisitStatus.PENDING.name());
+        assertThat(response.getSourceCourseId()).isEqualTo(3L);
+        assertThat(response.getCreatedCourseId()).isEqualTo(101L);
+        assertThat(response.getName()).isEqualTo("K-MZ Course Copy");
+    }
+
+    @Test
+    @DisplayName("유효한 공개 게시글에 연결된 사용자 코스도 내 코스로 복사한다")
+    void copyCourseLinkedToPublicPost() {
+        Course sourceCourse = Course.of(3L, 99L, null, "커뮤니티 코스", "공개 게시글 연결", "MANUAL", "POST0001");
+        given(courseMapper.findById(3L)).willReturn(Optional.of(sourceCourse));
+        given(courseMapper.existsPublicPostByCourseId(3L)).willReturn(true);
+        given(courseMapper.insert(any(CourseInsertCommand.class))).willAnswer(invocation -> {
+            CourseInsertCommand command = invocation.getArgument(0);
+            command.setCourseId(101L);
+            return 1;
+        });
+
+        CopyCourseResponse response = courseService.copyPublicCourse(USER_ID, 3L);
+
+        ArgumentCaptor<CourseInsertCommand> captor = ArgumentCaptor.forClass(CourseInsertCommand.class);
+        verify(courseMapper).insert(captor.capture());
+        CourseInsertCommand saved = captor.getValue();
+        assertThat(saved.getUserId()).isEqualTo(USER_ID);
+        assertThat(saved.getSourceCourseId()).isEqualTo(3L);
+        assertThat(saved.getCreationType()).isEqualTo(CourseCreationType.COPIED.name());
+        assertThat(saved.getName()).isEqualTo("커뮤니티 코스 Copy");
+        verify(courseMapper).copyPlacesFromCourse(3L, 101L, VisitStatus.PENDING.name());
+        assertThat(response.getCreatedCourseId()).isEqualTo(101L);
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 코스 복사는 COURSE_NOT_FOUND 로 거절한다")
+    void rejectCopyWhenSourceCourseNotFound() {
+        given(courseMapper.findById(404L)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> courseService.copyPublicCourse(USER_ID, 404L))
+                .isInstanceOf(BusinessException.class)
+                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.COURSE_NOT_FOUND);
+
+        verify(courseMapper, never()).insert(any());
+        verify(courseMapper, never()).copyPlacesFromCourse(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("사용자 소유 코스는 공개 코스가 아니므로 복사를 거절한다")
+    void rejectCopyWhenCourseIsNotPublic() {
+        Course sourceCourse = Course.of(3L, 99L, null, "비공개 코스", null, "MANUAL", "PRIVATE1");
+        given(courseMapper.findById(3L)).willReturn(Optional.of(sourceCourse));
+        given(courseMapper.existsPublicPostByCourseId(3L)).willReturn(false);
+
+        assertThatThrownBy(() -> courseService.copyPublicCourse(USER_ID, 3L))
+                .isInstanceOf(BusinessException.class)
+                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.COURSE_NOT_PUBLIC);
+
+        verify(courseMapper, never()).insert(any());
+        verify(courseMapper, never()).copyPlacesFromCourse(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("COURSE_PLACE 복사 실패 시 트랜잭션 메서드에서 예외가 전파된다")
+    void copyCoursePlaceFailurePropagatesInTransaction() throws NoSuchMethodException {
+        Course sourceCourse = Course.of(3L, null, null, "K-MZ Course", null, "SYSTEM", "KBEAUTY01");
+        given(courseMapper.findById(3L)).willReturn(Optional.of(sourceCourse));
+        given(courseMapper.insert(any(CourseInsertCommand.class))).willAnswer(invocation -> {
+            CourseInsertCommand command = invocation.getArgument(0);
+            command.setCourseId(101L);
+            return 1;
+        });
+        given(courseMapper.copyPlacesFromCourse(3L, 101L, VisitStatus.PENDING.name()))
+                .willThrow(new IllegalStateException("copy failed"));
+
+        assertThatThrownBy(() -> courseService.copyPublicCourse(USER_ID, 3L))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("copy failed");
+
+        Transactional transactional = CourseService.class
+                .getMethod("copyPublicCourse", Long.class, Long.class)
+                .getAnnotation(Transactional.class);
+        assertThat(transactional).isNotNull();
     }
 
     @Test
