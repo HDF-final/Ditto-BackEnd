@@ -162,6 +162,7 @@ public enum ErrorCode {
     COURSE_NOT_FOUND(HttpStatus.NOT_FOUND, "CR001", "코스를 찾을 수 없습니다."),
     NOT_COURSE_OWNER(HttpStatus.FORBIDDEN, "CR002", "코스에 대한 권한이 없습니다."),
     PLACE_NOT_FOUND(HttpStatus.NOT_FOUND, "CR003", "장소를 찾을 수 없습니다."),
+    DUPLICATE_PLACE_IN_COURSE(HttpStatus.BAD_REQUEST, "CR004", "코스에 같은 장소가 중복되어 있습니다."),
 
     // Community
     POST_NOT_FOUND(HttpStatus.NOT_FOUND, "CM001", "게시글을 찾을 수 없습니다."),
@@ -419,6 +420,43 @@ Ditto-BackEnd/
 | 기능 | Method | Endpoint | 인증 |
 | --- | --- | --- | --- |
 | 내 코스 생성·저장 | `POST` | `/api/v1/courses` | O |
+
+수동 모드 「빈 코스로 시작하기」는 `name`·`placeIds` 없이 호출하면 된다. `placeIds`를 넘기면 DB `place` 테이블에 있는 ID만 담는다.
+
+요청 예시:
+
+```json
+{
+  "name": "나의 더현대 코스",
+  "description": "오후 반나절 코스",
+  "placeIds": [11, 22, 33]
+}
+```
+
+빈 코스:
+
+```json
+{}
+```
+
+성공 응답:
+
+```json
+{
+  "success": true,
+  "code": "SUCCESS",
+  "message": "성공",
+  "data": {
+    "courseId": 100,
+    "name": "나의 더현대 코스",
+    "places": [
+      { "placeId": 11, "order": 1 },
+      { "placeId": 22, "order": 2 },
+      { "placeId": 33, "order": 3 }
+    ]
+  }
+}
+```
 | 내 코스 목록 조회 | `GET` | `/api/v1/courses/my` | O |
 | 내 코스 정보·방문 순서 수정 | `PUT` | `/api/v1/courses/{courseId}` | O |
 | 내 코스 삭제 | `DELETE` | `/api/v1/courses/{courseId}` | O |
@@ -722,6 +760,9 @@ cd Ditto-BackEnd
 # - Oracle: 스키마(ditto) 및 테이블 생성 (MyBatis는 자동 DDL 없음 — SQL 스크립트로 관리)
 # - PostgreSQL(RAG): CREATE DATABASE ditto_rag; CREATE EXTENSION IF NOT EXISTS vector;
 
+# 비밀 설정
+cp .env.example .env   # Windows: copy .env.example .env
+
 # 실행 (local 프로파일)
 ./gradlew bootRun
 ```
@@ -750,35 +791,33 @@ Windows PowerShell에서는 다음을 사용합니다.
 
 ## 환경 설정 예시
 
-`application.yml`에서 공통 설정과 활성 프로파일을 지정하고, 민감/환경별 값은 `application-local.yml`에 둡니다. 실제 비밀 값(운영 DB 비밀번호 등)은 Git에 커밋하지 않습니다.
+`application.yml`에 구조만 두고, DB 계정·비밀번호는 프로젝트 루트 `.env`에 둡니다. `.env`는 Git에 커밋하지 않습니다. 처음에는 `.env.example`을 복사합니다.
 
-### `application-local.yml`
+```bash
+copy .env.example .env
+```
+
+### `.env`
+
+```env
+ORACLE_JDBC_URL=jdbc:oracle:thin:@//localhost:1521/XEPDB1
+ORACLE_USERNAME=DITTO
+ORACLE_PASSWORD=CHANGE_ME
+POSTGRES_JDBC_URL=jdbc:postgresql://localhost:5432/ditto_rag
+POSTGRES_USERNAME=ditto
+POSTGRES_PASSWORD=CHANGE_ME
+```
+
+### `application.yml` (비밀 없음)
 
 ```yaml
-server:
-  port: 8080
-  servlet:
-    session:
-      timeout: 30m            # 세션 만료 시간
-      cookie:
-        name: JSESSIONID
-        http-only: true
-        secure: false         # 운영(HTTPS)에서는 true
-        same-site: lax
-
 spring:
-  # 이중 DataSource (config/persistence 의 @Configuration 에서 바인딩)
   datasource:
-    oracle:                 # 메인 DB
-      jdbc-url: jdbc:oracle:thin:@localhost:1521/XEPDB1
-      username: ditto
-      password: ditto1234
+    oracle:
+      jdbc-url: ${ORACLE_JDBC_URL}
+      username: ${ORACLE_USERNAME}
+      password: ${ORACLE_PASSWORD}
       driver-class-name: oracle.jdbc.OracleDriver
-    postgres:               # RAG 벡터 저장 (pgvector)
-      jdbc-url: jdbc:postgresql://localhost:5432/ditto_rag
-      username: ditto
-      password: ditto1234
-      driver-class-name: org.postgresql.Driver
 
   ai:                       # Spring AI — AWS Bedrock (자격증명은 IAM 역할/기본 체인)
     bedrock:
