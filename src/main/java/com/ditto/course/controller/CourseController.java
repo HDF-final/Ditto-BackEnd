@@ -1,7 +1,9 @@
 package com.ditto.course.controller;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -56,5 +58,16 @@ public class CourseController {
             @RequestParam(defaultValue = "20") int size) {
         return ApiResponse.success("성공",
                 courseService.getMyCourses(SecurityUtils.requireUserId(), page, size));
+    }
+
+    @Operation(
+            summary = "내 코스 삭제",
+            description = "로그인한 사용자 본인의 코스를 삭제합니다(soft delete). 본인 코스가 아니면 거부됩니다.")
+    @DeleteMapping("/{courseId}")
+    public ApiResponse<Void> delete(
+            @Parameter(description = "삭제할 코스 ID", example = "100")
+            @PathVariable Long courseId) {
+        courseService.delete(SecurityUtils.requireUserId(), courseId);
+        return ApiResponse.success();
     }
 }

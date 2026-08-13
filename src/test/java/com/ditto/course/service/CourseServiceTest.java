@@ -181,4 +181,42 @@ class CourseServiceTest {
         assertThat(response.getContent()).isEmpty();
         verify(courseMapper).findSummariesByUserId(USER_ID, 40, 20);
     }
+
+    @Test
+    @DisplayName("본인 코스를 삭제하면 soft delete 한다")
+    void deleteOwnCourse() {
+        Course course = Course.of(5L, USER_ID, null, "코스", null, "MANUAL", "ABCD1234");
+        given(courseMapper.findById(5L)).willReturn(Optional.of(course));
+
+        courseService.delete(USER_ID, 5L);
+
+        verify(courseMapper).softDelete(5L);
+    }
+
+    @Test
+    @DisplayName("본인 코스가 아니면 NOT_COURSE_OWNER 로 거부하고 삭제하지 않는다")
+    void rejectDeleteWhenNotOwner() {
+        Course course = Course.of(5L, 999L, null, "남의 코스", null, "MANUAL", "ABCD1234");
+        given(courseMapper.findById(5L)).willReturn(Optional.of(course));
+
+        assertThatThrownBy(() -> courseService.delete(USER_ID, 5L))
+                .isInstanceOf(BusinessException.class)
+                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.NOT_COURSE_OWNER);
+
+        verify(courseMapper, never()).softDelete(any());
+    }
+
+    @Test
+    @DisplayName("없는 코스를 삭제하면 COURSE_NOT_FOUND")
+    void rejectDeleteWhenCourseNotFound() {
+        given(courseMapper.findById(404L)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> courseService.delete(USER_ID, 404L))
+                .isInstanceOf(BusinessException.class)
+                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.COURSE_NOT_FOUND);
+
+        verify(courseMapper, never()).softDelete(any());
+    }
 }
