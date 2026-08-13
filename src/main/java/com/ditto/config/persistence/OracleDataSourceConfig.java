@@ -1,21 +1,59 @@
 package com.ditto.config.persistence;
 
+import javax.sql.DataSource;
+
+import org.apache.ibatis.session.SqlSessionFactory;
+import org.mybatis.spring.SqlSessionFactoryBean;
+import org.mybatis.spring.annotation.MapperScan;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.jdbc.DataSourceBuilder;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
+import org.springframework.core.io.support.PathMatchingResourcePatternResolver;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
+import org.springframework.transaction.PlatformTransactionManager;
+
+import com.zaxxer.hikari.HikariDataSource;
 
 /**
- * 메인 DB(Oracle) MyBatis 설정 — 구조 골격.
- *
- * <p>TODO: 아래 순서로 빈을 정의한다.
- * <ol>
- *   <li>{@code @Primary DataSource} — {@code @ConfigurationProperties("spring.datasource.oracle")}
- *       + {@code DataSourceBuilder} (Hikari, jdbc-url 바인딩)</li>
- *   <li>{@code SqlSessionFactory} — {@code SqlSessionFactoryBean} 에 위 DataSource +
- *       mapper-locations({@code classpath:mapper/**}) 주입</li>
- *   <li>{@code @MapperScan(basePackages = "com.ditto", sqlSessionFactoryRef = "oracleSqlSessionFactory")}</li>
- *   <li>{@code DataSourceTransactionManager} ({@code @Primary})</li>
- * </ol>
+ * 메인 DB(Oracle) MyBatis 및 DataSource 설정.
  */
 @Configuration
+@MapperScan(
+        basePackages = {
+                "com.ditto.country.repository",
+                "com.ditto.user.repository"
+        },
+        sqlSessionFactoryRef = "oracleSqlSessionFactory")
 public class OracleDataSourceConfig {
-    // TODO: 위 주석의 빈 정의를 채운다. (JPA 미사용 — MyBatis 기반)
+
+    @Primary
+    @Bean(name = "oracleDataSource")
+    @ConfigurationProperties("spring.datasource.oracle")
+    public DataSource oracleDataSource() {
+        return DataSourceBuilder.create().type(HikariDataSource.class).build();
+    }
+
+    @Primary
+    @Bean(name = "oracleSqlSessionFactory")
+    public SqlSessionFactory oracleSqlSessionFactory(DataSource oracleDataSource) throws Exception {
+        SqlSessionFactoryBean sessionFactoryBean = new SqlSessionFactoryBean();
+        sessionFactoryBean.setDataSource(oracleDataSource);
+
+        org.apache.ibatis.session.Configuration mybatisConfig = new org.apache.ibatis.session.Configuration();
+        mybatisConfig.setMapUnderscoreToCamelCase(true);
+        sessionFactoryBean.setConfiguration(mybatisConfig);
+
+        PathMatchingResourcePatternResolver resolver = new PathMatchingResourcePatternResolver();
+        sessionFactoryBean.setMapperLocations(resolver.getResources("classpath*:mapper/**/*.xml"));
+
+        return sessionFactoryBean.getObject();
+    }
+
+    @Primary
+    @Bean(name = "transactionManager")
+    public PlatformTransactionManager oracleTransactionManager(DataSource oracleDataSource) {
+        return new DataSourceTransactionManager(oracleDataSource);
+    }
 }
