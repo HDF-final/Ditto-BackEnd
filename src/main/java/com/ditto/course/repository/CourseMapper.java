@@ -21,6 +21,18 @@ public interface CourseMapper {
 
     int countByShareCode(@Param("shareCode") String shareCode);
 
+    int countPlaceInCourse(
+            @Param("courseId") Long courseId,
+            @Param("placeId") Long placeId);
+
+    int findMaxVisitOrder(@Param("courseId") Long courseId);
+
+    int markVisitOrdersForShift(
+            @Param("courseId") Long courseId,
+            @Param("position") int position);
+
+    int incrementMarkedVisitOrders(@Param("courseId") Long courseId);
+
     int insert(CourseInsertCommand command);
 
     int insertPlace(CoursePlaceInsertCommand command);

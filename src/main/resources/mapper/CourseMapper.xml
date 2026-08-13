@@ -26,6 +26,33 @@
          WHERE share_code = #{shareCode}
     </select>
 
+    <select id="countPlaceInCourse" resultType="int">
+        SELECT COUNT(*)
+          FROM course_place
+         WHERE course_id = #{courseId}
+           AND place_id = #{placeId}
+    </select>
+
+    <select id="findMaxVisitOrder" resultType="int">
+        SELECT COALESCE(MAX(visit_order), 0)
+          FROM course_place
+         WHERE course_id = #{courseId}
+    </select>
+
+    <update id="markVisitOrdersForShift">
+        UPDATE course_place
+           SET visit_order = -visit_order
+         WHERE course_id = #{courseId}
+           AND visit_order >= #{position}
+    </update>
+
+    <update id="incrementMarkedVisitOrders">
+        UPDATE course_place
+           SET visit_order = ABS(visit_order) + 1
+         WHERE course_id = #{courseId}
+           AND visit_order &lt; 0
+    </update>
+
     <insert id="insert"
             parameterType="com.ditto.course.repository.CourseMapper$CourseInsertCommand"
             useGeneratedKeys="true"
@@ -41,12 +68,12 @@
             view_count,
             created_at
         ) VALUES (
-            #{userId},
-            #{sourceCourseId},
-            #{name},
-            #{description},
-            #{creationType},
-            #{shareCode},
+            #{userId,jdbcType=NUMERIC},
+            #{sourceCourseId,jdbcType=NUMERIC},
+            #{name,jdbcType=VARCHAR},
+            #{description,jdbcType=VARCHAR},
+            #{creationType,jdbcType=VARCHAR},
+            #{shareCode,jdbcType=VARCHAR},
             0,
             SYSTIMESTAMP
         )
@@ -61,11 +88,11 @@
             recommendation_reason,
             visit_status
         ) VALUES (
-            #{courseId},
-            #{placeId},
-            #{visitOrder},
-            #{recommendationReason},
-            #{visitStatus}
+            #{courseId,jdbcType=NUMERIC},
+            #{placeId,jdbcType=NUMERIC},
+            #{visitOrder,jdbcType=NUMERIC},
+            #{recommendationReason,jdbcType=VARCHAR},
+            #{visitStatus,jdbcType=VARCHAR}
         )
     </insert>
 
