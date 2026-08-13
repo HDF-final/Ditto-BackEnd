@@ -246,6 +246,21 @@ class CourseServiceTest {
     }
 
     @Test
+    @DisplayName("name·description 을 생략하면 기존 값을 유지한다(부분 수정)")
+    void updateKeepsInfoWhenOmitted() {
+        Course course = Course.of(5L, USER_ID, null, "기존 이름", "기존 설명", "MANUAL", "ABCD1234");
+        given(courseMapper.findById(5L)).willReturn(Optional.of(course));
+        given(courseMapper.findPlaceIdsByCourseId(5L)).willReturn(List.of(11L, 22L));
+
+        UpdateCourseResponse response = courseService.update(USER_ID, 5L,
+                new UpdateCourseRequest(null, null, List.of(22L, 11L)));
+
+        verify(courseMapper).updateInfo(5L, "기존 이름", "기존 설명");
+        assertThat(response.getName()).isEqualTo("기존 이름");
+        assertThat(response.getOrderedPlaceIds()).containsExactly(22L, 11L);
+    }
+
+    @Test
     @DisplayName("본인 코스가 아니면 NOT_COURSE_OWNER 로 거부하고 수정하지 않는다")
     void rejectUpdateWhenNotOwner() {
         Course course = Course.of(5L, 999L, null, "남의 코스", null, "MANUAL", "ABCD1234");
