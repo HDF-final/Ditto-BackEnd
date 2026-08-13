@@ -72,6 +72,7 @@ public class CourseService {
     /**
      * 내 코스의 정보(이름·설명)와 방문 순서를 수정한다. 본인 코스만 가능하며,
      * orderedPlaceIds 는 코스에 속한 장소 전체를 바뀐 순서대로 담아야 한다(배열 순서 = visit_order).
+     * PATCH 이므로 name 을 생략(null/공백)하면 기존 이름을, description 을 생략(null)하면 기존 설명을 유지한다.
      */
     @Transactional
     public UpdateCourseResponse update(Long userId, Long courseId, UpdateCourseRequest request) {
@@ -83,8 +84,13 @@ public class CourseService {
         List<Long> orderedPlaceIds = normalizePlaceIds(request.getOrderedPlaceIds());
         validateReorderTargetsCourse(courseId, orderedPlaceIds);
 
-        String name = resolveName(request.getName());
-        courseMapper.updateInfo(courseId, name, trimToNull(request.getDescription()));
+        String name = StringUtils.hasText(request.getName())
+                ? request.getName().trim()
+                : course.getName();
+        String description = (request.getDescription() != null)
+                ? trimToNull(request.getDescription())
+                : course.getDescription();
+        courseMapper.updateInfo(courseId, name, description);
         if (!orderedPlaceIds.isEmpty()) {
             courseMapper.reorderPlaces(courseId, orderedPlaceIds);
         }
