@@ -23,7 +23,8 @@ import com.zaxxer.hikari.HikariDataSource;
 @MapperScan(
         basePackages = {
                 "com.ditto.country.repository",
-                "com.ditto.user.repository"
+                "com.ditto.user.repository",
+                "com.ditto.course.repository"
         },
         sqlSessionFactoryRef = "oracleSqlSessionFactory")
 public class OracleDataSourceConfig {
