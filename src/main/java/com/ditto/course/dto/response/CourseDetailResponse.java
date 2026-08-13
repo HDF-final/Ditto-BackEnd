@@ -1,6 +1,7 @@
 package com.ditto.course.dto.response;
 
 import java.util.List;
+import java.time.LocalDateTime;
 
 import com.ditto.course.domain.Course;
 
@@ -15,12 +16,12 @@ import lombok.Getter;
 public class CourseDetailResponse {
 
     private final Long courseId;
-    private final String title;
+    private final String name;
     private final String description;
     private final String creationType;
-    private final String shareCode;
     private final Long sourceCourseId;
-    private final int placeCount;
+    private final String shareCode;
+    private final LocalDateTime createdAt;
     private final List<CoursePlaceResponse> places;
 
     public static CourseDetailResponse from(Course course, List<CoursePlaceResponse> places) {
@@ -30,9 +31,9 @@ public class CourseDetailResponse {
                 course.getName(),
                 course.getDescription(),
                 course.getCreationType(),
-                course.getShareCode(),
                 course.getSourceCourseId(),
-                safePlaces.size(),
+                course.getShareCode(),
+                course.getCreatedAt(),
                 safePlaces);
     }
 }
