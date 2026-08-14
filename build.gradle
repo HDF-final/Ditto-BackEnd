@@ -31,11 +31,13 @@ ext {
     springdocVersion = '2.6.0'
     springAiVersion = '1.0.0'
     mybatisStarterVersion = '3.0.4'
+    awsSdkVersion = '2.31.26'
 }
 
 dependencyManagement {
     imports {
         mavenBom "org.springframework.ai:spring-ai-bom:${springAiVersion}"
+        mavenBom "software.amazon.awssdk:bom:${awsSdkVersion}"
     }
 }
 
@@ -70,6 +72,10 @@ dependencies {
     implementation 'org.springframework.ai:spring-ai-starter-model-bedrock-converse'
     implementation 'org.springframework.ai:spring-ai-starter-model-bedrock'
     implementation 'org.springframework.ai:spring-ai-starter-vector-store-pgvector'
+
+    // AWS S3 (이미지 객체 저장)
+    // 버전은 Spring AI BOM이 관리하는 AWS SDK v2와 맞춘다.
+    implementation 'software.amazon.awssdk:s3'
 
     // Test
     testImplementation 'org.springframework.boot:spring-boot-starter-test'

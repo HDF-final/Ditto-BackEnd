@@ -1,0 +1,211 @@
+package com.ditto.global.infrastructure.s3;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.util.Locale;
+import java.util.Map;
+import java.util.UUID;
+import java.util.regex.Pattern;
+
+import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
+import org.springframework.web.multipart.MultipartFile;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import software.amazon.awssdk.core.exception.SdkException;
+import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.DeleteObjectRequest;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.presigner.S3Presigner;
+import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
+
+import com.ditto.global.exception.BusinessException;
+import com.ditto.global.exception.ErrorCode;
+
+/**
+ * 도메인 공통 이미지 저장소.
+ * 파일은 비공개 S3에 저장하고, 호출자에게 영속화용 object key와 조회 URL을 반환한다.
+ */
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class S3Provider {
+
+    private static final long MAX_IMAGE_SIZE_BYTES = 10L * 1024 * 1024;
+    private static final int MAX_OBJECT_KEY_LENGTH = 1024;
+
+    private static final Map<String, String> EXTENSION_BY_CONTENT_TYPE = Map.of(
+            "image/jpeg", "jpg",
+            "image/png", "png",
+            "image/webp", "webp",
+            "image/gif", "gif");
+
+    private static final Pattern SAFE_DIRECTORY_PATTERN =
+            Pattern.compile("^[a-z0-9][a-z0-9/_-]*$");
+    private static final Pattern SAFE_OBJECT_KEY_PATTERN =
+            Pattern.compile("^[a-zA-Z0-9._/-]+$");
+
+    private final S3Client s3Client;
+    private final S3Presigner s3Presigner;
+    private final S3StorageProperties properties;
+
+    /**
+     * 이미지를 S3에 업로드한다.
+     *
+     * @param file 업로드 이미지
+     * @param directory 도메인별 저장 경로. 예: stores, users/profile
+     * @return DB 저장용 key와 클라이언트 응답용 URL
+     */
+    public S3UploadResult uploadImage(MultipartFile file, String directory) {
+        String contentType = validateAndGetContentType(file);
+        String normalizedDirectory = normalizeDirectory(directory);
+        String objectKey = createObjectKey(
+                normalizedDirectory,
+                EXTENSION_BY_CONTENT_TYPE.get(contentType));
+
+        PutObjectRequest request = PutObjectRequest.builder()
+                .bucket(properties.getBucket())
+                .key(objectKey)
+                .contentType(contentType)
+                .contentLength(file.getSize())
+                .build();
+
+        try (InputStream inputStream = file.getInputStream()) {
+            s3Client.putObject(
+                    request,
+                    RequestBody.fromInputStream(inputStream, file.getSize()));
+            log.info("S3 image uploaded. bucket={}, key={}", properties.getBucket(), objectKey);
+
+            return S3UploadResult.builder()
+                    .key(objectKey)
+                    .url(getImageUrl(objectKey))
+                    .build();
+        } catch (IOException | SdkException exception) {
+            log.error("S3 image upload failed. bucket={}, key={}",
+                    properties.getBucket(), objectKey, exception);
+            throw new BusinessException(ErrorCode.S3_UPLOAD_FAILED);
+        }
+    }
+
+    /**
+     * 저장된 object key로 클라이언트가 사용할 이미지 URL을 만든다.
+     * CloudFront base URL이 없으면 비공개 객체용 presigned GET URL을 반환한다.
+     */
+    public String getImageUrl(String objectKey) {
+        validateObjectKey(objectKey);
+
+        if (StringUtils.hasText(properties.getPublicBaseUrl())) {
+            return removeTrailingSlash(properties.getPublicBaseUrl()) + "/" + objectKey;
+        }
+
+        GetObjectRequest getObjectRequest = GetObjectRequest.builder()
+                .bucket(properties.getBucket())
+                .key(objectKey)
+                .build();
+        GetObjectPresignRequest presignRequest = GetObjectPresignRequest.builder()
+                .signatureDuration(properties.getPresignedUrlExpiration())
+                .getObjectRequest(getObjectRequest)
+                .build();
+
+        try {
+            return s3Presigner.presignGetObject(presignRequest).url().toString();
+        } catch (SdkException exception) {
+            log.error("S3 image URL generation failed. bucket={}, key={}",
+                    properties.getBucket(), objectKey, exception);
+            throw new BusinessException(ErrorCode.S3_URL_GENERATION_FAILED);
+        }
+    }
+
+    /** S3에서 이미지를 삭제한다. */
+    public void deleteImage(String objectKey) {
+        validateObjectKey(objectKey);
+
+        DeleteObjectRequest request = DeleteObjectRequest.builder()
+                .bucket(properties.getBucket())
+                .key(objectKey)
+                .build();
+
+        try {
+            s3Client.deleteObject(request);
+            log.info("S3 image deleted. bucket={}, key={}", properties.getBucket(), objectKey);
+        } catch (SdkException exception) {
+            log.error("S3 image deletion failed. bucket={}, key={}",
+                    properties.getBucket(), objectKey, exception);
+            throw new BusinessException(ErrorCode.S3_DELETE_FAILED);
+        }
+    }
+
+    private String validateAndGetContentType(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new BusinessException(ErrorCode.INVALID_IMAGE_FILE);
+        }
+        if (file.getSize() > MAX_IMAGE_SIZE_BYTES) {
+            throw new BusinessException(ErrorCode.IMAGE_SIZE_EXCEEDED);
+        }
+
+        String contentType = file.getContentType();
+        if (!StringUtils.hasText(contentType)) {
+            throw new BusinessException(ErrorCode.INVALID_IMAGE_FILE);
+        }
+
+        String normalizedContentType = contentType.toLowerCase(Locale.ROOT);
+        if (!EXTENSION_BY_CONTENT_TYPE.containsKey(normalizedContentType)) {
+            throw new BusinessException(ErrorCode.UNSUPPORTED_IMAGE_TYPE);
+        }
+        return normalizedContentType;
+    }
+
+    private String normalizeDirectory(String directory) {
+        if (!StringUtils.hasText(directory)) {
+            throw new BusinessException(ErrorCode.INVALID_STORAGE_PATH);
+        }
+
+        String normalized = directory.trim()
+                .replaceAll("^/+", "")
+                .replaceAll("/+$", "")
+                .toLowerCase(Locale.ROOT);
+
+        if (normalized.contains("..")
+                || normalized.contains("//")
+                || normalized.contains("\\")
+                || !SAFE_DIRECTORY_PATTERN.matcher(normalized).matches()) {
+            throw new BusinessException(ErrorCode.INVALID_STORAGE_PATH);
+        }
+        return normalized;
+    }
+
+    private String createObjectKey(String directory, String extension) {
+        return String.join(
+                "/",
+                normalizeDirectory(properties.getPrefix()),
+                directory,
+                LocalDate.now(ZoneOffset.UTC).toString(),
+                UUID.randomUUID() + "." + extension);
+    }
+
+    private void validateObjectKey(String objectKey) {
+        if (!StringUtils.hasText(objectKey)
+                || objectKey.length() > MAX_OBJECT_KEY_LENGTH
+                || objectKey.startsWith("/")
+                || objectKey.contains("..")
+                || objectKey.contains("//")
+                || objectKey.contains("\\")
+                || !SAFE_OBJECT_KEY_PATTERN.matcher(objectKey).matches()) {
+            throw new BusinessException(ErrorCode.INVALID_STORAGE_PATH);
+        }
+
+        String rootPrefix = normalizeDirectory(properties.getPrefix());
+        if (!objectKey.startsWith(rootPrefix + "/")) {
+            throw new BusinessException(ErrorCode.INVALID_STORAGE_PATH);
+        }
+    }
+
+    private String removeTrailingSlash(String value) {
+        return value.replaceAll("/+$", "");
+    }
+}

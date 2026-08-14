@@ -13,6 +13,10 @@ spring:
       username: ${ORACLE_USERNAME}
       password: ${ORACLE_PASSWORD}
       driver-class-name: oracle.jdbc.OracleDriver
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
   # RAG 빈이 붙기 전까지 Bedrock 임베딩·pgvector 자동설정을 끈다.
   # bedrock 스타터가 Titan + Cohere EmbeddingModel 을 동시에 만들면
   # PgVectorStore 가 어느 쪽을 쓸지 못 고르고 기동이 실패한다.
@@ -35,6 +39,17 @@ springdoc:
     operations-sorter: method
   api-docs:
     path: /v3/api-docs
+
+# S3 이미지 저장소
+# 자격증명은 소스에 두지 않고 로컬 AWS profile 또는 EC2 IAM Role로 공급한다.
+app:
+  storage:
+    s3:
+      bucket: ${AWS_S3_BUCKET}
+      region: ${AWS_REGION:ap-northeast-2}
+      prefix: ${AWS_S3_PREFIX:images}
+      public-base-url: ${AWS_S3_PUBLIC_BASE_URL:}
+      presigned-url-expiration: ${AWS_S3_PRESIGNED_URL_EXPIRATION:30m}
 
 # Actuator Health Check
 management:

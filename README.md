@@ -349,11 +349,12 @@ Ditto-BackEnd/
     │   │   ├── global/                   # 전역 공통 관심사
     │   │   │   ├── common/
     │   │   │   │   └── response/ApiResponse.java
-    │   │   │   └── exception/
+    │   │   │   ├── exception/
     │   │   │       ├── ErrorCode.java
     │   │   │       ├── BusinessException.java
     │   │   │       ├── ErrorResponse.java
     │   │   │       └── GlobalExceptionHandler.java
+    │   │   │   └── infrastructure/s3/   # 전역 이미지 저장·조회 URL 생성·삭제
     │   │   │
     │   │   ├── config/                   # 스프링 설정
     │   │   │   ├── SwaggerConfig.java
@@ -870,6 +871,13 @@ GEMINI_API_KEY=CHANGE_ME
 # AI 엔진 base URL (생략 시 http://127.0.0.1:8000)
 AI_ENGINE_BASE_URL=http://127.0.0.1:8000
 
+# S3 이미지 저장소
+AWS_S3_BUCKET=ditto-dev-images-601202752151
+AWS_REGION=ap-northeast-2
+AWS_S3_PREFIX=images
+AWS_S3_PUBLIC_BASE_URL=
+AWS_S3_PRESIGNED_URL_EXPIRATION=30m
+
 # AWS RDS PostgreSQL (RAG 계층)
 PG_HOST=CHANGE_ME.rds.amazonaws.com
 PG_USER=postgres
@@ -882,6 +890,11 @@ PG_SSLMODE=require
 
 ```yaml
 spring:
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
   datasource:
     oracle:
       jdbc-url: ${ORACLE_JDBC_URL}
@@ -900,6 +913,15 @@ spring:
       aws:
         region: ap-northeast-2
 
+app:
+  storage:
+    s3:
+      bucket: ${AWS_S3_BUCKET}
+      region: ${AWS_REGION:ap-northeast-2}
+      prefix: ${AWS_S3_PREFIX:images}
+      public-base-url: ${AWS_S3_PUBLIC_BASE_URL:}
+      presigned-url-expiration: ${AWS_S3_PRESIGNED_URL_EXPIRATION:30m}
+
 mybatis:
   mapper-locations: classpath:mapper/**/*.xml
   type-aliases-package: com.ditto
@@ -912,6 +934,24 @@ logging:
     com.ditto: DEBUG
     org.mybatis: DEBUG
 ```
+
+### S3 이미지 저장
+
+이미지 파일은 비공개 S3 버킷에 저장하고 Oracle에는 전체 URL이 아닌 object key만 저장합니다.
+Presigned URL은 만료되고, 향후 CloudFront 도메인이 바뀌어도 DB 값을 마이그레이션하지 않기 위해서입니다.
+
+```java
+S3UploadResult uploaded = s3Provider.uploadImage(imageFile, "stores");
+
+String imageKey = uploaded.getKey(); // DB에는 key만 저장
+String imageUrl = s3Provider.getImageUrl(imageKey); // API 응답 시 URL로 변환
+```
+
+- 지원 형식: JPEG, PNG, WEBP, GIF
+- 최대 크기: 10MB
+- 기본 key 형식: `images/{directory}/{yyyy-MM-dd}/{uuid}.{extension}`
+- `AWS_S3_PUBLIC_BASE_URL`이 비어 있으면 30분짜리 Presigned GET URL을 생성합니다.
+- 로컬은 AWS profile, 운영 EC2는 IAM Role을 사용하며 access key를 저장소에 넣지 않습니다.
 
 ## 기타 기본 설정
 
