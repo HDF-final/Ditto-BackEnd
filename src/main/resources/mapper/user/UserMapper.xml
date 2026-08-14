@@ -15,7 +15,8 @@
                email,
                password_hash,
                preferred_language_code,
-               status
+               status,
+               role
           FROM app_user
          WHERE email = #{_parameter}
            AND status = 'ACTIVE'
@@ -28,7 +29,8 @@
                email,
                password_hash,
                preferred_language_code,
-               status
+               status,
+               role
           FROM app_user
          WHERE user_id = #{_parameter}
            AND status = 'ACTIVE'
@@ -43,6 +45,7 @@
             password_hash,
             preferred_language_code,
             status,
+            role,
             created_at
         ) VALUES (
             #{countryId},
@@ -51,6 +54,7 @@
             #{passwordHash},
             #{preferredLanguageCode},
             #{status},
+            #{role},
             SYSTIMESTAMP
         )
     </insert>

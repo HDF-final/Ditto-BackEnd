@@ -19,4 +19,5 @@ public class UserRow {
     private String passwordHash;
     private String preferredLanguageCode;
     private String status;
+    private String role;
 }
