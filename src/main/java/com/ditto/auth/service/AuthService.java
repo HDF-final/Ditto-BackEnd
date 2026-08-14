@@ -62,6 +62,7 @@ public class AuthService {
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
                 .preferredLanguageCode(country.getDefaultLanguageCode())
                 .status(UserStatus.ACTIVE.name())
+                .role(UserRole.ROLE_CUSTOMER.name())
                 .build();
 
         userMapper.insert(command);
@@ -80,7 +81,7 @@ public class AuthService {
                 .filter(activeUser -> passwordEncoder.matches(request.getPassword(), activeUser.getPasswordHash()))
                 .orElseThrow(() -> new BusinessException(ErrorCode.LOGIN_UNAUTHENTICATED));
 
-        String role = UserRole.ROLE_CUSTOMER.name();
+        String role = user.getRole();
         AuthUser principal = new AuthUser(user.getUserId(), user.getEmail(), role);
         UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                 principal,
