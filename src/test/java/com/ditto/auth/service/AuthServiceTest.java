@@ -240,6 +240,7 @@ class AuthServiceTest {
         assertThat(command.getPasswordHash()).isNotEqualTo("password123!");
         assertThat(passwordEncoder.matches("password123!", command.getPasswordHash())).isTrue();
         assertThat(command.getStatus()).isEqualTo(UserStatus.ACTIVE.name());
+        assertThat(command.getRole()).isEqualTo("ROLE_CUSTOMER");
         assertThat(response.getUserEmail()).isEqualTo("new@example.com");
     }
 
@@ -269,6 +270,7 @@ class AuthServiceTest {
                 .passwordHash(passwordHash)
                 .preferredLanguageCode("ja")
                 .status(UserStatus.ACTIVE.name())
+                .role("ROLE_CUSTOMER")
                 .build();
     }
 }

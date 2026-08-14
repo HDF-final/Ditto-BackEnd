@@ -17,4 +17,5 @@ public class SignupUserCommand {
     private String passwordHash;
     private String preferredLanguageCode;
     private String status;
+    private String role;
 }
