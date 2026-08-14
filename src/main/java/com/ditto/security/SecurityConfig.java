@@ -1,8 +1,12 @@
 package com.ditto.security;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -16,6 +20,11 @@ import org.springframework.security.web.context.HttpSessionSecurityContextReposi
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.web.cors.CorsConfigurationSource;
 
+import com.ditto.global.exception.ErrorCode;
+import com.ditto.global.exception.ErrorResponse;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 
 @Configuration
@@ -25,10 +34,12 @@ public class SecurityConfig {
 
     private final CorsConfigurationSource corsConfigurationSource;
     private final ObjectProvider<LocalHeaderAuthenticationFilter> localHeaderAuthenticationFilterProvider;
+    private final ObjectMapper objectMapper;
 
     /** 인증 없이 접근 가능한 공개 경로 */
     private static final String[] PUBLIC_ENDPOINTS = {
-            "/api/v1/auth/**",
+            "/api/v1/auth/signup",
+            "/api/v1/auth/login",
             "/api/v1/courses/public/**",
             "/api/v1/news/**",
             "/api/v1/mobile/access-codes/verify",
@@ -55,15 +66,16 @@ public class SecurityConfig {
                         .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
                         .sessionFixation(fixation -> fixation.changeSessionId())
                         .maximumSessions(1))
+                .exceptionHandling(exception -> exception
+                        .authenticationEntryPoint((request, response, authException) ->
+                                writeError(response, ErrorCode.UNAUTHORIZED))
+                        .accessDeniedHandler((request, response, accessDeniedException) ->
+                                writeError(response, ErrorCode.ACCESS_DENIED)))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
-                // 로그아웃: 세션 무효화 + 세션 쿠키 삭제
-                .logout(logout -> logout
-                        .logoutUrl("/api/v1/auth/logout")
-                        .invalidateHttpSession(true)
-                        .deleteCookies("JSESSIONID"));
+                .logout(logout -> logout.disable());
 
         localHeaderAuthenticationFilterProvider.ifAvailable(filter ->
                 http.addFilterBefore(filter, UsernamePasswordAuthenticationFilter.class));
@@ -89,5 +101,12 @@ public class SecurityConfig {
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
+    }
+
+    private void writeError(HttpServletResponse response, ErrorCode errorCode) throws IOException {
+        response.setStatus(errorCode.getStatus().value());
+        response.setCharacterEncoding(StandardCharsets.UTF_8.name());
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        objectMapper.writeValue(response.getWriter(), ErrorResponse.of(errorCode));
     }
 }

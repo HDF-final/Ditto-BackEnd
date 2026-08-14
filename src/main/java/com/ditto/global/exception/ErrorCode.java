@@ -26,6 +26,9 @@ public enum ErrorCode {
     INVALID_CREDENTIALS(HttpStatus.UNAUTHORIZED, "A002", "이메일 또는 비밀번호가 올바르지 않습니다."),
     SESSION_EXPIRED(HttpStatus.UNAUTHORIZED, "A003", "세션이 만료되었습니다. 다시 로그인해 주세요."),
     ACCESS_DENIED(HttpStatus.FORBIDDEN, "A004", "접근 권한이 없습니다."),
+    AUTHENTICATION_FAILED(HttpStatus.UNAUTHORIZED, "A005", "이메일 또는 비밀번호가 올바르지 않습니다."),
+    LOGIN_UNAUTHENTICATED(HttpStatus.UNAUTHORIZED, "L001", "인증되지 않은 사용자입니다."),
+    LOGIN_PASSWORD_REQUIRED(HttpStatus.UNAUTHORIZED, "L002", "비밀번호를 입력해주세요."),
 
     // ===== Signup =====
     DUPLICATE_SIGNUP_EMAIL(HttpStatus.BAD_REQUEST, "S001", "이미 존재하는 이메일입니다."),
