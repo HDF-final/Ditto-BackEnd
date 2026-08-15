@@ -1,6 +1,8 @@
 package com.ditto.community.controller;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -8,7 +10,9 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.ditto.community.dto.request.CreateCoursePostRequest;
+import com.ditto.community.dto.request.UpdateCoursePostRequest;
 import com.ditto.community.dto.response.CreateCoursePostResponse;
+import com.ditto.community.dto.response.UpdateCoursePostResponse;
 import com.ditto.community.service.PostService;
 import com.ditto.global.common.response.ApiResponse;
 import com.ditto.security.SecurityUtils;
@@ -33,5 +37,15 @@ public class PostController {
             @Valid @RequestBody CreateCoursePostRequest request) {
         return ApiResponse.success("성공",
                 postService.createCoursePost(SecurityUtils.requireUserId(), request));
+    }
+
+    @Operation(summary = "코스 게시글 수정", description = "로그인한 사용자가 자신이 작성한 코스 게시글의 제목과 내용을 수정합니다.")
+    @PatchMapping("/{postId}")
+    @ResponseStatus(HttpStatus.OK)
+    public ApiResponse<UpdateCoursePostResponse> updateCoursePost(
+            @PathVariable Long postId,
+            @Valid @RequestBody UpdateCoursePostRequest request) {
+        return ApiResponse.success("성공",
+                postService.updateCoursePost(SecurityUtils.requireUserId(), postId, request));
     }
 }

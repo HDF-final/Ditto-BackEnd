@@ -1,5 +1,8 @@
 package com.ditto.course.repository;
 
+import java.time.LocalDateTime;
+import java.util.Optional;
+
 import org.apache.ibatis.annotations.Mapper;
 
 import lombok.AllArgsConstructor;
@@ -13,6 +16,10 @@ public interface PostMapper {
 
     int insert(PostInsertCommand command);
 
+    Optional<PostRow> findActiveById(Long postId);
+
+    int update(PostUpdateCommand command);
+
     @Getter
     @Setter
     @Builder
@@ -21,6 +28,38 @@ public interface PostMapper {
     class PostInsertCommand {
         private Long postId;
         private Long courseId;
+        private Long userId;
+        private String title;
+        private String content;
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    class PostRow {
+        private Long postId;
+        private Long courseId;
+        private Long userId;
+        private String title;
+        private String content;
+        private Integer likesCount;
+        private Integer saveCount;
+        private LocalDateTime createdAt;
+        private LocalDateTime deletedAt;
+
+        public boolean isWrittenBy(Long userId) {
+            return this.userId != null && this.userId.equals(userId);
+        }
+    }
+
+    @Getter
+    @Setter
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    class PostUpdateCommand {
+        private Long postId;
         private Long userId;
         private String title;
         private String content;
