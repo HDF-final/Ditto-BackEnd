@@ -30,6 +30,19 @@ public interface PostMapper {
 
     long countPublicCourses();
 
+    Optional<PublicCourseDetailPostRow> findPublicCourseDetailById(@Param("postId") Long postId);
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    class PublicCourseDetailPostRow {
+        private Long postId;
+        private Long courseId;
+        private String title;
+        private String content;
+    }
+
     @Getter
     @Setter
     @Builder

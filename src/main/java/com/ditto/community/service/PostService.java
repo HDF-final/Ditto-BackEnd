@@ -8,14 +8,17 @@ import org.springframework.transaction.annotation.Transactional;
 import com.ditto.community.dto.request.CreateCoursePostRequest;
 import com.ditto.community.dto.request.UpdateCoursePostRequest;
 import com.ditto.community.dto.response.CreateCoursePostResponse;
+import com.ditto.community.dto.response.PublicCourseDetailResponse;
 import com.ditto.community.dto.response.PublicCourseResponse;
 import com.ditto.community.dto.response.UpdateCoursePostResponse;
 import com.ditto.course.domain.Course;
+import com.ditto.course.dto.response.CoursePlaceResponse;
 import com.ditto.course.repository.CourseMapper;
 import com.ditto.course.repository.PostMapper;
 import com.ditto.course.repository.PostMapper.PostInsertCommand;
 import com.ditto.course.repository.PostMapper.PostRow;
 import com.ditto.course.repository.PostMapper.PostUpdateCommand;
+import com.ditto.course.repository.PostMapper.PublicCourseDetailPostRow;
 import com.ditto.global.common.response.PageResponse;
 import com.ditto.global.exception.BusinessException;
 import com.ditto.global.exception.ErrorCode;
@@ -45,6 +48,41 @@ public class PostService {
         long totalElements = postMapper.countPublicCourses();
 
         return new PageResponse<>(content != null ? content : List.of(), page, totalElements);
+    }
+
+    /**
+     * 커뮤니티에 공개된 코스 게시글 상세 정보와 연결된 코스 장소 목록을 조회한다.
+     */
+    public PublicCourseDetailResponse getPublicCourse(Long postId) {
+        if (postId == null || postId <= 0) {
+            throw new BusinessException(ErrorCode.POST_NOT_FOUND);
+        }
+
+        PublicCourseDetailPostRow post = postMapper.findPublicCourseDetailById(postId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.POST_NOT_FOUND));
+
+        List<CoursePlaceResponse> placeRows = courseMapper.findPlacesByCourseId(post.getCourseId());
+        List<PublicCourseDetailResponse.PlaceInfo> places = (placeRows == null)
+                ? List.of()
+                : placeRows.stream()
+                        .map(p -> PublicCourseDetailResponse.PlaceInfo.builder()
+                                .placeId(p.getPlaceId())
+                                .order(p.getVisitOrder())
+                                .build())
+                        .toList();
+
+        PublicCourseDetailResponse.CourseInfo courseInfo = PublicCourseDetailResponse.CourseInfo.builder()
+                .courseId(post.getCourseId())
+                .places(places)
+                .build();
+
+        return PublicCourseDetailResponse.builder()
+                .postId(post.getPostId())
+                .title(post.getTitle())
+                .content(post.getContent())
+                .course(courseInfo)
+                .comments(List.of())
+                .build();
     }
 
     @Transactional

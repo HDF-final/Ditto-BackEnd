@@ -90,4 +90,19 @@
            AND c.deleted_at IS NULL
     </select>
 
+    <select id="findPublicCourseDetailById"
+            resultType="com.ditto.course.repository.PostMapper$PublicCourseDetailPostRow">
+        SELECT p.post_id AS postId,
+               p.course_id AS courseId,
+               p.title,
+               p.content
+          FROM post p
+          JOIN course c
+            ON c.course_id = p.course_id
+         WHERE p.post_id = #{postId,jdbcType=NUMERIC}
+           AND p.deleted_at IS NULL
+           AND p.course_id IS NOT NULL
+           AND c.deleted_at IS NULL
+    </select>
+
 </mapper>
