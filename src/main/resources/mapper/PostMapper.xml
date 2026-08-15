@@ -62,4 +62,32 @@
            AND deleted_at IS NULL
     </update>
 
+    <select id="findPublicCourses" resultType="com.ditto.community.dto.response.PublicCourseResponse">
+        SELECT p.post_id,
+               p.course_id,
+               p.title,
+               p.likes_count AS like_count,
+               p.save_count AS bookmark_count
+          FROM post p
+          JOIN course c
+            ON c.course_id = p.course_id
+         WHERE p.deleted_at IS NULL
+           AND p.course_id IS NOT NULL
+           AND c.deleted_at IS NULL
+         ORDER BY p.created_at DESC,
+                  p.post_id DESC
+        OFFSET #{offset} ROWS
+        FETCH NEXT #{size} ROWS ONLY
+    </select>
+
+    <select id="countPublicCourses" resultType="long">
+        SELECT COUNT(*)
+          FROM post p
+          JOIN course c
+            ON c.course_id = p.course_id
+         WHERE p.deleted_at IS NULL
+           AND p.course_id IS NOT NULL
+           AND c.deleted_at IS NULL
+    </select>
+
 </mapper>

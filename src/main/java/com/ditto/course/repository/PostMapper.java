@@ -1,10 +1,13 @@
 package com.ditto.course.repository;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+
+import com.ditto.community.dto.response.PublicCourseResponse;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -22,6 +25,10 @@ public interface PostMapper {
     int update(PostUpdateCommand command);
 
     int softDelete(@Param("postId") Long postId, @Param("userId") Long userId);
+
+    List<PublicCourseResponse> findPublicCourses(@Param("offset") long offset, @Param("size") int size);
+
+    long countPublicCourses();
 
     @Getter
     @Setter

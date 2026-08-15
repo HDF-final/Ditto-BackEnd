@@ -1,11 +1,14 @@
 package com.ditto.community.service;
 
+import java.util.List;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.ditto.community.dto.request.CreateCoursePostRequest;
 import com.ditto.community.dto.request.UpdateCoursePostRequest;
 import com.ditto.community.dto.response.CreateCoursePostResponse;
+import com.ditto.community.dto.response.PublicCourseResponse;
 import com.ditto.community.dto.response.UpdateCoursePostResponse;
 import com.ditto.course.domain.Course;
 import com.ditto.course.repository.CourseMapper;
@@ -13,6 +16,7 @@ import com.ditto.course.repository.PostMapper;
 import com.ditto.course.repository.PostMapper.PostInsertCommand;
 import com.ditto.course.repository.PostMapper.PostRow;
 import com.ditto.course.repository.PostMapper.PostUpdateCommand;
+import com.ditto.global.common.response.PageResponse;
 import com.ditto.global.exception.BusinessException;
 import com.ditto.global.exception.ErrorCode;
 
@@ -23,8 +27,25 @@ import lombok.RequiredArgsConstructor;
 @Transactional(readOnly = true)
 public class PostService {
 
+    private static final int MAX_PAGE_SIZE = 100;
+
     private final CourseMapper courseMapper;
     private final PostMapper postMapper;
+
+    /**
+     * 커뮤니티에 공개된 코스 게시글 목록을 최신순으로 페이징 조회한다.
+     */
+    public PageResponse<PublicCourseResponse> getPublicCourses(int page, int size) {
+        if (page < 0 || size < 1 || size > MAX_PAGE_SIZE) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        long offset = (long) page * size;
+        List<PublicCourseResponse> content = postMapper.findPublicCourses(offset, size);
+        long totalElements = postMapper.countPublicCourses();
+
+        return new PageResponse<>(content != null ? content : List.of(), page, totalElements);
+    }
 
     @Transactional
     public CreateCoursePostResponse createCoursePost(Long userId, CreateCoursePostRequest request) {
