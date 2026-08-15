@@ -33,6 +33,11 @@ import com.ditto.course.repository.PostMapper.PostUpdateCommand;
 import com.ditto.global.exception.BusinessException;
 import com.ditto.global.exception.ErrorCode;
 
+import java.util.List;
+
+import com.ditto.community.dto.response.PublicCourseResponse;
+import com.ditto.global.common.response.PageResponse;
+
 @ExtendWith(MockitoExtension.class)
 class PostServiceTest {
 
@@ -341,5 +346,113 @@ class PostServiceTest {
                 .getAnnotation(Transactional.class);
 
         assertThat(transactional).isNotNull();
+    }
+
+    @Test
+    @DisplayName("공개 코스 게시글 목록을 정상 조회하고 필드를 매핑한다")
+    void getPublicCoursesSuccess() {
+        PublicCourseResponse item = PublicCourseResponse.builder()
+                .postId(1L)
+                .courseId(3L)
+                .title("내가 다녀온 K-MZ 코스")
+                .likeCount(12L)
+                .bookmarkCount(4L)
+                .build();
+        given(postMapper.findPublicCourses(0L, 10)).willReturn(List.of(item));
+        given(postMapper.countPublicCourses()).willReturn(1L);
+
+        PageResponse<PublicCourseResponse> response = postService.getPublicCourses(0, 10);
+
+        assertThat(response.getPage()).isZero();
+        assertThat(response.getTotalElements()).isEqualTo(1L);
+        assertThat(response.getContent()).hasSize(1);
+
+        PublicCourseResponse contentItem = response.getContent().get(0);
+        assertThat(contentItem.getPostId()).isEqualTo(1L);
+        assertThat(contentItem.getCourseId()).isEqualTo(3L);
+        assertThat(contentItem.getTitle()).isEqualTo("내가 다녀온 K-MZ 코스");
+        assertThat(contentItem.getLikeCount()).isEqualTo(12L);
+        assertThat(contentItem.getBookmarkCount()).isEqualTo(4L);
+
+        verify(postMapper).findPublicCourses(0L, 10);
+        verify(postMapper).countPublicCourses();
+    }
+
+    @Test
+    @DisplayName("목록이 없을 때 빈 리스트와 totalElements 0을 반환한다")
+    void getPublicCoursesEmpty() {
+        given(postMapper.findPublicCourses(0L, 10)).willReturn(List.of());
+        given(postMapper.countPublicCourses()).willReturn(0L);
+
+        PageResponse<PublicCourseResponse> response = postService.getPublicCourses(0, 10);
+
+        assertThat(response.getPage()).isZero();
+        assertThat(response.getTotalElements()).isZero();
+        assertThat(response.getContent()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("page와 size에 따른 offset 계산을 검증한다 (page=2, size=10 -> offset=20)")
+    void getPublicCoursesOffsetCalculation() {
+        given(postMapper.findPublicCourses(20L, 10)).willReturn(List.of());
+        given(postMapper.countPublicCourses()).willReturn(50L);
+
+        PageResponse<PublicCourseResponse> response = postService.getPublicCourses(2, 10);
+
+        assertThat(response.getPage()).isEqualTo(2);
+        assertThat(response.getTotalElements()).isEqualTo(50L);
+        verify(postMapper).findPublicCourses(20L, 10);
+    }
+
+    @Test
+    @DisplayName("페이지 범위를 초과하면 빈 목록과 요청 page, 전체 개수를 반환한다")
+    void getPublicCoursesBeyondRange() {
+        given(postMapper.findPublicCourses(100L, 10)).willReturn(List.of());
+        given(postMapper.countPublicCourses()).willReturn(5L);
+
+        PageResponse<PublicCourseResponse> response = postService.getPublicCourses(10, 10);
+
+        assertThat(response.getPage()).isEqualTo(10);
+        assertThat(response.getTotalElements()).isEqualTo(5L);
+        assertThat(response.getContent()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("음수 page 요청 시 INVALID_INPUT_VALUE 예외가 발생한다")
+    void rejectWhenNegativePage() {
+        assertThatThrownBy(() -> postService.getPublicCourses(-1, 10))
+                .isInstanceOf(BusinessException.class)
+                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
+
+        verify(postMapper, never()).findPublicCourses(any(Long.class), any(Integer.class));
+        verify(postMapper, never()).countPublicCourses();
+    }
+
+    @Test
+    @DisplayName("size가 0 이하 요청 시 INVALID_INPUT_VALUE 예외가 발생한다")
+    void rejectWhenSizeZeroOrNegative() {
+        assertThatThrownBy(() -> postService.getPublicCourses(0, 0))
+                .isInstanceOf(BusinessException.class)
+                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
+
+        assertThatThrownBy(() -> postService.getPublicCourses(0, -5))
+                .isInstanceOf(BusinessException.class)
+                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
+
+        verify(postMapper, never()).findPublicCourses(any(Long.class), any(Integer.class));
+    }
+
+    @Test
+    @DisplayName("size가 최대 크기(100) 초과 시 INVALID_INPUT_VALUE 예외가 발생한다")
+    void rejectWhenSizeExceedsMax() {
+        assertThatThrownBy(() -> postService.getPublicCourses(0, 101))
+                .isInstanceOf(BusinessException.class)
+                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
+
+        verify(postMapper, never()).findPublicCourses(any(Long.class), any(Integer.class));
     }
 }
