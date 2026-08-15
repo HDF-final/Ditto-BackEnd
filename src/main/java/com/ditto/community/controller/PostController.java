@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.ditto.community.dto.request.CreateCoursePostRequest;
 import com.ditto.community.dto.request.UpdateCoursePostRequest;
 import com.ditto.community.dto.response.CreateCoursePostResponse;
+import com.ditto.community.dto.response.PublicCourseDetailResponse;
 import com.ditto.community.dto.response.PublicCourseResponse;
 import com.ditto.community.dto.response.UpdateCoursePostResponse;
 import com.ditto.community.service.PostService;
@@ -47,6 +48,17 @@ public class PostController {
             @Parameter(description = "페이지 크기(1~100, 기본 10)", example = "10")
             @RequestParam(defaultValue = "10") int size) {
         return ApiResponse.success("성공", postService.getPublicCourses(page, size));
+    }
+
+    @Operation(
+            summary = "공개 코스 상세 조회",
+            description = "커뮤니티에 공개된 코스 게시글의 본문과 연결된 코스 및 장소 목록을 상세 조회합니다.")
+    @GetMapping("/{postId}")
+    @ResponseStatus(HttpStatus.OK)
+    public ApiResponse<PublicCourseDetailResponse> getPublicCourse(
+            @Parameter(description = "조회할 게시글 ID", example = "1")
+            @PathVariable Long postId) {
+        return ApiResponse.success("성공", postService.getPublicCourse(postId));
     }
 
     @Operation(summary = "코스 게시글 작성", description = "로그인한 사용자가 본인 소유 코스를 커뮤니티 게시글로 공개합니다.")

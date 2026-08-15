@@ -35,7 +35,10 @@ import com.ditto.global.exception.ErrorCode;
 
 import java.util.List;
 
+import com.ditto.community.dto.response.PublicCourseDetailResponse;
 import com.ditto.community.dto.response.PublicCourseResponse;
+import com.ditto.course.dto.response.CoursePlaceResponse;
+import com.ditto.course.repository.PostMapper.PublicCourseDetailPostRow;
 import com.ditto.global.common.response.PageResponse;
 
 @ExtendWith(MockitoExtension.class)
@@ -454,5 +457,80 @@ class PostServiceTest {
                 .isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
 
         verify(postMapper, never()).findPublicCourses(any(Long.class), any(Integer.class));
+    }
+
+    @Test
+    @DisplayName("공개 코스 게시글 상세와 장소 목록을 정상 조회한다")
+    void getPublicCourseSuccess() {
+        PublicCourseDetailPostRow postRow = new PublicCourseDetailPostRow(1L, 3L, "내가 다녀온 K-MZ 코스", "추천 동선입니다.");
+        CoursePlaceResponse place1 = new CoursePlaceResponse(11L, "더현대 서울", "1F", 1, null, null, null);
+        CoursePlaceResponse place2 = new CoursePlaceResponse(22L, "IFC 몰", "B1", 2, null, null, null);
+
+        given(postMapper.findPublicCourseDetailById(1L)).willReturn(Optional.of(postRow));
+        given(courseMapper.findPlacesByCourseId(3L)).willReturn(List.of(place1, place2));
+
+        PublicCourseDetailResponse response = postService.getPublicCourse(1L);
+
+        assertThat(response.getPostId()).isEqualTo(1L);
+        assertThat(response.getTitle()).isEqualTo("내가 다녀온 K-MZ 코스");
+        assertThat(response.getContent()).isEqualTo("추천 동선입니다.");
+        assertThat(response.getCourse()).isNotNull();
+        assertThat(response.getCourse().getCourseId()).isEqualTo(3L);
+        assertThat(response.getCourse().getPlaces()).hasSize(2);
+        assertThat(response.getCourse().getPlaces().get(0).getPlaceId()).isEqualTo(11L);
+        assertThat(response.getCourse().getPlaces().get(0).getOrder()).isEqualTo(1);
+        assertThat(response.getCourse().getPlaces().get(1).getPlaceId()).isEqualTo(22L);
+        assertThat(response.getCourse().getPlaces().get(1).getOrder()).isEqualTo(2);
+        assertThat(response.getComments()).isEmpty();
+
+        verify(postMapper).findPublicCourseDetailById(1L);
+        verify(courseMapper).findPlacesByCourseId(3L);
+    }
+
+    @Test
+    @DisplayName("코스에 장소가 없으면 places 빈 배열을 반환한다")
+    void getPublicCourseWithoutPlaces() {
+        PublicCourseDetailPostRow postRow = new PublicCourseDetailPostRow(1L, 3L, "내가 다녀온 K-MZ 코스", "추천 동선입니다.");
+
+        given(postMapper.findPublicCourseDetailById(1L)).willReturn(Optional.of(postRow));
+        given(courseMapper.findPlacesByCourseId(3L)).willReturn(List.of());
+
+        PublicCourseDetailResponse response = postService.getPublicCourse(1L);
+
+        assertThat(response.getPostId()).isEqualTo(1L);
+        assertThat(response.getCourse().getPlaces()).isEmpty();
+        assertThat(response.getComments()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("존재하지 않거나 삭제된 게시글/코스인 경우 POST_NOT_FOUND 예외가 발생한다")
+    void getPublicCourseNotFound() {
+        given(postMapper.findPublicCourseDetailById(999L)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> postService.getPublicCourse(999L))
+                .isInstanceOf(BusinessException.class)
+                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.POST_NOT_FOUND);
+
+        verify(courseMapper, never()).findPlacesByCourseId(any());
+    }
+
+    @Test
+    @DisplayName("postId가 null이거나 0 이하이면 POST_NOT_FOUND 예외가 발생한다")
+    void getPublicCourseInvalidPostId() {
+        assertThatThrownBy(() -> postService.getPublicCourse(null))
+                .isInstanceOf(BusinessException.class)
+                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.POST_NOT_FOUND);
+
+        assertThatThrownBy(() -> postService.getPublicCourse(0L))
+                .isInstanceOf(BusinessException.class)
+                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.POST_NOT_FOUND);
+
+        assertThatThrownBy(() -> postService.getPublicCourse(-1L))
+                .isInstanceOf(BusinessException.class)
+                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.POST_NOT_FOUND);
     }
 }

@@ -74,7 +74,7 @@ public class SecurityConfig {
                                 writeError(response, ErrorCode.ACCESS_DENIED)))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/v1/community/courses").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/v1/community/courses", "/api/v1/community/courses/**").permitAll()
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .logout(logout -> logout.disable());

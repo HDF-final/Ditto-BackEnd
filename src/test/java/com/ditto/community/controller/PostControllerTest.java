@@ -16,6 +16,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import com.ditto.community.dto.response.PublicCourseDetailResponse;
 import com.ditto.community.dto.response.PublicCourseResponse;
 import com.ditto.community.service.PostService;
 import com.ditto.global.common.response.PageResponse;
@@ -93,5 +94,54 @@ class PostControllerTest {
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.code").value("C001"))
                 .andExpect(jsonPath("$.message").value("입력값이 올바르지 않습니다."));
+    }
+
+    @Test
+    @DisplayName("공개 코스 상세 조회 성공 시 본문, 코스 장소 목록, 댓글 빈 배열을 반환한다")
+    void getPublicCourseSuccess() throws Exception {
+        PublicCourseDetailResponse detail = PublicCourseDetailResponse.builder()
+                .postId(1L)
+                .title("내가 다녀온 K-MZ 코스")
+                .content("추천 동선입니다.")
+                .course(PublicCourseDetailResponse.CourseInfo.builder()
+                        .courseId(3L)
+                        .places(List.of(
+                                PublicCourseDetailResponse.PlaceInfo.builder()
+                                        .placeId(11L)
+                                        .order(1)
+                                        .build()))
+                        .build())
+                .comments(List.of())
+                .build();
+        given(postService.getPublicCourse(1L)).willReturn(detail);
+
+        mockMvc.perform(get("/api/v1/community/courses/1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.code").value("SUCCESS"))
+                .andExpect(jsonPath("$.message").value("성공"))
+                .andExpect(jsonPath("$.data.postId").value(1L))
+                .andExpect(jsonPath("$.data.title").value("내가 다녀온 K-MZ 코스"))
+                .andExpect(jsonPath("$.data.content").value("추천 동선입니다."))
+                .andExpect(jsonPath("$.data.course.courseId").value(3L))
+                .andExpect(jsonPath("$.data.course.places[0].placeId").value(11L))
+                .andExpect(jsonPath("$.data.course.places[0].order").value(1))
+                .andExpect(jsonPath("$.data.comments").isArray())
+                .andExpect(jsonPath("$.data.comments").isEmpty());
+
+        verify(postService).getPublicCourse(1L);
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 게시글 상세 조회 시 404 에러와 CM001 코드를 반환한다")
+    void getPublicCourseNotFound() throws Exception {
+        given(postService.getPublicCourse(999L))
+                .willThrow(new BusinessException(ErrorCode.POST_NOT_FOUND));
+
+        mockMvc.perform(get("/api/v1/community/courses/999"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.code").value("CM001"))
+                .andExpect(jsonPath("$.message").value("게시글을 찾을 수 없습니다."));
     }
 }
