@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ditto.course.repository.PostMapper">
+
+    <insert id="insert"
+            parameterType="com.ditto.course.repository.PostMapper$PostInsertCommand"
+            useGeneratedKeys="true"
+            keyProperty="postId"
+            keyColumn="post_id">
+        INSERT INTO post (
+            course_id,
+            user_id,
+            title,
+            content,
+            likes_count,
+            save_count,
+            created_at,
+            deleted_at
+        ) VALUES (
+            #{courseId,jdbcType=NUMERIC},
+            #{userId,jdbcType=NUMERIC},
+            #{title,jdbcType=VARCHAR},
+            #{content,jdbcType=CLOB},
+            0,
+            0,
+            SYSTIMESTAMP,
+            NULL
+        )
+    </insert>
+
+</mapper>
