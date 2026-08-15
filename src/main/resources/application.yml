@@ -60,3 +60,14 @@ management:
   endpoint:
     health:
       show-details: when-authorized
+
+# K-컬처 뉴스피드 자동 생성 설정
+news-feed:
+  generation:
+    topics:
+      - K-POP
+      - K-뷰티
+      - K-패션
+      - 한국 팝업스토어
+      - 서울 핫플
+
