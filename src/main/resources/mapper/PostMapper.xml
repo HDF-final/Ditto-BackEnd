@@ -54,4 +54,12 @@
            AND deleted_at IS NULL
     </update>
 
+    <update id="softDelete">
+        UPDATE post
+           SET deleted_at = SYSTIMESTAMP
+         WHERE post_id = #{postId,jdbcType=NUMERIC}
+           AND user_id = #{userId,jdbcType=NUMERIC}
+           AND deleted_at IS NULL
+    </update>
+
 </mapper>

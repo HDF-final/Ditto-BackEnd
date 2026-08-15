@@ -77,4 +77,18 @@ public class PostService {
                 .title(title)
                 .build();
     }
+
+    @Transactional
+    public void deleteCoursePost(Long userId, Long postId) {
+        PostRow post = postMapper.findActiveById(postId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.POST_NOT_FOUND));
+
+        if (!post.isWrittenBy(userId)) {
+            throw new BusinessException(ErrorCode.ACCESS_DENIED);
+        }
+
+        if (postMapper.softDelete(postId, userId) != 1) {
+            throw new BusinessException(ErrorCode.POST_NOT_FOUND);
+        }
+    }
 }

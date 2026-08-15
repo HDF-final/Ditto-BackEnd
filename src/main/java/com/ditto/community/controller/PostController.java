@@ -1,6 +1,7 @@
 package com.ditto.community.controller;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -47,5 +48,13 @@ public class PostController {
             @Valid @RequestBody UpdateCoursePostRequest request) {
         return ApiResponse.success("성공",
                 postService.updateCoursePost(SecurityUtils.requireUserId(), postId, request));
+    }
+
+    @Operation(summary = "코스 게시글 삭제", description = "로그인한 사용자가 자신이 작성한 코스 게시글을 소프트 삭제합니다.")
+    @DeleteMapping("/{postId}")
+    @ResponseStatus(HttpStatus.OK)
+    public ApiResponse<Void> deleteCoursePost(@PathVariable Long postId) {
+        postService.deleteCoursePost(SecurityUtils.requireUserId(), postId);
+        return ApiResponse.success("성공", null);
     }
 }

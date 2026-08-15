@@ -3,6 +3,7 @@ package com.ditto.community.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -272,6 +273,71 @@ class PostServiceTest {
     void updateCoursePostIsTransactional() throws NoSuchMethodException {
         Transactional transactional = PostService.class
                 .getMethod("updateCoursePost", Long.class, Long.class, UpdateCoursePostRequest.class)
+                .getAnnotation(Transactional.class);
+
+        assertThat(transactional).isNotNull();
+    }
+
+    @Test
+    @DisplayName("본인이 작성한 게시글을 소프트 삭제한다")
+    void deleteCoursePost() {
+        PostRow post = new PostRow(2L, 100L, USER_ID, "제목", "내용", 3, 4, null, null);
+        given(postMapper.findActiveById(2L)).willReturn(Optional.of(post));
+        given(postMapper.softDelete(2L, USER_ID)).willReturn(1);
+
+        postService.deleteCoursePost(USER_ID, 2L);
+
+        verify(postMapper).softDelete(2L, USER_ID);
+        verify(courseMapper, never()).softDelete(any());
+    }
+
+    @Test
+    @DisplayName("존재하지 않거나 이미 삭제된 게시글은 삭제할 수 없다")
+    void rejectDeleteWhenPostNotFound() {
+        given(postMapper.findActiveById(404L)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> postService.deleteCoursePost(USER_ID, 404L))
+                .isInstanceOf(BusinessException.class)
+                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.POST_NOT_FOUND);
+
+        verify(postMapper, never()).softDelete(any(), any());
+    }
+
+    @Test
+    @DisplayName("다른 사용자가 작성한 게시글은 삭제할 수 없다")
+    void rejectDeleteWhenPostWrittenByOtherUser() {
+        PostRow post = new PostRow(2L, 100L, 99L, "제목", "내용", 3, 4, null, null);
+        given(postMapper.findActiveById(2L)).willReturn(Optional.of(post));
+
+        assertThatThrownBy(() -> postService.deleteCoursePost(USER_ID, 2L))
+                .isInstanceOf(BusinessException.class)
+                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.ACCESS_DENIED);
+
+        verify(postMapper, never()).softDelete(any(), any());
+    }
+
+    @Test
+    @DisplayName("소프트 삭제 UPDATE 결과가 0건이면 POST_NOT_FOUND")
+    void rejectDeleteWhenDeletedCountZero() {
+        PostRow post = new PostRow(2L, 100L, USER_ID, "제목", "내용", 3, 4, null, null);
+        given(postMapper.findActiveById(2L)).willReturn(Optional.of(post));
+        given(postMapper.softDelete(2L, USER_ID)).willReturn(0);
+
+        assertThatThrownBy(() -> postService.deleteCoursePost(USER_ID, 2L))
+                .isInstanceOf(BusinessException.class)
+                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.POST_NOT_FOUND);
+
+        verify(postMapper).softDelete(eq(2L), eq(USER_ID));
+    }
+
+    @Test
+    @DisplayName("게시글 삭제는 트랜잭션 메서드에서 실행된다")
+    void deleteCoursePostIsTransactional() throws NoSuchMethodException {
+        Transactional transactional = PostService.class
+                .getMethod("deleteCoursePost", Long.class, Long.class)
                 .getAnnotation(Transactional.class);
 
         assertThat(transactional).isNotNull();

@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 import java.util.Optional;
 
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -19,6 +20,8 @@ public interface PostMapper {
     Optional<PostRow> findActiveById(Long postId);
 
     int update(PostUpdateCommand command);
+
+    int softDelete(@Param("postId") Long postId, @Param("userId") Long userId);
 
     @Getter
     @Setter
