@@ -29,4 +29,29 @@
         )
     </insert>
 
+    <select id="findActiveById" resultType="com.ditto.course.repository.PostMapper$PostRow">
+        SELECT
+            post_id AS postId,
+            course_id AS courseId,
+            user_id AS userId,
+            title,
+            content,
+            likes_count AS likesCount,
+            save_count AS saveCount,
+            created_at AS createdAt,
+            deleted_at AS deletedAt
+        FROM post
+        WHERE post_id = #{postId,jdbcType=NUMERIC}
+          AND deleted_at IS NULL
+    </select>
+
+    <update id="update" parameterType="com.ditto.course.repository.PostMapper$PostUpdateCommand">
+        UPDATE post
+           SET title = #{title,jdbcType=VARCHAR},
+               content = #{content,jdbcType=CLOB}
+         WHERE post_id = #{postId,jdbcType=NUMERIC}
+           AND user_id = #{userId,jdbcType=NUMERIC}
+           AND deleted_at IS NULL
+    </update>
+
 </mapper>
