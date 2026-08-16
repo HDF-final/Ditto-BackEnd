@@ -158,19 +158,19 @@ jobs:
         shell: bash
         run: |
           NEW_VER="${{ steps.create-lt.outputs.NEW_VERSION }}"
-          echo "Updating ASG: ${ASG_NAME} to Launch Template: ${LAUNCH_TEMPLATE_NAME} (Version: ${NEW_VER})"
+          echo "Updating ASG: ${{ env.ASG_NAME }} to Launch Template: ${{ env.LAUNCH_TEMPLATE_NAME }} (Version: ${NEW_VER})"
 
           aws autoscaling update-auto-scaling-group \
-            --auto-scaling-group-name "${ASG_NAME}" \
-            --launch-template "{\"LaunchTemplateName\":\"${LAUNCH_TEMPLATE_NAME}\",\"Version\":\"${NEW_VER}\"}"
+            --auto-scaling-group-name "${{ env.ASG_NAME }}" \
+            --launch-template "LaunchTemplateName=${{ env.LAUNCH_TEMPLATE_NAME }},Version=${NEW_VER}"
 
       # 6. ASG 인스턴스 새로고침(Instance Refresh) 실행 및 완료 대기
       - name: Trigger and monitor ASG Instance Refresh
         shell: bash
         run: |
-          echo "Starting Instance Refresh for ASG: ${ASG_NAME}..."
+          echo "Starting Instance Refresh for ASG: ${{ env.ASG_NAME }}..."
           REFRESH_ID=$(aws autoscaling start-instance-refresh \
-            --auto-scaling-group-name "${ASG_NAME}" \
+            --auto-scaling-group-name "${{ env.ASG_NAME }}" \
             --preferences '{"MinHealthyPercentage": 100, "InstanceWarmup": 60}' \
             --query 'InstanceRefreshId' \
             --output text)
@@ -179,7 +179,7 @@ jobs:
 
           while true; do
             STATUS=$(aws autoscaling describe-instance-refreshes \
-              --auto-scaling-group-name "${ASG_NAME}" \
+              --auto-scaling-group-name "${{ env.ASG_NAME }}" \
               --instance-refresh-ids "${REFRESH_ID}" \
               --query 'InstanceRefreshes[0].Status' \
               --output text)
