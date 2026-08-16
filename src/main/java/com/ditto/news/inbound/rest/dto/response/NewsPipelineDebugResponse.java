@@ -38,4 +38,7 @@ public class NewsPipelineDebugResponse {
 
     @Schema(description = "4단계: 최종 조합 및 생성된 뉴스피드 카드")
     private GeneratedNewsFeed generatedFeed;
+
+    @Schema(description = "5단계: DB 저장 후 발급된 PK ID", example = "101")
+    private Long savedNewsFeedId;
 }

@@ -20,10 +20,13 @@ import com.ditto.news.application.port.out.AiNewsFeedGenerator;
 import com.ditto.news.application.port.out.NewsArticleCollector;
 import com.ditto.news.application.port.out.NewsArticleCrawler;
 import com.ditto.news.application.port.out.NewsArticleSelector;
+import com.ditto.news.application.port.out.NewsFeedRepository;
 import com.ditto.news.config.NewsFeedGenerationProperties;
 import com.ditto.news.domain.CrawledNewsArticle;
 import com.ditto.news.domain.GeneratedNewsFeed;
 import com.ditto.news.domain.NewsArticleCandidate;
+import com.ditto.news.domain.NewsFeed;
+import com.ditto.news.inbound.rest.dto.response.NewsPipelineDebugResponse;
 
 @ExtendWith(MockitoExtension.class)
 class NewsFeedPipelineServiceTest {
@@ -40,6 +43,9 @@ class NewsFeedPipelineServiceTest {
     @Mock
     private AiNewsFeedGenerator aiNewsFeedGenerator;
 
+    @Mock
+    private NewsFeedRepository newsFeedRepository;
+
     private NewsFeedGenerationProperties properties;
     private NewsFeedPipelineService pipelineService;
 
@@ -47,11 +53,11 @@ class NewsFeedPipelineServiceTest {
     void setUp() {
         properties = new NewsFeedGenerationProperties();
         properties.setTopics(List.of("K-POP", "K-Drama"));
-        pipelineService = new NewsFeedPipelineService(collector, crawler, selector, aiNewsFeedGenerator, properties);
+        pipelineService = new NewsFeedPipelineService(collector, crawler, selector, aiNewsFeedGenerator, newsFeedRepository, properties);
     }
 
     @Test
-    @DisplayName("후보수집 -> 본문크롤링 -> 기사선별 -> 피드생성 전 파이프라인 단계가 순차적으로 정상 실행된다")
+    @DisplayName("후보수집 -> 본문크롤링 -> 기사선별 -> AI생성 -> DB저장 5단계 전 파이프라인이 순차적으로 정상 실행된다")
     void executesPipelineSuccessfully() {
         String topic = "K-POP";
         NewsArticleCandidate candidate = NewsArticleCandidate.builder()
@@ -68,26 +74,36 @@ class NewsFeedPipelineServiceTest {
         GeneratedNewsFeed expectedFeed = GeneratedNewsFeed.builder()
                 .title("[K-POP] K-POP Single")
                 .body("Summary")
+                .summaries(List.of("요약 1", "요약 2", "요약 3"))
+                .keywords(List.of("#KPOP"))
+                .build();
+
+        NewsFeed savedFeed = NewsFeed.builder()
+                .newsFeedId(101L)
+                .title("[K-POP] K-POP Single")
                 .build();
 
         given(collector.collect(topic)).willReturn(List.of(candidate));
         given(crawler.crawlAll(List.of(candidate))).willReturn(List.of(crawled));
         given(selector.selectRelevantArticles(List.of(crawled), List.of(topic))).willReturn(List.of(crawled));
         given(aiNewsFeedGenerator.generate(List.of(crawled), topic)).willReturn(expectedFeed);
+        given(newsFeedRepository.save(expectedFeed)).willReturn(savedFeed);
 
-        GeneratedNewsFeed result = pipelineService.executePipeline(topic);
+        NewsPipelineDebugResponse debugResult = pipelineService.executePipelineWithDebug(topic);
 
-        assertThat(result).isNotNull();
-        assertThat(result.getTitle()).isEqualTo("[K-POP] K-POP Single");
+        assertThat(debugResult).isNotNull();
+        assertThat(debugResult.getGeneratedFeed().getTitle()).isEqualTo("[K-POP] K-POP Single");
+        assertThat(debugResult.getSavedNewsFeedId()).isEqualTo(101L);
 
         verify(collector).collect(topic);
         verify(crawler).crawlAll(List.of(candidate));
         verify(selector).selectRelevantArticles(List.of(crawled), List.of(topic));
         verify(aiNewsFeedGenerator).generate(List.of(crawled), topic);
+        verify(newsFeedRepository).save(expectedFeed);
     }
 
     @Test
-    @DisplayName("후보 기사가 0건이면 후속 크롤링 및 생성을 건너뛰고 null을 반환한다")
+    @DisplayName("후보 기사가 0건이면 후속 크롤링, 생성 및 DB 저장을 건너뛰고 null을 반환한다")
     void skipsPipelineWhenNoCandidates() {
         String topic = "K-POP";
         given(collector.collect(topic)).willReturn(Collections.emptyList());
@@ -97,6 +113,7 @@ class NewsFeedPipelineServiceTest {
         assertThat(result).isNull();
         verify(crawler, never()).crawlAll(any());
         verify(aiNewsFeedGenerator, never()).generate(any(), any());
+        verify(newsFeedRepository, never()).save(any());
     }
 
     @Test
