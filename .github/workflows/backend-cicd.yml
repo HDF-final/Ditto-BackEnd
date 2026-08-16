@@ -14,9 +14,10 @@ concurrency:
 
 env:
   AWS_REGION: ap-northeast-2
-  ECR_REGISTRY: 601202752151.dkr.ecr.ap-northeast-2.amazonaws.com
+  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-northeast-2.amazonaws.com
   ECR_REPOSITORY: ditto-backend
-  EC2_INSTANCE_ID: i-07d513012815a288f
+  EC2_INSTANCE_ID: ${{ secrets.EC2_INSTANCE_ID }}
+  DEPLOY_ROLE_ARN: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/HDF-GitHubActions-Backend-Deploy-Role
 
 jobs:
   test:
@@ -26,16 +27,16 @@ jobs:
       contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Set up Java 17
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v6
+        uses: gradle/actions/setup-gradle@v3
 
       - name: Run tests
         run: ./gradlew test --no-daemon
@@ -50,12 +51,12 @@ jobs:
       id-token: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v6
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::601202752151:role/HDF-GitHubActions-Backend-Deploy-Role
+          role-to-assume: ${{ env.DEPLOY_ROLE_ARN }}
           role-session-name: GitHubActions-DittoBackend
           aws-region: ${{ env.AWS_REGION }}
 
@@ -86,12 +87,12 @@ jobs:
                 "set -eu",
                 "cd /opt/ditto",
                 "PREVIOUS_TAG=$(sed -n \"s/^IMAGE_TAG=//p\" .env | tail -n 1)",
-                "test -n \"$PREVIOUS_TAG\"",
+                "PREVIOUS_TAG=${PREVIOUS_TAG:-latest}",
                 "aws ecr get-login-password --region \($region) | sudo docker login --username AWS --password-stdin \($registry)",
                 "sudo docker pull \($registry)/\($repository):\($tag)",
                 "sed -i \"s/^IMAGE_TAG=.*/IMAGE_TAG=\($tag)/\" .env",
                 "sudo docker compose up -d --no-deps backend || { sed -i \"s/^IMAGE_TAG=.*/IMAGE_TAG=$PREVIOUS_TAG/\" .env; sudo docker compose up -d --no-deps backend; exit 1; }",
-                "for attempt in $(seq 1 12); do if curl -fsS http://localhost:8080/actuator/health >/dev/null; then echo DEPLOY_OK; exit 0; fi; sleep 5; done; echo DEPLOY_FAILED; sed -i \"s/^IMAGE_TAG=.*/IMAGE_TAG=$PREVIOUS_TAG/\" .env; sudo docker compose up -d --no-deps backend; exit 1"
+                "for attempt in $(seq 1 24); do if curl -fsS http://localhost:8080/actuator/health >/dev/null; then echo DEPLOY_OK; exit 0; fi; sleep 5; done; echo DEPLOY_FAILED; sed -i \"s/^IMAGE_TAG=.*/IMAGE_TAG=$PREVIOUS_TAG/\" .env; sudo docker compose up -d --no-deps backend; exit 1"
               ]
             }')
 
