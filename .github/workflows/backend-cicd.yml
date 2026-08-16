@@ -80,7 +80,7 @@ jobs:
         id: create-lt
         shell: bash
         run: |
-          USER_DATA_SCRIPT=$(cat << EOF
+          cat << 'EOF' > /tmp/user_data.sh
           #!/bin/bash
           set -eux
           export DEBIAN_FRONTEND=noninteractive
@@ -97,21 +97,21 @@ jobs:
           usermod -aG docker ubuntu
 
           APP_DIR="/opt/ditto"
-          mkdir -p "\$APP_DIR"
-          chown -R ubuntu:ubuntu "\$APP_DIR"
+          mkdir -p "$APP_DIR"
+          chown -R ubuntu:ubuntu "$APP_DIR"
 
-          AWS_REGION="${AWS_REGION}"
-          ECR_REGISTRY="${ECR_REGISTRY}"
-          ECR_REPOSITORY="${ECR_REPOSITORY}"
+          AWS_REGION="${{ vars.AWS_REGION }}"
+          ECR_REGISTRY="${{ vars.ECR_REGISTRY }}"
+          ECR_REPOSITORY="${{ vars.ECR_REPOSITORY }}"
 
-          cat << 'COMPOSE_EOF' > "\$APP_DIR/docker-compose.yml"
+          cat << 'COMPOSE_EOF' > "$APP_DIR/docker-compose.yml"
           services:
             backend:
-              image: "\${ECR_REGISTRY}/\${ECR_REPOSITORY}:\${IMAGE_TAG:-latest}"
+              image: "${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG:-latest}"
               container_name: ditto-backend
               restart: unless-stopped
               env_file:
-                - \${ENV_FILE:-.env}
+                - ${ENV_FILE:-.env}
               ports:
                 - "8080:8080"
               healthcheck:
@@ -127,22 +127,21 @@ jobs:
                   max-file: "3"
           COMPOSE_EOF
 
-          cat << ENV_EOF > "\$APP_DIR/.env"
-          ECR_REGISTRY=${ECR_REGISTRY}
-          ECR_REPOSITORY=${ECR_REPOSITORY}
+          cat << ENV_EOF > "$APP_DIR/.env"
+          ECR_REGISTRY=${{ vars.ECR_REGISTRY }}
+          ECR_REPOSITORY=${{ vars.ECR_REPOSITORY }}
           IMAGE_TAG=latest
           SPRING_DATASOURCE_URL=${{ secrets.SPRING_DATASOURCE_URL }}
           SPRING_DATASOURCE_USERNAME=${{ secrets.SPRING_DATASOURCE_USERNAME }}
           SPRING_DATASOURCE_PASSWORD=${{ secrets.SPRING_DATASOURCE_PASSWORD }}
           ENV_EOF
 
-          /usr/local/bin/aws ecr get-login-password --region "\$AWS_REGION" | docker login --username AWS --password-stdin "\$ECR_REGISTRY"
-          docker compose -f "\$APP_DIR/docker-compose.yml" pull
-          docker compose -f "\$APP_DIR/docker-compose.yml" up -d
+          /usr/local/bin/aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
+          docker compose -f "$APP_DIR/docker-compose.yml" pull
+          docker compose -f "$APP_DIR/docker-compose.yml" up -d
           EOF
-          )
 
-          ENCODED_USER_DATA=$(echo "$USER_DATA_SCRIPT" | base64 -w 0)
+          ENCODED_USER_DATA=$(base64 -w 0 /tmp/user_data.sh)
 
           NEW_VERSION=$(aws ec2 create-launch-template-version \
             --launch-template-name "${LAUNCH_TEMPLATE_NAME}" \
@@ -151,45 +150,50 @@ jobs:
             --query 'LaunchTemplateVersion.VersionNumber' \
             --output text)
 
-          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "NEW_VERSION=${NEW_VERSION}" >> $GITHUB_OUTPUT
 
-      # 5. ASG 시작 템플릿 버전 갱신
+      # 5. ASG 시작 템플릿 버전 갱신 (파싱 오류 원천 차단)
       - name: Update ASG Launch Template version
         shell: bash
         run: |
-          NEW_VER="${{ steps.create-lt.outputs.NEW_VERSION }}"
-          echo "Updating ASG: ${{ env.ASG_NAME }} to Launch Template: ${{ env.LAUNCH_TEMPLATE_NAME }} (Version: ${NEW_VER})"
+          TARGET_ASG="${{ vars.ASG_NAME }}"
+          TARGET_LT="${{ vars.LAUNCH_TEMPLATE_NAME }}"
+          TARGET_VER="${{ steps.create-lt.outputs.NEW_VERSION }}"
+
+          echo "Updating ASG [${TARGET_ASG}] with Launch Template [${TARGET_LT}] Version [${TARGET_VER}]"
 
           aws autoscaling update-auto-scaling-group \
-            --auto-scaling-group-name "${{ env.ASG_NAME }}" \
-            --launch-template "LaunchTemplateName=${{ env.LAUNCH_TEMPLATE_NAME }},Version=${NEW_VER}"
+            --auto-scaling-group-name "${TARGET_ASG}" \
+            --launch-template "LaunchTemplateName=${TARGET_LT},Version=${TARGET_VER}"
 
       # 6. ASG 인스턴스 새로고침(Instance Refresh) 실행 및 완료 대기
       - name: Trigger and monitor ASG Instance Refresh
         shell: bash
         run: |
-          echo "Starting Instance Refresh for ASG: ${{ env.ASG_NAME }}..."
+          TARGET_ASG="${{ vars.ASG_NAME }}"
+          echo "Starting Instance Refresh for ASG: ${TARGET_ASG}..."
+
           REFRESH_ID=$(aws autoscaling start-instance-refresh \
-            --auto-scaling-group-name "${{ env.ASG_NAME }}" \
+            --auto-scaling-group-name "${TARGET_ASG}" \
             --preferences '{"MinHealthyPercentage": 100, "InstanceWarmup": 60}' \
             --query 'InstanceRefreshId' \
             --output text)
 
-          echo "Instance Refresh ID: $REFRESH_ID"
+          echo "Instance Refresh ID: ${REFRESH_ID}"
 
           while true; do
             STATUS=$(aws autoscaling describe-instance-refreshes \
-              --auto-scaling-group-name "${{ env.ASG_NAME }}" \
+              --auto-scaling-group-name "${TARGET_ASG}" \
               --instance-refresh-ids "${REFRESH_ID}" \
               --query 'InstanceRefreshes[0].Status' \
               --output text)
 
-            echo "[$(date +'%H:%M:%S')] Current refresh status: $STATUS"
+            echo "[$(date +'%H:%M:%S')] Current refresh status: ${STATUS}"
 
-            if [ "$STATUS" = "Successful" ]; then
+            if [ "${STATUS}" = "Successful" ]; then
               echo "✅ Instance Refresh completed successfully without downtime!"
               break
-            elif [ "$STATUS" = "Failed" ] || [ "$STATUS" = "Cancelled" ]; then
+            elif [ "${STATUS}" = "Failed" ] || [ "${STATUS}" = "Cancelled" ]; then
               echo "❌ Instance Refresh failed or was cancelled."
               exit 1
             fi
