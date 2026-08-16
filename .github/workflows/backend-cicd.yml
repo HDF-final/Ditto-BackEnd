@@ -157,10 +157,12 @@ jobs:
       - name: Update ASG Launch Template version
         shell: bash
         run: |
-          echo "Updating ASG: ${ASG_NAME} to Launch Template: ${LAUNCH_TEMPLATE_NAME} (Version: ${{ steps.create-lt.outputs.NEW_VERSION }})"
+          NEW_VER="${{ steps.create-lt.outputs.NEW_VERSION }}"
+          echo "Updating ASG: ${ASG_NAME} to Launch Template: ${LAUNCH_TEMPLATE_NAME} (Version: ${NEW_VER})"
+
           aws autoscaling update-auto-scaling-group \
             --auto-scaling-group-name "${ASG_NAME}" \
-            --launch-template "LaunchTemplateName=${LAUNCH_TEMPLATE_NAME},Version=${{ steps.create-lt.outputs.NEW_VERSION }}"
+            --launch-template "{\"LaunchTemplateName\":\"${LAUNCH_TEMPLATE_NAME}\",\"Version\":\"${NEW_VER}\"}"
 
       # 6. ASG 인스턴스 새로고침(Instance Refresh) 실행 및 완료 대기
       - name: Trigger and monitor ASG Instance Refresh
