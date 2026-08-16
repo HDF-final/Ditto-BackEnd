@@ -13,11 +13,10 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  AWS_REGION: ap-northeast-2
-  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-northeast-2.amazonaws.com
-  ECR_REPOSITORY: ditto-backend
+  AWS_REGION: ${{ vars.AWS_REGION || 'ap-northeast-2' }}
+  ECR_REGISTRY: ${{ vars.ECR_REGISTRY }}
+  ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
   EC2_INSTANCE_ID: ${{ secrets.EC2_INSTANCE_ID }}
-  DEPLOY_ROLE_ARN: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/HDF-GitHubActions-Backend-Deploy-Role
 
 jobs:
   test:
@@ -56,7 +55,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ env.DEPLOY_ROLE_ARN }}
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
           role-session-name: GitHubActions-DittoBackend
           aws-region: ${{ env.AWS_REGION }}
 
@@ -87,12 +86,12 @@ jobs:
                 "set -eu",
                 "cd /opt/ditto",
                 "PREVIOUS_TAG=$(sed -n \"s/^IMAGE_TAG=//p\" .env | tail -n 1)",
-                "PREVIOUS_TAG=${PREVIOUS_TAG:-latest}",
+                "test -n \"$PREVIOUS_TAG\"",
                 "aws ecr get-login-password --region \($region) | sudo docker login --username AWS --password-stdin \($registry)",
                 "sudo docker pull \($registry)/\($repository):\($tag)",
                 "sed -i \"s/^IMAGE_TAG=.*/IMAGE_TAG=\($tag)/\" .env",
                 "sudo docker compose up -d --no-deps backend || { sed -i \"s/^IMAGE_TAG=.*/IMAGE_TAG=$PREVIOUS_TAG/\" .env; sudo docker compose up -d --no-deps backend; exit 1; }",
-                "for attempt in $(seq 1 24); do if curl -fsS http://localhost:8080/actuator/health >/dev/null; then echo DEPLOY_OK; exit 0; fi; sleep 5; done; echo DEPLOY_FAILED; sed -i \"s/^IMAGE_TAG=.*/IMAGE_TAG=$PREVIOUS_TAG/\" .env; sudo docker compose up -d --no-deps backend; exit 1"
+                "for attempt in $(seq 1 12); do if curl -fsS http://localhost:8080/actuator/health >/dev/null; then echo DEPLOY_OK; exit 0; fi; sleep 5; done; echo DEPLOY_FAILED; sed -i \"s/^IMAGE_TAG=.*/IMAGE_TAG=$PREVIOUS_TAG/\" .env; sudo docker compose up -d --no-deps backend; exit 1"
               ]
             }')
 
