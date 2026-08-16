@@ -10,6 +10,13 @@ concurrency:
   group: backend-dev-deploy
   cancel-in-progress: false
 
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  ECR_REGISTRY: ${{ vars.ECR_REGISTRY }}
+  ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+  ASG_NAME: ${{ vars.ASG_NAME }}
+  LAUNCH_TEMPLATE_NAME: ${{ vars.LAUNCH_TEMPLATE_NAME }}
+
 jobs:
   test:
     name: Test
@@ -50,7 +57,7 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
           role-session-name: GitHubActions-DittoBackend
-          aws-region: ${{ vars.AWS_REGION }}
+          aws-region: ${{ env.AWS_REGION }}
 
       # 2. Amazon ECR 로그인
       - name: Log in to Amazon ECR
@@ -60,7 +67,7 @@ jobs:
       - name: Build and push image
         shell: bash
         run: |
-          IMAGE_URI="${{ vars.ECR_REGISTRY }}/${{ vars.ECR_REPOSITORY }}"
+          IMAGE_URI="${ECR_REGISTRY}/${ECR_REPOSITORY}"
           docker build --platform linux/amd64 \
             --tag "${IMAGE_URI}:${GITHUB_SHA}" \
             --tag "${IMAGE_URI}:latest" \
@@ -73,7 +80,7 @@ jobs:
         id: create-lt
         shell: bash
         run: |
-          USER_DATA_SCRIPT=$(cat << 'EOF'
+          USER_DATA_SCRIPT=$(cat << EOF
           #!/bin/bash
           set -eux
           export DEBIAN_FRONTEND=noninteractive
@@ -90,21 +97,21 @@ jobs:
           usermod -aG docker ubuntu
 
           APP_DIR="/opt/ditto"
-          mkdir -p "$APP_DIR"
-          chown -R ubuntu:ubuntu "$APP_DIR"
+          mkdir -p "\$APP_DIR"
+          chown -R ubuntu:ubuntu "\$APP_DIR"
 
-          AWS_REGION="${{ vars.AWS_REGION }}"
-          ECR_REGISTRY="${{ vars.ECR_REGISTRY }}"
-          ECR_REPOSITORY="${{ vars.ECR_REPOSITORY }}"
+          AWS_REGION="${AWS_REGION}"
+          ECR_REGISTRY="${ECR_REGISTRY}"
+          ECR_REPOSITORY="${ECR_REPOSITORY}"
 
-          cat << 'COMPOSE_EOF' > "$APP_DIR/docker-compose.yml"
+          cat << 'COMPOSE_EOF' > "\$APP_DIR/docker-compose.yml"
           services:
             backend:
-              image: "${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG:-latest}"
+              image: "\${ECR_REGISTRY}/\${ECR_REPOSITORY}:\${IMAGE_TAG:-latest}"
               container_name: ditto-backend
               restart: unless-stopped
               env_file:
-                - ${ENV_FILE:-.env}
+                - \${ENV_FILE:-.env}
               ports:
                 - "8080:8080"
               healthcheck:
@@ -120,25 +127,25 @@ jobs:
                   max-file: "3"
           COMPOSE_EOF
 
-          cat << ENV_EOF > "$APP_DIR/.env"
-          ECR_REGISTRY=${{ vars.ECR_REGISTRY }}
-          ECR_REPOSITORY=${{ vars.ECR_REPOSITORY }}
+          cat << ENV_EOF > "\$APP_DIR/.env"
+          ECR_REGISTRY=${ECR_REGISTRY}
+          ECR_REPOSITORY=${ECR_REPOSITORY}
           IMAGE_TAG=latest
           SPRING_DATASOURCE_URL=${{ secrets.SPRING_DATASOURCE_URL }}
           SPRING_DATASOURCE_USERNAME=${{ secrets.SPRING_DATASOURCE_USERNAME }}
           SPRING_DATASOURCE_PASSWORD=${{ secrets.SPRING_DATASOURCE_PASSWORD }}
           ENV_EOF
 
-          /usr/local/bin/aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
-          docker compose -f "$APP_DIR/docker-compose.yml" pull
-          docker compose -f "$APP_DIR/docker-compose.yml" up -d
+          /usr/local/bin/aws ecr get-login-password --region "\$AWS_REGION" | docker login --username AWS --password-stdin "\$ECR_REGISTRY"
+          docker compose -f "\$APP_DIR/docker-compose.yml" pull
+          docker compose -f "\$APP_DIR/docker-compose.yml" up -d
           EOF
           )
 
           ENCODED_USER_DATA=$(echo "$USER_DATA_SCRIPT" | base64 -w 0)
 
           NEW_VERSION=$(aws ec2 create-launch-template-version \
-            --launch-template-name "${{ vars.LAUNCH_TEMPLATE_NAME }}" \
+            --launch-template-name "${LAUNCH_TEMPLATE_NAME}" \
             --source-version '$Latest' \
             --launch-template-data "{\"UserData\":\"${ENCODED_USER_DATA}\"}" \
             --query 'LaunchTemplateVersion.VersionNumber' \
@@ -150,17 +157,18 @@ jobs:
       - name: Update ASG Launch Template version
         shell: bash
         run: |
+          echo "Updating ASG: ${ASG_NAME} to Launch Template: ${LAUNCH_TEMPLATE_NAME} (Version: ${{ steps.create-lt.outputs.NEW_VERSION }})"
           aws autoscaling update-auto-scaling-group \
-            --auto-scaling-group-name "${{ vars.ASG_NAME }}" \
-            --launch-template "LaunchTemplateName=${{ vars.LAUNCH_TEMPLATE_NAME }},Version=${{ steps.create-lt.outputs.NEW_VERSION }}"
+            --auto-scaling-group-name "${ASG_NAME}" \
+            --launch-template "LaunchTemplateName=${LAUNCH_TEMPLATE_NAME},Version=${{ steps.create-lt.outputs.NEW_VERSION }}"
 
-      # 6. ASG 인스턴스 새로고침(Instance Refresh) 실행 및 롤링 배포 모니터링
+      # 6. ASG 인스턴스 새로고침(Instance Refresh) 실행 및 완료 대기
       - name: Trigger and monitor ASG Instance Refresh
         shell: bash
         run: |
-          echo "Starting Instance Refresh for ASG: ${{ vars.ASG_NAME }}..."
+          echo "Starting Instance Refresh for ASG: ${ASG_NAME}..."
           REFRESH_ID=$(aws autoscaling start-instance-refresh \
-            --auto-scaling-group-name "${{ vars.ASG_NAME }}" \
+            --auto-scaling-group-name "${ASG_NAME}" \
             --preferences '{"MinHealthyPercentage": 100, "InstanceWarmup": 60}' \
             --query 'InstanceRefreshId' \
             --output text)
@@ -169,7 +177,7 @@ jobs:
 
           while true; do
             STATUS=$(aws autoscaling describe-instance-refreshes \
-              --auto-scaling-group-name "${{ vars.ASG_NAME }}" \
+              --auto-scaling-group-name "${ASG_NAME}" \
               --instance-refresh-ids "${REFRESH_ID}" \
               --query 'InstanceRefreshes[0].Status' \
               --output text)
