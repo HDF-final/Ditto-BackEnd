@@ -10,13 +10,6 @@ concurrency:
   group: backend-dev-deploy
   cancel-in-progress: false
 
-env:
-  AWS_REGION: ap-northeast-2
-  ECR_REGISTRY: 601202752151.dkr.ecr.ap-northeast-2.amazonaws.com
-  ECR_REPOSITORY: ditto-backend
-  ASG_NAME: asg-hdf-backend
-  LAUNCH_TEMPLATE_NAME: HDF-lt-hdf-backend
-
 jobs:
   test:
     name: Test
@@ -51,13 +44,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 1. AWS OIDC 자격 증명 획득
+      # 1. AWS OIDC 인증
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
           role-session-name: GitHubActions-DittoBackend
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: ${{ vars.AWS_REGION }}
 
       # 2. Amazon ECR 로그인
       - name: Log in to Amazon ECR
@@ -67,7 +60,7 @@ jobs:
       - name: Build and push image
         shell: bash
         run: |
-          IMAGE_URI="${ECR_REGISTRY}/${ECR_REPOSITORY}"
+          IMAGE_URI="${{ vars.ECR_REGISTRY }}/${{ vars.ECR_REPOSITORY }}"
           docker build --platform linux/amd64 \
             --tag "${IMAGE_URI}:${GITHUB_SHA}" \
             --tag "${IMAGE_URI}:latest" \
@@ -75,12 +68,11 @@ jobs:
           docker push "${IMAGE_URI}:${GITHUB_SHA}"
           docker push "${IMAGE_URI}:latest"
 
-      # 4. 시작 템플릿 새 버전 생성 (새 이미지 태그 반영)
+      # 4. 시작 템플릿 새 버전 생성
       - name: Create new Launch Template version
         id: create-lt
         shell: bash
         run: |
-          # 시작 템플릿의 기본 User Data 스크립트 작성
           USER_DATA_SCRIPT=$(cat << 'EOF'
           #!/bin/bash
           set -eux
@@ -101,9 +93,9 @@ jobs:
           mkdir -p "$APP_DIR"
           chown -R ubuntu:ubuntu "$APP_DIR"
 
-          AWS_REGION="ap-northeast-2"
-          ECR_REGISTRY="601202752151.dkr.ecr.ap-northeast-2.amazonaws.com"
-          ECR_REPOSITORY="ditto-backend"
+          AWS_REGION="${{ vars.AWS_REGION }}"
+          ECR_REGISTRY="${{ vars.ECR_REGISTRY }}"
+          ECR_REPOSITORY="${{ vars.ECR_REPOSITORY }}"
 
           cat << 'COMPOSE_EOF' > "$APP_DIR/docker-compose.yml"
           services:
@@ -129,10 +121,9 @@ jobs:
           COMPOSE_EOF
 
           cat << ENV_EOF > "$APP_DIR/.env"
-          ECR_REGISTRY=${ECR_REGISTRY}
-          ECR_REPOSITORY=${ECR_REPOSITORY}
+          ECR_REGISTRY=${{ vars.ECR_REGISTRY }}
+          ECR_REPOSITORY=${{ vars.ECR_REPOSITORY }}
           IMAGE_TAG=latest
-          # 실제 Spring Boot DB 환경변수 주입
           SPRING_DATASOURCE_URL=${{ secrets.SPRING_DATASOURCE_URL }}
           SPRING_DATASOURCE_USERNAME=${{ secrets.SPRING_DATASOURCE_USERNAME }}
           SPRING_DATASOURCE_PASSWORD=${{ secrets.SPRING_DATASOURCE_PASSWORD }}
@@ -147,7 +138,7 @@ jobs:
           ENCODED_USER_DATA=$(echo "$USER_DATA_SCRIPT" | base64 -w 0)
 
           NEW_VERSION=$(aws ec2 create-launch-template-version \
-            --launch-template-name "${LAUNCH_TEMPLATE_NAME}" \
+            --launch-template-name "${{ vars.LAUNCH_TEMPLATE_NAME }}" \
             --source-version '$Latest' \
             --launch-template-data "{\"UserData\":\"${ENCODED_USER_DATA}\"}" \
             --query 'LaunchTemplateVersion.VersionNumber' \
@@ -160,16 +151,16 @@ jobs:
         shell: bash
         run: |
           aws autoscaling update-auto-scaling-group \
-            --auto-scaling-group-name "${ASG_NAME}" \
-            --launch-template "LaunchTemplateName=${LAUNCH_TEMPLATE_NAME},Version=${{ steps.create-lt.outputs.NEW_VERSION }}"
+            --auto-scaling-group-name "${{ vars.ASG_NAME }}" \
+            --launch-template "LaunchTemplateName=${{ vars.LAUNCH_TEMPLATE_NAME }},Version=${{ steps.create-lt.outputs.NEW_VERSION }}"
 
-      # 6. ASG 인스턴스 새로고침(Instance Refresh) 실행 및 완료 대기
+      # 6. ASG 인스턴스 새로고침(Instance Refresh) 실행 및 롤링 배포 모니터링
       - name: Trigger and monitor ASG Instance Refresh
         shell: bash
         run: |
-          echo "Starting Instance Refresh for ASG: ${ASG_NAME}..."
+          echo "Starting Instance Refresh for ASG: ${{ vars.ASG_NAME }}..."
           REFRESH_ID=$(aws autoscaling start-instance-refresh \
-            --auto-scaling-group-name "${ASG_NAME}" \
+            --auto-scaling-group-name "${{ vars.ASG_NAME }}" \
             --preferences '{"MinHealthyPercentage": 100, "InstanceWarmup": 60}' \
             --query 'InstanceRefreshId' \
             --output text)
@@ -178,12 +169,12 @@ jobs:
 
           while true; do
             STATUS=$(aws autoscaling describe-instance-refreshes \
-              --auto-scaling-group-name "${ASG_NAME}" \
+              --auto-scaling-group-name "${{ vars.ASG_NAME }}" \
               --instance-refresh-ids "${REFRESH_ID}" \
               --query 'InstanceRefreshes[0].Status' \
               --output text)
 
-            echo "Current refresh status: $STATUS"
+            echo "[$(date +'%H:%M:%S')] Current refresh status: $STATUS"
 
             if [ "$STATUS" = "Successful" ]; then
               echo "✅ Instance Refresh completed successfully without downtime!"
