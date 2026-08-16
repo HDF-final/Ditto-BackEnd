@@ -1,0 +1,20 @@
+services:
+  backend:
+    image: "${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG:-latest}"
+    container_name: ditto-backend
+    restart: unless-stopped
+    env_file:
+      - ${ENV_FILE:-.env}
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

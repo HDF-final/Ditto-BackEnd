@@ -1,0 +1,124 @@
+name: Backend CI/CD
+
+on:
+  pull_request:
+    branches:
+      - dev
+  push:
+    branches:
+      - dev
+
+concurrency:
+  group: backend-dev-deploy
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ap-northeast-2
+  ECR_REGISTRY: 601202752151.dkr.ecr.ap-northeast-2.amazonaws.com
+  ECR_REPOSITORY: ditto-backend
+  EC2_INSTANCE_ID: i-07d513012815a288f
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Run tests
+        run: ./gradlew test --no-daemon
+
+  deploy:
+    name: Build and deploy
+    if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: arn:aws:iam::601202752151:role/HDF-GitHubActions-Backend-Deploy-Role
+          role-session-name: GitHubActions-DittoBackend
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push image
+        shell: bash
+        run: |
+          IMAGE_URI="${ECR_REGISTRY}/${ECR_REPOSITORY}"
+          docker build --platform linux/amd64 \
+            --tag "${IMAGE_URI}:${GITHUB_SHA}" \
+            --tag "${IMAGE_URI}:latest" \
+            .
+          docker push "${IMAGE_URI}:${GITHUB_SHA}"
+          docker push "${IMAGE_URI}:latest"
+
+      - name: Deploy through AWS Systems Manager
+        shell: bash
+        run: |
+          PARAMETERS=$(jq -n \
+            --arg region "${AWS_REGION}" \
+            --arg registry "${ECR_REGISTRY}" \
+            --arg repository "${ECR_REPOSITORY}" \
+            --arg tag "${GITHUB_SHA}" \
+            '{
+              commands: [
+                "set -eu",
+                "cd /opt/ditto",
+                "PREVIOUS_TAG=$(sed -n \"s/^IMAGE_TAG=//p\" .env | tail -n 1)",
+                "test -n \"$PREVIOUS_TAG\"",
+                "aws ecr get-login-password --region \($region) | sudo docker login --username AWS --password-stdin \($registry)",
+                "sudo docker pull \($registry)/\($repository):\($tag)",
+                "sed -i \"s/^IMAGE_TAG=.*/IMAGE_TAG=\($tag)/\" .env",
+                "sudo docker compose up -d --no-deps backend || { sed -i \"s/^IMAGE_TAG=.*/IMAGE_TAG=$PREVIOUS_TAG/\" .env; sudo docker compose up -d --no-deps backend; exit 1; }",
+                "for attempt in $(seq 1 12); do if curl -fsS http://localhost:8080/actuator/health >/dev/null; then echo DEPLOY_OK; exit 0; fi; sleep 5; done; echo DEPLOY_FAILED; sed -i \"s/^IMAGE_TAG=.*/IMAGE_TAG=$PREVIOUS_TAG/\" .env; sudo docker compose up -d --no-deps backend; exit 1"
+              ]
+            }')
+
+          COMMAND_ID=$(aws ssm send-command \
+            --region "${AWS_REGION}" \
+            --instance-ids "${EC2_INSTANCE_ID}" \
+            --document-name AWS-RunShellScript \
+            --comment "Deploy Ditto backend ${GITHUB_SHA}" \
+            --timeout-seconds 600 \
+            --parameters "${PARAMETERS}" \
+            --query 'Command.CommandId' \
+            --output text)
+
+          if ! aws ssm wait command-executed \
+            --region "${AWS_REGION}" \
+            --command-id "${COMMAND_ID}" \
+            --instance-id "${EC2_INSTANCE_ID}"; then
+            aws ssm get-command-invocation \
+              --region "${AWS_REGION}" \
+              --command-id "${COMMAND_ID}" \
+              --instance-id "${EC2_INSTANCE_ID}" \
+              --query '{Status:Status,Output:StandardOutputContent,Error:StandardErrorContent}'
+            exit 1
+          fi
+
+          aws ssm get-command-invocation \
+            --region "${AWS_REGION}" \
+            --command-id "${COMMAND_ID}" \
+            --instance-id "${EC2_INSTANCE_ID}" \
+            --query '{Status:Status,Output:StandardOutputContent,Error:StandardErrorContent}'

@@ -840,6 +840,15 @@ Windows PowerShell에서는 다음을 사용합니다.
 ./gradlew clean build
 ```
 
+### 개발 서버 배포
+
+- `dev` 대상 PR에서는 전체 테스트를 실행합니다.
+- `dev` 브랜치에 병합되면 Docker 이미지를 `linux/amd64`로 빌드해 ECR에 커밋 SHA와 `latest` 태그로 푸시합니다.
+- GitHub Actions는 장기 AWS 키 대신 OIDC로 임시 자격증명을 발급받습니다.
+- 배포는 SSM Run Command로 Backend EC2의 `/opt/ditto`에서 Docker Compose를 갱신합니다.
+- 새 컨테이너의 Actuator 상태가 60초 안에 정상화되지 않으면 직전 이미지 태그로 되돌립니다.
+- 운영 환경변수와 비밀값은 EC2의 `/opt/ditto/.env`에만 저장하며 GitHub 저장소에 커밋하지 않습니다.
+
 ### Swagger UI
 
 애플리케이션 실행 후 아래 주소에서 API 문서를 확인합니다.
@@ -872,7 +881,7 @@ GEMINI_API_KEY=CHANGE_ME
 AI_ENGINE_BASE_URL=http://127.0.0.1:8000
 
 # S3 이미지 저장소
-AWS_S3_BUCKET=ditto-dev-images-601202752151
+AWS_S3_BUCKET=hdf-ditto-images
 AWS_REGION=ap-northeast-2
 AWS_S3_PREFIX=images
 AWS_S3_PUBLIC_BASE_URL=

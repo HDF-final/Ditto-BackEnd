@@ -34,7 +34,6 @@ src/main/resources/application-*-private.yml
 ### Local Docker / Database ###
 docker-compose.yml
 docker-compose.*.yml
-Dockerfile
 .docker/
 src/main/resources/sql/
 *.sql
