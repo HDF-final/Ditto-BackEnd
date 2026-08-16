@@ -75,14 +75,13 @@ jobs:
           docker push "${IMAGE_URI}:${GITHUB_SHA}"
           docker push "${IMAGE_URI}:latest"
 
-      # 4. 시작 템플릿 새 버전 생성 (ENV_FILE_CONTENT 통 주입)
+      # 4. 시작 템플릿 새 버전 생성
       - name: Create new Launch Template version
         id: create-lt
         env:
           ENV_CONTENT: ${{ secrets.ENV_FILE_CONTENT }}
         shell: bash
         run: |
-          # .env 내용을 base64로 인코딩하여 User Data 스크립트 내부로 안전하게 주입
           ENV_B64=$(echo -n "$ENV_CONTENT" | base64 -w 0)
 
           cat << EOF > /tmp/user_data.sh
@@ -132,7 +131,6 @@ jobs:
                   max-file: "3"
           COMPOSE_EOF
 
-          # base64 디코딩으로 .env 파일 완벽 복원
           echo "${ENV_B64}" | base64 -d > "\$APP_DIR/.env"
 
           /usr/local/bin/aws ecr get-login-password --region "\$AWS_REGION" | docker login --username AWS --password-stdin "\$ECR_REGISTRY"
@@ -170,15 +168,27 @@ jobs:
         shell: bash
         run: |
           TARGET_ASG="${{ vars.ASG_NAME }}"
-          echo "Starting Instance Refresh for ASG: ${TARGET_ASG}..."
+          echo "Checking existing Instance Refresh for ASG: ${TARGET_ASG}..."
 
+          EXISTING_STATUS=$(aws autoscaling describe-instance-refreshes \
+            --auto-scaling-group-name "${TARGET_ASG}" \
+            --query 'InstanceRefreshes[0].Status' \
+            --output text 2>/dev/null || echo "None")
+
+          if [ "$EXISTING_STATUS" = "InProgress" ] || [ "$EXISTING_STATUS" = "Pending" ]; then
+            echo "Cancelling previous in-progress refresh..."
+            aws autoscaling cancel-instance-refresh --auto-scaling-group-name "${TARGET_ASG}" || true
+            sleep 10
+          fi
+
+          echo "Starting Instance Refresh for ASG: ${TARGET_ASG}..."
           REFRESH_ID=$(aws autoscaling start-instance-refresh \
             --auto-scaling-group-name "${TARGET_ASG}" \
-            --preferences '{"MinHealthyPercentage": 100, "InstanceWarmup": 60}' \
+            --preferences '{"MinHealthyPercentage": 100, "MaxHealthyPercentage": 200, "InstanceWarmup": 120}' \
             --query 'InstanceRefreshId' \
             --output text)
 
-          echo "Instance Refresh ID: ${REFRESH_ID}"
+          echo "Instance Refresh ID: $REFRESH_ID"
 
           while true; do
             STATUS=$(aws autoscaling describe-instance-refreshes \
