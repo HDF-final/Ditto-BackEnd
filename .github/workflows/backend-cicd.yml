@@ -75,7 +75,7 @@ jobs:
           docker push "${IMAGE_URI}:${GITHUB_SHA}"
           docker push "${IMAGE_URI}:latest"
 
-      # 4. 시작 템플릿 새 버전 생성
+      # 4. 시작 템플릿 새 버전 생성 (ENV_FILE_CONTENT 주입)
       - name: Create new Launch Template version
         id: create-lt
         env:
@@ -163,7 +163,7 @@ jobs:
             --auto-scaling-group-name "${TARGET_ASG}" \
             --launch-template "LaunchTemplateName=${TARGET_LT},Version=${TARGET_VER}"
 
-      # 6. ASG 인스턴스 새로고침(Instance Refresh) 실행 및 완료 대기
+      # 6. ASG 인스턴스 새로고침(Instance Refresh) 실행 및 완료 대기 (30초 웜업 최적화)
       - name: Trigger and monitor ASG Instance Refresh
         shell: bash
         run: |
@@ -184,7 +184,7 @@ jobs:
           echo "Starting Instance Refresh for ASG: ${TARGET_ASG}..."
           REFRESH_ID=$(aws autoscaling start-instance-refresh \
             --auto-scaling-group-name "${TARGET_ASG}" \
-            --preferences '{"MinHealthyPercentage": 100, "MaxHealthyPercentage": 200, "InstanceWarmup": 120}' \
+            --preferences '{"MinHealthyPercentage": 100, "MaxHealthyPercentage": 200, "InstanceWarmup": 30}' \
             --query 'InstanceRefreshId' \
             --output text)
 
