@@ -1,9 +1,7 @@
-name: Backend CI/CD
+name: Backend CI/CD (ASG Rolling Deployment)
 
 on:
-  pull_request:
-    branches:
-      - dev
+  workflow_dispatch:
   push:
     branches:
       - dev
@@ -13,10 +11,11 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  AWS_REGION: ${{ vars.AWS_REGION || 'ap-northeast-2' }}
-  ECR_REGISTRY: ${{ vars.ECR_REGISTRY }}
-  ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
-  EC2_INSTANCE_ID: ${{ secrets.EC2_INSTANCE_ID }}
+  AWS_REGION: ap-northeast-2
+  ECR_REGISTRY: 601202752151.dkr.ecr.ap-northeast-2.amazonaws.com
+  ECR_REPOSITORY: ditto-backend
+  ASG_NAME: asg-hdf-backend
+  LAUNCH_TEMPLATE_NAME: HDF-lt-hdf-backend
 
 jobs:
   test:
@@ -41,8 +40,8 @@ jobs:
         run: ./gradlew test --no-daemon
 
   deploy:
-    name: Build and deploy
-    if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+    name: Build, Push & ASG Refresh
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     needs: test
     runs-on: ubuntu-latest
     permissions:
@@ -52,6 +51,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # 1. AWS OIDC 자격 증명 획득
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -59,9 +59,11 @@ jobs:
           role-session-name: GitHubActions-DittoBackend
           aws-region: ${{ env.AWS_REGION }}
 
+      # 2. Amazon ECR 로그인
       - name: Log in to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
 
+      # 3. Docker 이미지 빌드 및 ECR 푸시
       - name: Build and push image
         shell: bash
         run: |
@@ -73,52 +75,123 @@ jobs:
           docker push "${IMAGE_URI}:${GITHUB_SHA}"
           docker push "${IMAGE_URI}:latest"
 
-      - name: Deploy through AWS Systems Manager
+      # 4. 시작 템플릿 새 버전 생성 (새 이미지 태그 반영)
+      - name: Create new Launch Template version
+        id: create-lt
         shell: bash
         run: |
-          PARAMETERS=$(jq -n \
-            --arg region "${AWS_REGION}" \
-            --arg registry "${ECR_REGISTRY}" \
-            --arg repository "${ECR_REPOSITORY}" \
-            --arg tag "${GITHUB_SHA}" \
-            '{
-              commands: [
-                "set -eu",
-                "cd /opt/ditto",
-                "PREVIOUS_TAG=$(sed -n \"s/^IMAGE_TAG=//p\" .env | tail -n 1)",
-                "test -n \"$PREVIOUS_TAG\"",
-                "aws ecr get-login-password --region \($region) | sudo docker login --username AWS --password-stdin \($registry)",
-                "sudo docker pull \($registry)/\($repository):\($tag)",
-                "sed -i \"s/^IMAGE_TAG=.*/IMAGE_TAG=\($tag)/\" .env",
-                "sudo docker compose up -d --no-deps backend || { sed -i \"s/^IMAGE_TAG=.*/IMAGE_TAG=$PREVIOUS_TAG/\" .env; sudo docker compose up -d --no-deps backend; exit 1; }",
-                "for attempt in $(seq 1 12); do if curl -fsS http://localhost:8080/actuator/health >/dev/null; then echo DEPLOY_OK; exit 0; fi; sleep 5; done; echo DEPLOY_FAILED; sed -i \"s/^IMAGE_TAG=.*/IMAGE_TAG=$PREVIOUS_TAG/\" .env; sudo docker compose up -d --no-deps backend; exit 1"
-              ]
-            }')
+          # 시작 템플릿의 기본 User Data 스크립트 작성
+          USER_DATA_SCRIPT=$(cat << 'EOF'
+          #!/bin/bash
+          set -eux
+          export DEBIAN_FRONTEND=noninteractive
+          apt update -y
+          apt install -y docker.io docker-compose-v2 curl unzip jq
 
-          COMMAND_ID=$(aws ssm send-command \
-            --region "${AWS_REGION}" \
-            --instance-ids "${EC2_INSTANCE_ID}" \
-            --document-name AWS-RunShellScript \
-            --comment "Deploy Ditto backend ${GITHUB_SHA}" \
-            --timeout-seconds 600 \
-            --parameters "${PARAMETERS}" \
-            --query 'Command.CommandId' \
+          cd /tmp
+          curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+          unzip -q awscliv2.zip
+          ./aws/install
+          rm -rf awscliv2.zip aws/
+
+          systemctl enable --now docker
+          usermod -aG docker ubuntu
+
+          APP_DIR="/opt/ditto"
+          mkdir -p "$APP_DIR"
+          chown -R ubuntu:ubuntu "$APP_DIR"
+
+          AWS_REGION="ap-northeast-2"
+          ECR_REGISTRY="601202752151.dkr.ecr.ap-northeast-2.amazonaws.com"
+          ECR_REPOSITORY="ditto-backend"
+
+          cat << 'COMPOSE_EOF' > "$APP_DIR/docker-compose.yml"
+          services:
+            backend:
+              image: "${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG:-latest}"
+              container_name: ditto-backend
+              restart: unless-stopped
+              env_file:
+                - ${ENV_FILE:-.env}
+              ports:
+                - "8080:8080"
+              healthcheck:
+                test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health"]
+                interval: 30s
+                timeout: 5s
+                retries: 5
+                start_period: 60s
+              logging:
+                driver: json-file
+                options:
+                  max-size: "10m"
+                  max-file: "3"
+          COMPOSE_EOF
+
+          cat << ENV_EOF > "$APP_DIR/.env"
+          ECR_REGISTRY=${ECR_REGISTRY}
+          ECR_REPOSITORY=${ECR_REPOSITORY}
+          IMAGE_TAG=latest
+          # 실제 Spring Boot DB 환경변수 주입
+          SPRING_DATASOURCE_URL=${{ secrets.SPRING_DATASOURCE_URL }}
+          SPRING_DATASOURCE_USERNAME=${{ secrets.SPRING_DATASOURCE_USERNAME }}
+          SPRING_DATASOURCE_PASSWORD=${{ secrets.SPRING_DATASOURCE_PASSWORD }}
+          ENV_EOF
+
+          /usr/local/bin/aws ecr get-login-password --region "$AWS_REGION" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
+          docker compose -f "$APP_DIR/docker-compose.yml" pull
+          docker compose -f "$APP_DIR/docker-compose.yml" up -d
+          EOF
+          )
+
+          ENCODED_USER_DATA=$(echo "$USER_DATA_SCRIPT" | base64 -w 0)
+
+          NEW_VERSION=$(aws ec2 create-launch-template-version \
+            --launch-template-name "${LAUNCH_TEMPLATE_NAME}" \
+            --source-version '$Latest' \
+            --launch-template-data "{\"UserData\":\"${ENCODED_USER_DATA}\"}" \
+            --query 'LaunchTemplateVersion.VersionNumber' \
             --output text)
 
-          if ! aws ssm wait command-executed \
-            --region "${AWS_REGION}" \
-            --command-id "${COMMAND_ID}" \
-            --instance-id "${EC2_INSTANCE_ID}"; then
-            aws ssm get-command-invocation \
-              --region "${AWS_REGION}" \
-              --command-id "${COMMAND_ID}" \
-              --instance-id "${EC2_INSTANCE_ID}" \
-              --query '{Status:Status,Output:StandardOutputContent,Error:StandardErrorContent}'
-            exit 1
-          fi
+          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_OUTPUT
 
-          aws ssm get-command-invocation \
-            --region "${AWS_REGION}" \
-            --command-id "${COMMAND_ID}" \
-            --instance-id "${EC2_INSTANCE_ID}" \
-            --query '{Status:Status,Output:StandardOutputContent,Error:StandardErrorContent}'
+      # 5. ASG 시작 템플릿 버전 갱신
+      - name: Update ASG Launch Template version
+        shell: bash
+        run: |
+          aws autoscaling update-auto-scaling-group \
+            --auto-scaling-group-name "${ASG_NAME}" \
+            --launch-template "LaunchTemplateName=${LAUNCH_TEMPLATE_NAME},Version=${{ steps.create-lt.outputs.NEW_VERSION }}"
+
+      # 6. ASG 인스턴스 새로고침(Instance Refresh) 실행 및 완료 대기
+      - name: Trigger and monitor ASG Instance Refresh
+        shell: bash
+        run: |
+          echo "Starting Instance Refresh for ASG: ${ASG_NAME}..."
+          REFRESH_ID=$(aws autoscaling start-instance-refresh \
+            --auto-scaling-group-name "${ASG_NAME}" \
+            --preferences '{"MinHealthyPercentage": 100, "InstanceWarmup": 60}' \
+            --query 'InstanceRefreshId' \
+            --output text)
+
+          echo "Instance Refresh ID: $REFRESH_ID"
+
+          while true; do
+            STATUS=$(aws autoscaling describe-instance-refreshes \
+              --auto-scaling-group-name "${ASG_NAME}" \
+              --instance-refresh-ids "${REFRESH_ID}" \
+              --query 'InstanceRefreshes[0].Status' \
+              --output text)
+
+            echo "Current refresh status: $STATUS"
+
+            if [ "$STATUS" = "Successful" ]; then
+              echo "✅ Instance Refresh completed successfully without downtime!"
+              break
+            elif [ "$STATUS" = "Failed" ] || [ "$STATUS" = "Cancelled" ]; then
+              echo "❌ Instance Refresh failed or was cancelled."
+              exit 1
+            fi
+
+            sleep 15
+          done
