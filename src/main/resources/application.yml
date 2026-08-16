@@ -67,3 +67,13 @@ news-feed:
     topics:
       - K-POP
 
+# Google Gemini API
+gemini:
+  api-key: ${GEMINI_API_KEY:}
+  base-url: ${GEMINI_BASE_URL:https://generativelanguage.googleapis.com}
+  model: ${GEMINI_MODEL:gemini-2.5-flash}
+  connect-timeout-seconds: 5
+  read-timeout-seconds: 30
+  enabled: true
+
+

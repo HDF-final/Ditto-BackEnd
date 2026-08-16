@@ -77,9 +77,6 @@ dependencies {
     // 버전은 Spring AI BOM이 관리하는 AWS SDK v2와 맞춘다.
     implementation 'software.amazon.awssdk:s3'
 
-    // HTML 파싱 (뉴스 크롤러)
-    implementation 'org.jsoup:jsoup:1.18.1'
-
     // Test
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.security:spring-security-test'
