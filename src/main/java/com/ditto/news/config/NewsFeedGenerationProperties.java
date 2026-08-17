@@ -23,9 +23,14 @@ public class NewsFeedGenerationProperties {
     private boolean schedulerEnabled = true;
 
     /**
-     * 스케줄러 실행 크론 표현식 (기본값: 매 3시간마다 실행).
+     * 스케줄러 실행 크론 표현식 (기본값: 매일 오전 6시 1회 실행).
      */
-    private String cron = "0 0 */3 * * *";
+    private String cron = "0 0 6 * * *";
+
+    /**
+     * 실행 1회당 생성할 최대 독립 뉴스피드 개수 (기본값: 3개).
+     */
+    private int maxFeedsPerTopic = 3;
 
     /**
      * DITTO가 자동 생성할 K-컬처 뉴스피드 주제 목록.

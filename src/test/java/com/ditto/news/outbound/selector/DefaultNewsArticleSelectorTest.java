@@ -33,6 +33,62 @@ class DefaultNewsArticleSelectorTest {
     }
 
     @Test
+    @DisplayName("동일 아티스트(예: 스트레이 키즈)에 관한 기사가 여러 개 수집되면 점수가 더 높고 최신인 1건만 선별된다")
+    void deduplicatesSameArtistArticles() {
+        CrawledNewsArticle article1 = CrawledNewsArticle.builder()
+                .title("스트레이 키즈, '빌보드 200' 9연속 1위…비틀스 이어 그룹 2번째(종합)")
+                .body("K-pop boy group Stray Kids creates history on Billboard.")
+                .url("https://example.com/skz1")
+                .publishedAt(baseTime.minusHours(1))
+                .build();
+
+        CrawledNewsArticle article2 = CrawledNewsArticle.builder()
+                .title("스트레이 키즈, 미국 빌보드 앨범 차트 9연속 1위")
+                .body("Stray Kids achieves another milestone.")
+                .url("https://example.com/skz2")
+                .publishedAt(baseTime.minusHours(2))
+                .build();
+
+        CrawledNewsArticle article3 = CrawledNewsArticle.builder()
+                .title("빅뱅부터 엔하이픈·NCT 127까지…보이그룹 '8월 컴백 대전'")
+                .body("Various K-pop boy groups returning this August.")
+                .url("https://example.com/bigbang")
+                .publishedAt(baseTime.minusHours(1))
+                .build();
+
+        List<CrawledNewsArticle> results = selector.selectRelevantArticles(
+                List.of(article1, article2, article3), List.of("K-POP"));
+
+        assertThat(results).hasSize(2);
+        assertThat(results.get(0).getTitle()).isEqualTo("스트레이 키즈, '빌보드 200' 9연속 1위…비틀스 이어 그룹 2번째(종합)");
+        assertThat(results.get(1).getTitle()).isEqualTo("빅뱅부터 엔하이픈·NCT 127까지…보이그룹 '8월 컴백 대전'");
+    }
+
+    @Test
+    @DisplayName("제목의 단어 유사도(Jaccard)가 높은 동일 사건 중복 기사는 후순위 기사가 배제된다")
+    void deduplicatesSemanticWordOverlap() {
+        CrawledNewsArticle a1 = CrawledNewsArticle.builder()
+                .title("K-POP 글로벌 음원 차트 1위 달성 성과 분석")
+                .body("음원 차트 정상에 올랐습니다.")
+                .url("https://example.com/news1")
+                .publishedAt(baseTime.minusHours(1))
+                .build();
+
+        CrawledNewsArticle a2 = CrawledNewsArticle.builder()
+                .title("K-POP 글로벌 음원 차트 1위 달성 관련 소식")
+                .body("음원 차트 정상에 올랐습니다.")
+                .url("https://example.com/news2")
+                .publishedAt(baseTime.minusHours(2))
+                .build();
+
+        List<CrawledNewsArticle> results = selector.selectRelevantArticles(
+                List.of(a1, a2), List.of("K-POP"));
+
+        assertThat(results).hasSize(1);
+        assertThat(results.get(0).getTitle()).isEqualTo("K-POP 글로벌 음원 차트 1위 달성 성과 분석");
+    }
+
+    @Test
     @DisplayName("URL이 동일한 기사는 점수가 더 높고 최신인 기사 1건만 유지된다")
     void deduplicatesByUrl() {
         CrawledNewsArticle article1 = CrawledNewsArticle.builder()
@@ -174,14 +230,14 @@ class DefaultNewsArticleSelectorTest {
     @DisplayName("관련성 점수가 동일할 경우 더 최신에 발행된 기사가 우선 정렬된다")
     void sortsByRecencyWhenScoresAreEqual() {
         CrawledNewsArticle older = CrawledNewsArticle.builder()
-                .title("K-POP Special Concert A")
+                .title("K-POP Seoul World Tour Event")
                 .body("Concert details A.")
                 .url("https://example.com/a")
                 .publishedAt(baseTime.minusDays(5))
                 .build();
 
         CrawledNewsArticle newer = CrawledNewsArticle.builder()
-                .title("K-POP Special Concert B")
+                .title("K-POP Tokyo Music Showcase")
                 .body("Concert details B.")
                 .url("https://example.com/b")
                 .publishedAt(baseTime.minusHours(5))
@@ -191,8 +247,8 @@ class DefaultNewsArticleSelectorTest {
                 List.of(older, newer), List.of("K-POP"));
 
         assertThat(results).hasSize(2);
-        assertThat(results.get(0).getTitle()).isEqualTo("K-POP Special Concert B");
-        assertThat(results.get(1).getTitle()).isEqualTo("K-POP Special Concert A");
+        assertThat(results.get(0).getTitle()).isEqualTo("K-POP Tokyo Music Showcase");
+        assertThat(results.get(1).getTitle()).isEqualTo("K-POP Seoul World Tour Event");
     }
 
     @Test
@@ -223,14 +279,14 @@ class DefaultNewsArticleSelectorTest {
     @DisplayName("publishedAt이 null인 기사는 예외 없이 안전하게 처리되며 동일 점수 시 날짜 있는 기사 뒤에 정렬된다")
     void handlesNullPublishedAtSafely() {
         CrawledNewsArticle dated = CrawledNewsArticle.builder()
-                .title("K-POP Global Chart Milestone 1")
+                .title("K-POP Global Billboard Milestone")
                 .body("Detailed idol report.")
                 .url("https://example.com/dated")
                 .publishedAt(baseTime.minusHours(2))
                 .build();
 
         CrawledNewsArticle undated = CrawledNewsArticle.builder()
-                .title("K-POP Global Chart Milestone 2")
+                .title("K-POP Seoul Music Awards Ceremony")
                 .body("Detailed idol report.")
                 .url("https://example.com/undated")
                 .publishedAt(null)
@@ -240,37 +296,37 @@ class DefaultNewsArticleSelectorTest {
                 List.of(undated, dated), List.of("K-POP"));
 
         assertThat(results).hasSize(2);
-        assertThat(results.get(0).getTitle()).isEqualTo("K-POP Global Chart Milestone 1");
-        assertThat(results.get(1).getTitle()).isEqualTo("K-POP Global Chart Milestone 2");
+        assertThat(results.get(0).getTitle()).isEqualTo("K-POP Global Billboard Milestone");
+        assertThat(results.get(1).getTitle()).isEqualTo("K-POP Seoul Music Awards Ceremony");
     }
 
     @Test
     @DisplayName("후보 기사가 최대 선별 개수(5개)를 초과할 경우 상위 5개만 반환한다")
     void limitsToMaxArticles() {
         List<CrawledNewsArticle> articles = List.of(
-                createArticle(1, "K-POP 1", 1),
-                createArticle(2, "K-POP 2", 2),
-                createArticle(3, "K-POP 3", 3),
-                createArticle(4, "K-POP 4", 4),
-                createArticle(5, "K-POP 5", 5),
-                createArticle(6, "K-POP 6", 6),
-                createArticle(7, "K-POP 7", 7)
+                createArticle(1, "K-POP Global Debut 1", 1),
+                createArticle(2, "K-POP World Concert 2", 2),
+                createArticle(3, "K-POP Music Festival 3", 3),
+                createArticle(4, "K-POP Album Release 4", 4),
+                createArticle(5, "K-POP Showcase Stage 5", 5),
+                createArticle(6, "K-POP Billboard Chart 6", 6),
+                createArticle(7, "K-POP Stadium Tour 7", 7)
         );
 
         List<CrawledNewsArticle> results = selector.selectRelevantArticles(articles, List.of("K-POP"));
 
         assertThat(results).hasSize(5);
-        assertThat(results.get(0).getTitle()).isEqualTo("K-POP 1");
-        assertThat(results.get(4).getTitle()).isEqualTo("K-POP 5");
+        assertThat(results.get(0).getTitle()).isEqualTo("K-POP Global Debut 1");
+        assertThat(results.get(4).getTitle()).isEqualTo("K-POP Showcase Stage 5");
     }
 
     @Test
     @DisplayName("후보 기사가 최대 선별 개수(5개)보다 적으면 존재하는 기사만 모두 반환한다")
     void returnsAllWhenLessThanMax() {
         List<CrawledNewsArticle> articles = List.of(
-                createArticle(1, "K-POP Single 1", 1),
-                createArticle(2, "K-POP Single 2", 2),
-                createArticle(3, "K-POP Single 3", 3)
+                createArticle(1, "K-POP Single Track Debut", 1),
+                createArticle(2, "K-POP Album Release Event", 2),
+                createArticle(3, "K-POP Global World Tour", 3)
         );
 
         List<CrawledNewsArticle> results = selector.selectRelevantArticles(articles, List.of("K-POP"));

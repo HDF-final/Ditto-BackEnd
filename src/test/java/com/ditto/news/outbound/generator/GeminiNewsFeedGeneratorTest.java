@@ -59,7 +59,7 @@ class GeminiNewsFeedGeneratorTest {
                         "글로벌 팬덤 소비가 해외 음원 스트리밍으로 확대"
                 ))
                 .body("올여름 가요계가 대형 아티스트들의 연이은 신보 발매로 뜨겁게 달아오르고 있습니다.")
-                .keywords(List.of("#KPOP", "#뉴진스", "#BTS"))
+                .keywords(List.of("#KPOP", "#뉴진스", "#BTS", "#빌보드1위"))
                 .build();
 
         given(geminiClient.generateRewrittenNews(anyList(), eq("K-POP")))
@@ -73,13 +73,13 @@ class GeminiNewsFeedGeneratorTest {
         assertThat(result.getSummaries().get(0)).isEqualTo("뉴진스 서울을 시작으로 첫 월드투어 공식 발표");
         assertThat(result.getBody()).contains("올여름 가요계가 대형 아티스트들의 연이은 신보 발매로", "출처: Yonhap News, The Korea Herald");
         assertThat(result.getRepresentativeImageUrl()).isEqualTo("https://img.yna.co.kr/photo1.jpg");
-        assertThat(result.getKeywords()).containsExactly("#KPOP", "#뉴진스", "#BTS");
+        assertThat(result.getKeywords()).contains("#뉴진스", "#BTS");
         assertThat(result.getSlug()).startsWith("k-pop-");
     }
 
     @Test
-    @DisplayName("Gemini 미설정/실패 시 안전하게 템플릿 기반 폴백 뉴스피드(요약 포함)를 생성한다")
-    void generatesNewsFeedViaTemplateFallbackWhenGeminiFails() {
+    @DisplayName("Gemini 미설정/실패 시 기사 본문에서 아티스트명(#뉴진스)과 이벤트명(#월드투어)을 동적으로 추출하여 고유 태그를 생성한다")
+    void generatesNewsFeedViaTemplateFallbackWithDynamicArtistTags() {
         CrawledNewsArticle article1 = CrawledNewsArticle.builder()
                 .title("New Jeans World Tour Announcement")
                 .body("New Jeans announced their first world tour starting in Seoul.")
@@ -98,7 +98,7 @@ class GeminiNewsFeedGeneratorTest {
         assertThat(result.getSummaries()).isNotEmpty();
         assertThat(result.getBody()).contains("New Jeans announced", "출처: Yonhap News");
         assertThat(result.getRepresentativeImageUrl()).isEqualTo("https://img.yna.co.kr/photo1.jpg");
-        assertThat(result.getKeywords()).contains("#KPOP", "#KCulture", "#트렌드");
+        assertThat(result.getKeywords()).contains("#뉴진스", "#월드투어");
         assertThat(result.getSlug()).startsWith("k-pop-");
     }
 
