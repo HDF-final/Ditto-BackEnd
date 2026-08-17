@@ -94,11 +94,11 @@ class GeminiNewsFeedGeneratorTest {
         GeneratedNewsFeed result = generator.generate(List.of(article1), "K-POP");
 
         assertThat(result).isNotNull();
-        assertThat(result.getTitle()).contains("K-POP", "New Jeans World Tour Announcement");
+        assertThat(result.getTitle()).isEqualTo("New Jeans World Tour Announcement");
         assertThat(result.getSummaries()).isNotEmpty();
         assertThat(result.getBody()).contains("New Jeans announced", "출처: Yonhap News");
         assertThat(result.getRepresentativeImageUrl()).isEqualTo("https://img.yna.co.kr/photo1.jpg");
-        assertThat(result.getKeywords()).contains("#K-POP", "#KCulture", "#DITTO");
+        assertThat(result.getKeywords()).contains("#KPOP", "#KCulture", "#트렌드");
         assertThat(result.getSlug()).startsWith("k-pop-");
     }
 

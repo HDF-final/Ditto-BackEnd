@@ -11,7 +11,8 @@
             body,
             summary,
             keywords,
-            created_at
+            created_at,
+            deleted_at
         ) VALUES (
             #{title,jdbcType=VARCHAR},
             #{slug,jdbcType=VARCHAR},
@@ -19,7 +20,8 @@
             #{body,jdbcType=CLOB},
             #{summary,jdbcType=VARCHAR},
             #{keywords,jdbcType=VARCHAR},
-            SYSTIMESTAMP
+            SYSTIMESTAMP,
+            NULL
         )
     </insert>
 
@@ -31,9 +33,11 @@
                body,
                summary,
                keywords,
-               created_at AS createdAt
+               created_at AS createdAt,
+               deleted_at AS deletedAt
           FROM news_feed
          WHERE news_feed_id = #{newsFeedId}
+           AND deleted_at IS NULL
     </select>
 
     <select id="findBySlug" resultType="com.ditto.news.outbound.repository.entity.NewsFeedRow">
@@ -44,9 +48,11 @@
                body,
                summary,
                keywords,
-               created_at AS createdAt
+               created_at AS createdAt,
+               deleted_at AS deletedAt
           FROM news_feed
          WHERE slug = #{slug}
+           AND deleted_at IS NULL
     </select>
 
     <select id="findAll" resultType="com.ditto.news.outbound.repository.entity.NewsFeedRow">
@@ -57,8 +63,10 @@
                body,
                summary,
                keywords,
-               created_at AS createdAt
+               created_at AS createdAt,
+               deleted_at AS deletedAt
           FROM news_feed
+         WHERE deleted_at IS NULL
          ORDER BY created_at DESC, news_feed_id DESC
         OFFSET #{offset} ROWS FETCH NEXT #{size} ROWS ONLY
     </select>
@@ -66,6 +74,7 @@
     <select id="count" resultType="long">
         SELECT COUNT(*)
           FROM news_feed
+         WHERE deleted_at IS NULL
     </select>
 
     <update id="update">
@@ -76,11 +85,14 @@
                summary = #{summary,jdbcType=VARCHAR},
                keywords = #{keywords,jdbcType=VARCHAR}
          WHERE news_feed_id = #{newsFeedId}
+           AND deleted_at IS NULL
     </update>
 
-    <delete id="deleteById">
-        DELETE FROM news_feed
+    <update id="deleteById">
+        UPDATE news_feed
+           SET deleted_at = SYSTIMESTAMP
          WHERE news_feed_id = #{newsFeedId}
-    </delete>
+           AND deleted_at IS NULL
+    </update>
 
 </mapper>

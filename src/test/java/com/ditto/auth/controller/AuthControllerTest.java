@@ -23,11 +23,12 @@ import org.springframework.web.cors.CorsConfigurationSource;
 
 import com.ditto.auth.dto.response.AuthUserResponse;
 import com.ditto.auth.service.AuthService;
+import com.ditto.config.CorsConfig;
 import com.ditto.security.AuthUser;
 import com.ditto.security.SecurityConfig;
 
 @WebMvcTest(AuthController.class)
-@Import(SecurityConfig.class)
+@Import({SecurityConfig.class, CorsConfig.class})
 class AuthControllerTest {
 
     @Autowired
@@ -35,9 +36,6 @@ class AuthControllerTest {
 
     @MockBean
     private AuthService authService;
-
-    @MockBean
-    private CorsConfigurationSource corsConfigurationSource;
 
     @Test
     @DisplayName("세션 없이 /auth/me 요청 시 JSON 401을 반환한다")

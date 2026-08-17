@@ -132,6 +132,7 @@ public class NewsFeedRepositoryImpl implements NewsFeedRepository {
                 .summaries(deserializeList(row.getSummary()))
                 .keywords(deserializeList(row.getKeywords()))
                 .createdAt(row.getCreatedAt())
+                .deletedAt(row.getDeletedAt())
                 .build();
     }
 
