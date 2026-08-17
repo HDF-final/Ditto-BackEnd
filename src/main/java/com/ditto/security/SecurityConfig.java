@@ -35,7 +35,7 @@ public class SecurityConfig {
 
     private final CorsConfigurationSource corsConfigurationSource;
     private final ObjectProvider<LocalHeaderAuthenticationFilter> localHeaderAuthenticationFilterProvider;
-    private final ObjectMapper objectMapper;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     /** 인증 없이 접근 가능한 공개 경로 */
     private static final String[] PUBLIC_ENDPOINTS = {

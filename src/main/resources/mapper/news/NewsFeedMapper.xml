@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ditto.news.outbound.repository.mapper.NewsFeedMapper">
+
+    <insert id="insert">
+        INSERT INTO news_feed (
+            title,
+            slug,
+            representative_image_url,
+            body,
+            summary,
+            keywords,
+            created_at,
+            deleted_at
+        ) VALUES (
+            #{title,jdbcType=VARCHAR},
+            #{slug,jdbcType=VARCHAR},
+            #{representativeImageUrl,jdbcType=VARCHAR},
+            #{body,jdbcType=CLOB},
+            #{summary,jdbcType=VARCHAR},
+            #{keywords,jdbcType=VARCHAR},
+            SYSTIMESTAMP,
+            NULL
+        )
+    </insert>
+
+    <select id="findById" resultType="com.ditto.news.outbound.repository.entity.NewsFeedRow">
+        SELECT news_feed_id AS newsFeedId,
+               title,
+               slug,
+               representative_image_url AS representativeImageUrl,
+               body,
+               summary,
+               keywords,
+               created_at AS createdAt,
+               deleted_at AS deletedAt
+          FROM news_feed
+         WHERE news_feed_id = #{newsFeedId}
+           AND deleted_at IS NULL
+    </select>
+
+    <select id="findBySlug" resultType="com.ditto.news.outbound.repository.entity.NewsFeedRow">
+        SELECT news_feed_id AS newsFeedId,
+               title,
+               slug,
+               representative_image_url AS representativeImageUrl,
+               body,
+               summary,
+               keywords,
+               created_at AS createdAt,
+               deleted_at AS deletedAt
+          FROM news_feed
+         WHERE slug = #{slug}
+           AND deleted_at IS NULL
+    </select>
+
+    <select id="findAll" resultType="com.ditto.news.outbound.repository.entity.NewsFeedRow">
+        SELECT news_feed_id AS newsFeedId,
+               title,
+               slug,
+               representative_image_url AS representativeImageUrl,
+               body,
+               summary,
+               keywords,
+               created_at AS createdAt,
+               deleted_at AS deletedAt
+          FROM news_feed
+         WHERE deleted_at IS NULL
+         ORDER BY created_at DESC, news_feed_id DESC
+        OFFSET #{offset} ROWS FETCH NEXT #{size} ROWS ONLY
+    </select>
+
+    <select id="findAllForSitemap" resultType="com.ditto.news.outbound.repository.entity.NewsFeedRow">
+        SELECT slug,
+               created_at AS createdAt
+          FROM news_feed
+         WHERE deleted_at IS NULL
+         ORDER BY created_at DESC, news_feed_id DESC
+    </select>
+
+    <select id="count" resultType="long">
+        SELECT COUNT(*)
+          FROM news_feed
+         WHERE deleted_at IS NULL
+    </select>
+
+    <update id="update">
+        UPDATE news_feed
+           SET title = #{title,jdbcType=VARCHAR},
+               body = #{body,jdbcType=CLOB},
+               representative_image_url = #{representativeImageUrl,jdbcType=VARCHAR},
+               summary = #{summary,jdbcType=VARCHAR},
+               keywords = #{keywords,jdbcType=VARCHAR}
+         WHERE news_feed_id = #{newsFeedId}
+           AND deleted_at IS NULL
+    </update>
+
+    <update id="deleteById">
+        UPDATE news_feed
+           SET deleted_at = SYSTIMESTAMP
+         WHERE news_feed_id = #{newsFeedId}
+           AND deleted_at IS NULL
+    </update>
+
+</mapper>

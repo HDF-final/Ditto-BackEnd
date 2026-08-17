@@ -25,7 +25,8 @@ import com.zaxxer.hikari.HikariDataSource;
                 "com.ditto.course.repository",
                 "com.ditto.country.repository",
                 "com.ditto.user.repository",
-                "com.ditto.navigation.repository"
+                "com.ditto.navigation.repository",
+                "com.ditto.news.outbound.repository.mapper"
         },
         sqlSessionFactoryRef = "oracleSqlSessionFactory")
 public class OracleDataSourceConfig {
