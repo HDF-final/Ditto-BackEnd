@@ -105,6 +105,7 @@
             resultType="com.ditto.course.dto.response.CoursePlaceResponse">
         SELECT p.place_id,
                p.name,
+               p.image_url,
                f.floor_code,
                cp.visit_order,
                cp.recommendation_reason,

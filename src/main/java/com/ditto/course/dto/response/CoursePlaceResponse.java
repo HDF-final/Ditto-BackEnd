@@ -15,6 +15,7 @@ public class CoursePlaceResponse {
 
     private Long placeId;
     private String name;
+    private String imageUrl;
     private String floorCode;
     private int visitOrder;
     private String recommendationReason;
