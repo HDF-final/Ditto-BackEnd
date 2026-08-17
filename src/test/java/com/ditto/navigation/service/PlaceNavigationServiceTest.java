@@ -14,6 +14,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.ditto.global.exception.BusinessException;
 import com.ditto.global.exception.ErrorCode;
+import com.ditto.global.infrastructure.s3.S3Provider;
 import com.ditto.navigation.dto.response.PlaceNavigationResponse;
 import com.ditto.navigation.repository.PlaceNavigationMapper;
 import com.ditto.navigation.repository.PlaceNavigationMapper.PlaceNavigationRow;
@@ -24,13 +25,18 @@ class PlaceNavigationServiceTest {
     @Mock
     private PlaceNavigationMapper placeNavigationMapper;
 
+    @Mock
+    private S3Provider s3Provider;
+
     @InjectMocks
     private PlaceNavigationService placeNavigationService;
 
     @Test
     void getNavigablePlacesReturnsMappedPlaces() {
-        PlaceNavigationRow row = row(11L, "B2_STORE_0032", "MLB", "B2");
+        PlaceNavigationRow row = row(11L, "B2_STORE_0032", "MLB", "B2", "place-picture/11_MLB.jpg");
         given(placeNavigationMapper.findAllNavigable()).willReturn(List.of(row));
+        given(s3Provider.resolveImageUrl("place-picture/11_MLB.jpg"))
+                .willReturn("https://cdn.example.com/place-picture/11_MLB.jpg");
 
         List<PlaceNavigationResponse> result = placeNavigationService.getNavigablePlaces();
 
@@ -39,6 +45,8 @@ class PlaceNavigationServiceTest {
         assertThat(result.get(0).getNavigationKey()).isEqualTo("B2_STORE_0032");
         assertThat(result.get(0).getName()).isEqualTo("MLB");
         assertThat(result.get(0).getFloorCode()).isEqualTo("B2");
+        assertThat(result.get(0).getImageUrl())
+                .isEqualTo("https://cdn.example.com/place-picture/11_MLB.jpg");
     }
 
     @Test
@@ -63,12 +71,14 @@ class PlaceNavigationServiceTest {
             Long placeId,
             String navigationKey,
             String name,
-            String floorCode) {
+            String floorCode,
+            String imageUrl) {
         PlaceNavigationRow row = new PlaceNavigationRow();
         row.setPlaceId(placeId);
         row.setNavigationKey(navigationKey);
         row.setName(name);
         row.setFloorCode(floorCode);
+        row.setImageUrl(imageUrl);
         return row;
     }
 }
