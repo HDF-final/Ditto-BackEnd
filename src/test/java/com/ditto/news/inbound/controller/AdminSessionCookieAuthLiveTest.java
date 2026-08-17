@@ -29,6 +29,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 @SpringBootTest
 @AutoConfigureMockMvc
+@EnabledIfEnvironmentVariable(named = "SMOKE_TEST", matches = "true")
 class AdminSessionCookieAuthLiveTest {
 
     @Autowired
@@ -42,7 +43,6 @@ class AdminSessionCookieAuthLiveTest {
 
     @Test
     @Transactional
-    @EnabledIfEnvironmentVariable(named = "SMOKE_TEST", matches = "true")
     @DisplayName("[세션 인증 실시간 검증] admin@naver.com 로그인 -> 세션 획득 -> 관리자 뉴스 수정 성공")
     void testAdminLoginAndSessionAuth() throws Exception {
         // 0. 테스트용 임시 뉴스피드 생성
