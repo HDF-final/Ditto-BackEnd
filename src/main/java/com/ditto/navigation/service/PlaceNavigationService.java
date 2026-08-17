@@ -7,6 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.ditto.global.exception.BusinessException;
 import com.ditto.global.exception.ErrorCode;
+import com.ditto.global.infrastructure.s3.S3Provider;
 import com.ditto.navigation.dto.response.PlaceNavigationResponse;
 import com.ditto.navigation.repository.PlaceNavigationMapper;
 import com.ditto.navigation.repository.PlaceNavigationMapper.PlaceNavigationRow;
@@ -19,6 +20,7 @@ import lombok.RequiredArgsConstructor;
 public class PlaceNavigationService {
 
     private final PlaceNavigationMapper placeNavigationMapper;
+    private final S3Provider s3Provider;
 
     public List<PlaceNavigationResponse> getNavigablePlaces() {
         return placeNavigationMapper.findAllNavigable().stream()
@@ -43,6 +45,7 @@ public class PlaceNavigationService {
                 .navigationKey(row.getNavigationKey())
                 .name(row.getName())
                 .floorCode(row.getFloorCode())
+                .imageUrl(s3Provider.resolveImageUrl(row.getImageUrl()))
                 .build();
     }
 }

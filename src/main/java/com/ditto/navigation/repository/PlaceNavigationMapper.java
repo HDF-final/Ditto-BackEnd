@@ -25,5 +25,6 @@ public interface PlaceNavigationMapper {
         private String navigationKey;
         private String name;
         private String floorCode;
+        private String imageUrl;
     }
 }
