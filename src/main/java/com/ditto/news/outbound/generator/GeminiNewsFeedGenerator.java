@@ -21,7 +21,7 @@ import lombok.extern.slf4j.Slf4j;
 
 /**
  * Google Gemini 기반 AI 뉴스피드 생성기 아웃바운드 어댑터.
- * 프론트엔드 UI 디자인에 맞춘 세련된 매거진 아티클 형식(헤드라인, 3줄 요약, 본문 서식, 인용구, 콘텐츠 기반 동적 태그)을 생성합니다.
+ * 프론트엔드 UI 디자인에 맞춘 세련된 매거진 아티클 형식(헤드라인, 3줄 요약, 본문 서식, 맞춤형 DITTO Trend Lab 인용구, 동적 태그, 출처 링크)을 생성합니다.
  */
 @Slf4j
 @Service
@@ -164,7 +164,9 @@ public class GeminiNewsFeedGenerator implements AiNewsFeedGenerator {
             String sourceAttribution) {
 
         CrawledNewsArticle mainArticle = articles.get(0);
-        String title = cleanHeadline(mainArticle.getTitle());
+        String rawTitle = mainArticle.getTitle() != null ? mainArticle.getTitle() : "";
+        String rawBody = mainArticle.getBody() != null ? mainArticle.getBody() : "";
+        String title = cleanHeadline(rawTitle);
         List<String> summaries = buildEditorialSummaries(articles, topic);
 
         StringBuilder bodyBuilder = new StringBuilder();
@@ -172,18 +174,21 @@ public class GeminiNewsFeedGenerator implements AiNewsFeedGenerator {
         // 1문단: 배경 및 도입
         bodyBuilder.append(String.format("글로벌 %s 트렌드가 빠르게 확산되며 팬덤 중심의 소비와 새로운 콘텐츠 경험이 국내외 시장의 흐름을 바꾸고 있습니다.\n\n", topic));
 
-        // 2문단: 세부 사실 및 현장 이야기
-        if (mainArticle.getBody() != null && !mainArticle.getBody().isBlank()) {
-            String clean = mainArticle.getBody().replaceAll("\\s+", " ").trim();
-            String snippet = clean.length() > 250 ? clean.substring(0, 250) + "..." : clean;
-            bodyBuilder.append(snippet).append("\n\n");
+        // 2문단: 세부 사실 및 현장 이야기 (기자 이메일/사진 캡션 등 노이즈 정제 및 전체 본문 보존)
+        if (!rawBody.isBlank()) {
+            String clean = cleanArticleBody(rawBody);
+            if (!clean.isBlank()) {
+                bodyBuilder.append(clean).append("\n\n");
+            }
         }
 
-        // 3문단: 인용구 블록 (UI 디자인 매거진 스타일)
-        bodyBuilder.append(String.format("“현장에서 체감하는 %s 문화 경험이 귀국 후 소비와 글로벌 팬덤으로 이어지는 핵심 동력입니다.”\n- DITTO Trend Lab\n\n", topic));
+        // 3문단: 기사 내용 맞춤형 DITTO Trend Lab 핵심 인사이트 인용구 블록
+        String insightQuote = buildDynamicInsightQuote(rawTitle, rawBody, topic);
+        bodyBuilder.append(insightQuote);
 
-        // 4문단: DITTO 코스 연계 및 마무리 제언
-        bodyBuilder.append(String.format("DITTO는 앞으로도 %s 콘텐츠와 실제 여행 경험이 만나는 스팟을 지속적으로 추적합니다. 사용자가 저장한 코스와 뉴스 관심사를 연결해 실제 방문 가능한 추천 스팟으로 확장할 예정입니다.", topic));
+        // 4문단: 기사 주인공/사건 맞춤형 DITTO 코스 연계 및 마무리 제언
+        String conclusion = buildDynamicConclusion(rawTitle, topic);
+        bodyBuilder.append(conclusion);
 
         if (!sourceAttribution.isBlank()) {
             bodyBuilder.append("\n\n").append(sourceAttribution);
@@ -199,6 +204,86 @@ public class GeminiNewsFeedGenerator implements AiNewsFeedGenerator {
                 .representativeImageUrl(representativeImageUrl)
                 .keywords(keywords)
                 .build();
+    }
+
+    /**
+     * 기사의 주인공 아티스트와 핵심 사건을 분석하여 맞춤형 DITTO Trend Lab 분석 인용구를 생성합니다.
+     */
+    public String buildDynamicInsightQuote(String title, String body, String topic) {
+        String full = (title + " " + body).toLowerCase(Locale.ROOT);
+
+        if (full.contains("스트레이 키즈") || full.contains("스트레이키즈") || full.contains("stray kids") || full.contains("스키즈")) {
+            if (full.contains("빌보드") || full.contains("billboard") || full.contains("1위")) {
+                return "“스트레이 키즈의 글로벌 빌보드 9연속 1위는 단순 음원 성적을 넘어, K-POP 아티스트의 강력한 IP가 오프라인 성지순례와 글로벌 투어 소비로 확장되는 결정적 전환점입니다.”\n- DITTO Trend Lab\n\n";
+            }
+            return "“스트레이 키즈의 폭발적인 글로벌 성장은 전 세계 팬덤을 한국 현장 체험과 오프라인 명소로 이끄는 핵심 동력입니다.”\n- DITTO Trend Lab\n\n";
+        }
+        if (full.contains("빅뱅") || full.contains("엔하이픈") || full.contains("nct") || full.contains("보이그룹")) {
+            if (full.contains("컴백")) {
+                return "“8월 대형 보이그룹들의 연이은 컴백 대전은 팬덤 중심의 앨범 팝업스토어 및 현장 체험 수요를 단기간에 집중시키는 기폭제가 되고 있습니다.”\n- DITTO Trend Lab\n\n";
+            }
+            return "“차세대 보이그룹들의 활발한 글로벌 활동은 한국 대중문화 현장의 생생한 열기를 전 세계 팬들에게 직접 전달하는 가교 역할을 합니다.”\n- DITTO Trend Lab\n\n";
+        }
+        if (full.contains("뉴진스") || full.contains("newjeans") || full.contains("new jeans")) {
+            return "“뉴진스의 독창적인 음악적 시도와 감각적인 비주얼은 글로벌 여행자들에게 가장 트렌디한 서울의 감성과 라이프스타일을 각인시키고 있습니다.”\n- DITTO Trend Lab\n\n";
+        }
+        if (full.contains("에스파") || full.contains("aespa")) {
+            return "“에스파의 독보적인 세계관과 글로벌 성과는 K-POP과 미래형 콘텐츠 경험이 결합된 새로운 현장 문화 소비를 창출하고 있습니다.”\n- DITTO Trend Lab\n\n";
+        }
+        if (full.contains("팝업") || full.contains("더현대") || full.contains("성수")) {
+            return "“도심 곳곳에서 펼쳐지는 팝업스토어와 트렌드 스팟은 글로벌 여행자가 한국의 최신 라이프스타일을 가장 직관적으로 체험할 수 있는 최적의 무대입니다.”\n- DITTO Trend Lab\n\n";
+        }
+        if (full.contains("뷰티") || full.contains("화장품")) {
+            return "“K-뷰티 인디 브랜드의 글로벌 약진은 단순한 제품 소비를 넘어 한국 뷰티 살롱과 피부 케어 투어로 이어지는 고부가가치 여행 트렌드를 형성하고 있습니다.”\n- DITTO Trend Lab\n\n";
+        }
+
+        String cleanTitle = cleanHeadline(title);
+        return String.format("“%s 관련 성과는 글로벌 팬덤이 실제 한국 여행 및 현장 문화 소비로 이어지는 중요한 트렌드 지표입니다.”\n- DITTO Trend Lab\n\n", cleanTitle);
+    }
+
+    /**
+     * 기사 주인공/사건에 맞춘 마무리 제언 문구를 생성합니다.
+     */
+    public String buildDynamicConclusion(String title, String topic) {
+        String lower = (title != null ? title : "").toLowerCase(Locale.ROOT);
+        if (lower.contains("스트레이 키즈") || lower.contains("스트레이키즈") || lower.contains("stray kids") || lower.contains("스키즈")) {
+            return "DITTO는 스트레이 키즈의 글로벌 행보와 함께, 팬들이 직접 방문할 수 있는 소속사 인근 성지 및 추천 명소를 맞춤형 코스로 연결해 제공합니다.";
+        }
+        if (lower.contains("빅뱅") || lower.contains("엔하이픈") || lower.contains("nct")) {
+            return "DITTO는 8월 컴백 아티스트들의 공식 팝업스토어 및 서울 주요 핫플레이스를 연계한 특별 큐레이션 코스를 지속적으로 업데이트합니다.";
+        }
+        if (lower.contains("뉴진스") || lower.contains("newjeans")) {
+            return "DITTO는 뉴진스의 뮤직비디오 촬영지와 앨범 팝업 공간을 둘러볼 수 있는 감성 여행 코스를 추천합니다.";
+        }
+        if (lower.contains("팝업") || lower.contains("성수") || lower.contains("더현대")) {
+            return "DITTO는 매주 새롭게 열리는 핫한 팝업스토어 일정과 주변 맛집·카페를 한눈에 둘러볼 수 있는 맞춤형 탐방 코스를 지원합니다.";
+        }
+        return String.format("DITTO는 앞으로도 %s 최신 트렌드와 사용자의 관심사를 분석하여, 실제 방문 가능한 매력적인 오프라인 추천 코스로 확장할 예정입니다.", topic);
+    }
+
+    /**
+     * 원문 기사 본문에서 기자명, 이메일, 사진 캡션 등의 노이즈를 깔끔하게 정제합니다.
+     */
+    public String cleanArticleBody(String rawBody) {
+        if (rawBody == null || rawBody.isBlank()) {
+            return "";
+        }
+        return rawBody
+                // 기자 이메일 제거 (예: ryousanta@yna.co.kr)
+                .replaceAll("[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}", "")
+                // (서울=연합뉴스) OOO 기자 = ... 패턴 제거
+                .replaceAll("\\([가-힣\\s]+=[가-힣\\s]+\\)[^=]*?기자\\s*=", "")
+                // = 사진 ... 제거
+                .replaceAll("=\\s*사진[^\\n]*", "")
+                // 날짜 패턴 정리
+                .replaceAll("\\d{4}\\.\\s*\\d{1,2}\\.\\s*\\d{1,2}", "")
+                // [사진], [포토] 대괄호 캡션 제거
+                .replaceAll("\\[[^\\]]*사진[^\\]]*\\]|\\[[^\\]]*포토[^\\]]*\\]", "")
+                .replaceAll("(?i)\\[[^\\]]*photo[^\\]]*\\]", "")
+                // 연속 공백 및 줄바꿈 정리
+                .replaceAll("[ \\t]+", " ")
+                .replaceAll("(\\r?\\n\\s*){2,}", "\n\n")
+                .trim();
     }
 
     private List<String> buildEditorialSummaries(List<CrawledNewsArticle> articles, String topic) {
@@ -299,16 +384,25 @@ public class GeminiNewsFeedGenerator implements AiNewsFeedGenerator {
                 + "-" + UUID.randomUUID().toString().substring(0, 8);
     }
 
+    /**
+     * 출처 이름과 원문 기사 링크 URL을 클릭 가능한 마크다운 링크로 조합합니다.
+     * 예: "출처: [연합뉴스](https://www.yna.co.kr/view/AKR2026...)"
+     */
     private String buildSourceAttribution(List<CrawledNewsArticle> articles) {
-        Set<String> sources = new LinkedHashSet<>();
-        for (CrawledNewsArticle a : articles) {
-            if (a.getSource() != null && !a.getSource().isBlank()) {
-                sources.add(a.getSource().trim());
-            }
-        }
-        if (sources.isEmpty()) {
+        if (articles == null || articles.isEmpty()) {
             return "";
         }
-        return "출처: " + String.join(", ", sources);
+        CrawledNewsArticle main = articles.get(0);
+        String sourceName = (main.getSource() != null && !main.getSource().isBlank())
+                ? main.getSource().trim()
+                : "연합뉴스";
+        String sourceUrl = (main.getUrl() != null && !main.getUrl().isBlank())
+                ? main.getUrl().trim()
+                : "";
+
+        if (!sourceUrl.isEmpty()) {
+            return String.format("출처: [%s](%s)", sourceName, sourceUrl);
+        }
+        return "출처: " + sourceName;
     }
 }

@@ -71,18 +71,18 @@ class GeminiNewsFeedGeneratorTest {
         assertThat(result.getTitle()).isEqualTo("K-POP 서머 차트 돌풍… 뉴진스부터 BTS 솔로까지 컴백 열기");
         assertThat(result.getSummaries()).hasSize(3);
         assertThat(result.getSummaries().get(0)).isEqualTo("뉴진스 서울을 시작으로 첫 월드투어 공식 발표");
-        assertThat(result.getBody()).contains("올여름 가요계가 대형 아티스트들의 연이은 신보 발매로", "출처: Yonhap News, The Korea Herald");
+        assertThat(result.getBody()).contains("올여름 가요계가 대형 아티스트들의 연이은 신보 발매로", "출처: [Yonhap News](https://www.yna.co.kr/view/1)");
         assertThat(result.getRepresentativeImageUrl()).isEqualTo("https://img.yna.co.kr/photo1.jpg");
         assertThat(result.getKeywords()).contains("#뉴진스", "#BTS");
         assertThat(result.getSlug()).startsWith("k-pop-");
     }
 
     @Test
-    @DisplayName("Gemini 미설정/실패 시 기사 본문에서 아티스트명(#뉴진스)과 이벤트명(#월드투어)을 동적으로 추출하여 고유 태그를 생성한다")
+    @DisplayName("Gemini 미설정/실패 시 기사 본문에서 아티스트명(#뉴진스)과 이벤트명(#월드투어)을 동적으로 추출하고 본문 노이즈를 정제한다")
     void generatesNewsFeedViaTemplateFallbackWithDynamicArtistTags() {
         CrawledNewsArticle article1 = CrawledNewsArticle.builder()
                 .title("New Jeans World Tour Announcement")
-                .body("New Jeans announced their first world tour starting in Seoul.")
+                .body("(서울=연합뉴스) 김기자 기자 = New Jeans announced their first world tour starting in Seoul. 2026.8.6 test@yna.co.kr")
                 .url("https://www.yna.co.kr/view/1")
                 .source("Yonhap News")
                 .imageUrl("https://img.yna.co.kr/photo1.jpg")
@@ -96,7 +96,8 @@ class GeminiNewsFeedGeneratorTest {
         assertThat(result).isNotNull();
         assertThat(result.getTitle()).isEqualTo("New Jeans World Tour Announcement");
         assertThat(result.getSummaries()).isNotEmpty();
-        assertThat(result.getBody()).contains("New Jeans announced", "출처: Yonhap News");
+        assertThat(result.getBody()).contains("New Jeans announced their first world tour starting in Seoul.", "출처: [Yonhap News](https://www.yna.co.kr/view/1)");
+        assertThat(result.getBody()).doesNotContain("test@yna.co.kr", "김기자 기자 =");
         assertThat(result.getRepresentativeImageUrl()).isEqualTo("https://img.yna.co.kr/photo1.jpg");
         assertThat(result.getKeywords()).contains("#뉴진스", "#월드투어");
         assertThat(result.getSlug()).startsWith("k-pop-");
