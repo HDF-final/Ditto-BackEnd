@@ -64,6 +64,9 @@ management:
 # K-컬처 뉴스피드 자동 생성 설정
 news-feed:
   generation:
+    scheduler-enabled: true
+    cron: "0 0 6 * * *"
+    max-feeds-per-topic: 3
     topics:
       - K-POP
 

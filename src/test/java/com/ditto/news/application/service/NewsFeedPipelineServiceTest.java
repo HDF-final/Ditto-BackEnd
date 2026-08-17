@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import java.util.Collections;
@@ -53,6 +54,7 @@ class NewsFeedPipelineServiceTest {
     void setUp() {
         properties = new NewsFeedGenerationProperties();
         properties.setTopics(List.of("K-POP", "K-Drama"));
+        properties.setMaxFeedsPerTopic(3);
         pipelineService = new NewsFeedPipelineService(collector, crawler, selector, aiNewsFeedGenerator, newsFeedRepository, properties);
     }
 
@@ -100,6 +102,44 @@ class NewsFeedPipelineServiceTest {
         verify(selector).selectRelevantArticles(List.of(crawled), List.of(topic));
         verify(aiNewsFeedGenerator).generate(List.of(crawled), topic);
         verify(newsFeedRepository).save(expectedFeed);
+    }
+
+    @Test
+    @DisplayName("선별된 기사 3건에 대해 내용이 겹치지 않게 각각 개별 뉴스피드를 3건 생성하고 저장한다")
+    void generatesThreeDistinctNewsFeedsIndependently() {
+        String topic = "K-POP";
+        CrawledNewsArticle a1 = CrawledNewsArticle.builder().title("기사 1: 보이그룹 컴백").url("http://url1").build();
+        CrawledNewsArticle a2 = CrawledNewsArticle.builder().title("기사 2: 걸그룹 빌보드 진입").url("http://url2").build();
+        CrawledNewsArticle a3 = CrawledNewsArticle.builder().title("기사 3: K-POP 팝업스토어").url("http://url3").build();
+
+        GeneratedNewsFeed feed1 = GeneratedNewsFeed.builder().title("뉴스피드 1").slug("k-pop-feed-1").build();
+        GeneratedNewsFeed feed2 = GeneratedNewsFeed.builder().title("뉴스피드 2").slug("k-pop-feed-2").build();
+        GeneratedNewsFeed feed3 = GeneratedNewsFeed.builder().title("뉴스피드 3").slug("k-pop-feed-3").build();
+
+        given(collector.collect(topic)).willReturn(List.of(
+                NewsArticleCandidate.builder().url("http://url1").build(),
+                NewsArticleCandidate.builder().url("http://url2").build(),
+                NewsArticleCandidate.builder().url("http://url3").build()
+        ));
+        given(crawler.crawlAll(any())).willReturn(List.of(a1, a2, a3));
+        given(selector.selectRelevantArticles(any(), any())).willReturn(List.of(a1, a2, a3));
+
+        given(aiNewsFeedGenerator.generate(List.of(a1), topic)).willReturn(feed1);
+        given(aiNewsFeedGenerator.generate(List.of(a2), topic)).willReturn(feed2);
+        given(aiNewsFeedGenerator.generate(List.of(a3), topic)).willReturn(feed3);
+
+        given(newsFeedRepository.save(feed1)).willReturn(NewsFeed.builder().newsFeedId(201L).build());
+        given(newsFeedRepository.save(feed2)).willReturn(NewsFeed.builder().newsFeedId(202L).build());
+        given(newsFeedRepository.save(feed3)).willReturn(NewsFeed.builder().newsFeedId(203L).build());
+
+        NewsPipelineDebugResponse debugResult = pipelineService.executePipelineWithDebug(topic);
+
+        assertThat(debugResult).isNotNull();
+        assertThat(debugResult.getGeneratedFeeds()).hasSize(3);
+        assertThat(debugResult.getSavedNewsFeedIds()).containsExactly(201L, 202L, 203L);
+
+        verify(aiNewsFeedGenerator, times(3)).generate(any(), any());
+        verify(newsFeedRepository, times(3)).save(any());
     }
 
     @Test

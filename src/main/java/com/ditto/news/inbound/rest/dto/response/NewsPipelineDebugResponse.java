@@ -36,9 +36,15 @@ public class NewsPipelineDebugResponse {
     @Schema(description = "3단계: 최종 선별된 기사 상세 목록")
     private List<CrawledNewsArticle> selectedArticles;
 
-    @Schema(description = "4단계: 최종 조합 및 생성된 뉴스피드 카드")
+    @Schema(description = "4단계: 단일/대표 생성된 뉴스피드 카드")
     private GeneratedNewsFeed generatedFeed;
 
-    @Schema(description = "5단계: DB 저장 후 발급된 PK ID", example = "101")
+    @Schema(description = "4단계: 개별 생성된 다건 뉴스피드 카드 목록")
+    private List<GeneratedNewsFeed> generatedFeeds;
+
+    @Schema(description = "5단계: DB 저장 후 발급된 대표 PK ID", example = "101")
     private Long savedNewsFeedId;
+
+    @Schema(description = "5단계: DB 저장 후 발급된 PK ID 목록")
+    private List<Long> savedNewsFeedIds;
 }

@@ -15,15 +15,15 @@ import java.util.Set;
 
 import org.springframework.stereotype.Service;
 
-import com.ditto.news.domain.CrawledNewsArticle;
 import com.ditto.news.application.port.out.NewsArticleSelector;
+import com.ditto.news.domain.CrawledNewsArticle;
 
 import lombok.extern.slf4j.Slf4j;
 
 /**
  * {@link NewsArticleSelector} 포트 구현체.
- * 크롤링된 뉴스 기사 목록에서 주제 관련성 점수 계산, URL 및 정규화 제목 중복 제거,
- * 기사 최신성 검증 및 상위 N개 선별을 수행합니다.
+ * 크롤링된 뉴스 기사 목록에서 주제 관련성 점수 계산, 동일 아티스트/토픽 엔티티 중복 방지,
+ * 자카드(Jaccard) 어휘 유사도 기반 동일 사건 중복 제거, 기사 최신성 검증 및 상위 N개 선별을 수행합니다.
  */
 @Slf4j
 @Service
@@ -59,6 +59,59 @@ public class DefaultNewsArticleSelector implements NewsArticleSelector {
     /** 최종 선별할 최대 기사 수 */
     public static final int MAX_SELECTED_ARTICLES = 5;
 
+    /** 제목 자카드 유사도 중복 임계치 (60% 이상 단어 일치 시 동일 사건으로 판단) */
+    public static final double SIMILARITY_THRESHOLD = 0.60;
+
+    /** K-POP 대표 아티스트 정규화 엔티티 매핑 (동일 아티스트 뉴스 중복 선별 방지) */
+    private static final Map<String, String> ARTIST_CANONICAL_MAP = Map.ofEntries(
+            Map.entry("스트레이 키즈", "stray_kids"),
+            Map.entry("스트레이키즈", "stray_kids"),
+            Map.entry("스키즈", "stray_kids"),
+            Map.entry("stray kids", "stray_kids"),
+            Map.entry("straykids", "stray_kids"),
+            Map.entry("방탄소년단", "bts"),
+            Map.entry("bts", "bts"),
+            Map.entry("뉴진스", "newjeans"),
+            Map.entry("newjeans", "newjeans"),
+            Map.entry("new jeans", "newjeans"),
+            Map.entry("에스파", "aespa"),
+            Map.entry("aespa", "aespa"),
+            Map.entry("세븐틴", "seventeen"),
+            Map.entry("seventeen", "seventeen"),
+            Map.entry("아이브", "ive"),
+            Map.entry("ive", "ive"),
+            Map.entry("트와이스", "twice"),
+            Map.entry("twice", "twice"),
+            Map.entry("르세라핌", "le_sserafim"),
+            Map.entry("le sserafim", "le_sserafim"),
+            Map.entry("lesserafim", "le_sserafim"),
+            Map.entry("라이즈", "riize"),
+            Map.entry("riize", "riize"),
+            Map.entry("엔시티", "nct"),
+            Map.entry("nct", "nct"),
+            Map.entry("nct 127", "nct"),
+            Map.entry("엔하이픈", "enhypen"),
+            Map.entry("enhypen", "enhypen"),
+            Map.entry("빅뱅", "bigbang"),
+            Map.entry("bigbang", "bigbang"),
+            Map.entry("투모로우바이투게더", "txt"),
+            Map.entry("txt", "txt"),
+            Map.entry("블랙핑크", "blackpink"),
+            Map.entry("blackpink", "blackpink"),
+            Map.entry("black pink", "blackpink"),
+            Map.entry("제로베이스원", "zerobaseone"),
+            Map.entry("zerobaseone", "zerobaseone"),
+            Map.entry("보이넥스트도어", "boynextdoor"),
+            Map.entry("boynextdoor", "boynextdoor")
+    );
+
+    /** 불용어 및 장르 키워드 (단어 유사도 계산 시 장르명 제외) */
+    private static final Set<String> STOP_WORDS = Set.of(
+            "기자", "종합", "속보", "단독", "오늘", "내일", "어제", "지난", "이번", "연합뉴스",
+            "korea", "news", "herald", "times", "yna", "사진", "포토", "영상",
+            "kpop", "k-pop", "케이팝", "kculture", "트렌드"
+    );
+
     /** K-POP 관련성 판단을 위한 정밀 키워드/아티스트 목록 */
     private static final List<String> KPOP_RELATED_TERMS = List.of(
             "k-pop", "kpop", "k pop", "케이팝",
@@ -86,13 +139,6 @@ public class DefaultNewsArticleSelector implements NewsArticleSelector {
         this.clock = clock != null ? clock : Clock.system(ZoneId.of("Asia/Seoul"));
     }
 
-    /**
-     * 대상 키워드 목록을 기반으로 크롤링된 기사 목록에서 연관성이 높고 중복되지 않은 기사들을 선별합니다.
-     *
-     * @param articles       크롤링된 기사 목록
-     * @param targetKeywords 선별 기준 키워드 목록 (예: ["K-POP"])
-     * @return 관련성 내림차순 및 최신순으로 정렬된 상위 기사 목록 (최대 5개)
-     */
     @Override
     public List<CrawledNewsArticle> selectRelevantArticles(List<CrawledNewsArticle> articles, List<String> targetKeywords) {
         if (articles == null || articles.isEmpty()) {
@@ -140,7 +186,7 @@ public class DefaultNewsArticleSelector implements NewsArticleSelector {
             return Collections.emptyList();
         }
 
-        // 3. 중복 제거 (URL 및 정규화 제목 기준, 고득점/최신순 우선 보존)
+        // 3. 다계층 중복 제거 (URL + 정규화 제목 + 아티스트 엔티티 + 자카드 어휘 유사도)
         List<ScoredArticle> deduplicated = deduplicateArticles(scoredArticles);
 
         // 4. 최대 N개 제한 및 최종 기사 리스트 반환
@@ -150,9 +196,6 @@ public class DefaultNewsArticleSelector implements NewsArticleSelector {
                 .toList();
     }
 
-    /**
-     * 단일 키워드에 대한 기사 선별 편의 메서드.
-     */
     public List<CrawledNewsArticle> selectRelevantArticlesForKeyword(List<CrawledNewsArticle> articles, String targetKeyword) {
         if (targetKeyword == null || targetKeyword.isBlank()) {
             return Collections.emptyList();
@@ -160,9 +203,6 @@ public class DefaultNewsArticleSelector implements NewsArticleSelector {
         return selectRelevantArticles(articles, List.of(targetKeyword.trim()));
     }
 
-    /**
-     * 기사의 제목, 본문, 보조 표현, 최신성을 종합하여 관련성 점수를 계산합니다.
-     */
     public int calculateRelevanceScore(CrawledNewsArticle article, List<String> targetKeywords, LocalDateTime now) {
         String title = article.getTitle() != null ? article.getTitle().toLowerCase(Locale.ROOT) : "";
         String body = article.getBody() != null ? article.getBody().toLowerCase(Locale.ROOT) : "";
@@ -181,7 +221,6 @@ public class DefaultNewsArticleSelector implements NewsArticleSelector {
                 hasDirectBodyMatch = true;
             }
 
-            // 보조 연관 키워드 검사
             List<String> relatedTerms = getRelatedTerms(keyword);
             for (String term : relatedTerms) {
                 String lowerTerm = term.toLowerCase(Locale.ROOT);
@@ -194,26 +233,16 @@ public class DefaultNewsArticleSelector implements NewsArticleSelector {
             }
         }
 
-        // 키워드나 연관어가 제목/본문 어디에도 없으면 0점 (무관 기사)
         if (!hasDirectTitleMatch && !hasDirectBodyMatch && !hasRelatedTitleMatch && !hasRelatedBodyMatch) {
             return 0;
         }
 
         int score = 0;
-        if (hasDirectTitleMatch) {
-            score += TITLE_EXACT_MATCH_SCORE;
-        }
-        if (hasDirectBodyMatch) {
-            score += BODY_EXACT_MATCH_SCORE;
-        }
-        if (hasRelatedTitleMatch) {
-            score += TITLE_RELATED_TERM_SCORE;
-        }
-        if (hasRelatedBodyMatch) {
-            score += BODY_RELATED_TERM_SCORE;
-        }
+        if (hasDirectTitleMatch) score += TITLE_EXACT_MATCH_SCORE;
+        if (hasDirectBodyMatch) score += BODY_EXACT_MATCH_SCORE;
+        if (hasRelatedTitleMatch) score += TITLE_RELATED_TERM_SCORE;
+        if (hasRelatedBodyMatch) score += BODY_RELATED_TERM_SCORE;
 
-        // 최신성 보너스 점수 가산
         if (article.getPublishedAt() != null) {
             Duration age = Duration.between(article.getPublishedAt(), now);
             if (age.isNegative() || age.toHours() <= 24) {
@@ -228,35 +257,28 @@ public class DefaultNewsArticleSelector implements NewsArticleSelector {
         return score;
     }
 
-    /**
-     * 중복 감지를 위해 기사 제목을 정규화합니다.
-     */
     public String normalizeTitle(String title) {
         if (title == null || title.isBlank()) {
             return "";
         }
 
         String normalized = title.toLowerCase(Locale.ROOT);
-
-        // 1. [단독], [속보], [포토], (종합), [Exclusive] 등 괄호 태그 제거
         normalized = normalized.replaceAll("\\[[^\\]]*\\]|\\([^\\)]*\\)", " ");
-
-        // 2. K-POP / k pop / kpop 등 표기 통일
         normalized = normalized.replaceAll("k[\\s-_]*pop", "kpop");
         normalized = normalized.replaceAll("k[\\s-_]*beauty", "kbeauty");
         normalized = normalized.replaceAll("k[\\s-_]*fashion", "kfashion");
-
-        // 3. 특수문자 제거 (한글, 영문, 숫자, 공백만 유지)
         normalized = normalized.replaceAll("[^a-z0-9가-힣\\s]", " ");
-
-        // 4. 연속 공백 정리 및 앞뒤 공백 제거
         normalized = normalized.replaceAll("\\s+", " ").trim();
 
         return normalized;
     }
 
     /**
-     * URL 및 정규화된 제목 기준으로 중복을 제거합니다.
+     * 다계층 중복 제거:
+     * 1) URL 일치 검사
+     * 2) 정규화 제목 일치 검사
+     * 3) 대표 아티스트(Entity) 중복 검사 (동일 아티스트 뉴스는 하루에 최고 점수 1건만 선별)
+     * 4) 자카드 어휘 유사도 검사 (동일 사건 중복 배제)
      */
     private List<ScoredArticle> deduplicateArticles(List<ScoredArticle> scoredArticles) {
         List<ScoredArticle> sorted = scoredArticles.stream()
@@ -268,22 +290,131 @@ public class DefaultNewsArticleSelector implements NewsArticleSelector {
         List<ScoredArticle> deduplicated = new ArrayList<>();
         Set<String> seenUrls = new HashSet<>();
         Set<String> seenTitles = new HashSet<>();
+        Set<String> seenEntities = new HashSet<>();
+        List<Set<String>> seenWordSets = new ArrayList<>();
 
         for (ScoredArticle item : sorted) {
             String url = item.getArticle().getUrl() != null ? item.getArticle().getUrl().trim() : "";
-            String normalizedTitle = normalizeTitle(item.getArticle().getTitle());
+            String rawTitle = item.getArticle().getTitle() != null ? item.getArticle().getTitle() : "";
+            String normalizedTitle = normalizeTitle(rawTitle);
 
-            boolean duplicateUrl = !url.isEmpty() && seenUrls.contains(url);
-            boolean duplicateTitle = !normalizedTitle.isEmpty() && seenTitles.contains(normalizedTitle);
-
-            if (!duplicateUrl && !duplicateTitle) {
-                if (!url.isEmpty()) seenUrls.add(url);
-                if (!normalizedTitle.isEmpty()) seenTitles.add(normalizedTitle);
-                deduplicated.add(item);
+            // 1. URL 중복
+            if (!url.isEmpty() && seenUrls.contains(url)) {
+                log.debug("URL 중복으로 기사 제외: url={}", url);
+                continue;
             }
+
+            // 2. 제목 단순 중복
+            if (!normalizedTitle.isEmpty() && seenTitles.contains(normalizedTitle)) {
+                log.debug("정규화 제목 중복으로 기사 제외: title='{}'", rawTitle);
+                continue;
+            }
+
+            // 3. 아티스트 엔티티 중복 (예: 이미 스트레이키즈 기사가 선별되었다면 다음 스트레이키즈 기사는 건너뜀)
+            Set<String> detectedEntities = extractCanonicalEntities(rawTitle);
+            if (!detectedEntities.isEmpty()) {
+                boolean entityOverlap = false;
+                for (String entity : detectedEntities) {
+                    if (seenEntities.contains(entity)) {
+                        entityOverlap = true;
+                        log.info("동일 아티스트/주제 중복으로 기사 제외 (기존: {}, 현재 기사: '{}')", entity, rawTitle);
+                        break;
+                    }
+                }
+                if (entityOverlap) {
+                    continue;
+                }
+            } else {
+                // 4. 엔티티 미지정 기사의 경우 자카드 어휘 유사도 검사 (핵심 단어 3개 이상 겹치고 유사도 60% 이상 시 중복 배제)
+                Set<String> currentWords = extractMeaningfulWords(rawTitle);
+                if (currentWords.size() >= 3) {
+                    boolean semanticOverlap = false;
+                    for (Set<String> seenWords : seenWordSets) {
+                        Set<String> intersection = new HashSet<>(currentWords);
+                        intersection.retainAll(seenWords);
+                        double similarity = calculateJaccardSimilarity(currentWords, seenWords);
+                        if (intersection.size() >= 3 && similarity >= SIMILARITY_THRESHOLD) {
+                            semanticOverlap = true;
+                            log.info("어휘 유사도({}%) 중복으로 기사 제외: '{}'", Math.round(similarity * 100), rawTitle);
+                            break;
+                        }
+                    }
+                    if (semanticOverlap) {
+                        continue;
+                    }
+                }
+            }
+
+            // 중복 검사를 모두 통과한 고유 기사 등록
+            if (!url.isEmpty()) seenUrls.add(url);
+            if (!normalizedTitle.isEmpty()) seenTitles.add(normalizedTitle);
+            seenEntities.addAll(detectedEntities);
+            Set<String> words = extractMeaningfulWords(rawTitle);
+            if (!words.isEmpty()) seenWordSets.add(words);
+
+            deduplicated.add(item);
         }
 
         return deduplicated;
+    }
+
+    /**
+     * 제목에서 정규화된 대표 아티스트/엔티티를 추출합니다.
+     */
+    public Set<String> extractCanonicalEntities(String text) {
+        if (text == null || text.isBlank()) {
+            return Collections.emptySet();
+        }
+        String lower = text.toLowerCase(Locale.ROOT);
+        Set<String> entities = new HashSet<>();
+
+        for (Map.Entry<String, String> entry : ARTIST_CANONICAL_MAP.entrySet()) {
+            if (lower.contains(entry.getKey())) {
+                entities.add(entry.getValue());
+            }
+        }
+        return entities;
+    }
+
+    /**
+     * 텍스트에서 의미 있는 핵심 단어 집합을 추출합니다. (불용어 및 장르 키워드 제외)
+     */
+    public Set<String> extractMeaningfulWords(String text) {
+        if (text == null || text.isBlank()) {
+            return Collections.emptySet();
+        }
+        String cleaned = text.toLowerCase(Locale.ROOT)
+                .replaceAll("\\[[^\\]]*\\]|\\([^\\)]*\\)", " ")
+                .replaceAll("[^a-z0-9가-힣\\s]", " ");
+
+        String[] tokens = cleaned.split("\\s+");
+        Set<String> words = new HashSet<>();
+        for (String token : tokens) {
+            String trimmed = token.trim();
+            if (!trimmed.isEmpty() && !STOP_WORDS.contains(trimmed)) {
+                words.add(trimmed);
+            }
+        }
+        return words;
+    }
+
+    /**
+     * 두 단어 집합 간의 자카드 유사도를 계산합니다.
+     */
+    public double calculateJaccardSimilarity(Set<String> words1, Set<String> words2) {
+        if (words1.isEmpty() || words2.isEmpty()) {
+            return 0.0;
+        }
+        Set<String> intersection = new HashSet<>(words1);
+        intersection.retainAll(words2);
+
+        Set<String> union = new HashSet<>(words1);
+        union.addAll(words2);
+
+        if (union.isEmpty()) {
+            return 0.0;
+        }
+        return (double) intersection.size() / union.size();
     }
 
     private List<String> getRelatedTerms(String keyword) {

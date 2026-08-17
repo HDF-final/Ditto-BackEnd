@@ -24,7 +24,7 @@ import lombok.extern.slf4j.Slf4j;
 
 /**
  * 뉴스피드 생성 및 DB 영속화 파이프라인 서비스.
- * RSS 후보 수집 -> Python 기사 본문 크롤링 -> 가중치 선별 -> AI 뉴스피드 생성 -> DB 영속화(INSERT)를 순차적으로 오케스트레이션합니다.
+ * RSS 후보 수집 -> Python 기사 본문 크롤링 -> 가중치 선별 -> 개별 AI 뉴스피드(최대 3건) 생성 -> DB 영속화(INSERT)를 순차적으로 오케스트레이션합니다.
  */
 @Slf4j
 @Service
@@ -39,7 +39,7 @@ public class NewsFeedPipelineService {
     private final NewsFeedGenerationProperties properties;
 
     /**
-     * 특정 토픽에 대해 파이프라인을 실행하고 최종 생성 및 저장된 뉴스피드를 반환합니다.
+     * 특정 토픽에 대해 파이프라인을 실행하고 최종 생성 및 저장된 첫 번째 뉴스피드를 반환합니다.
      */
     @Transactional
     public GeneratedNewsFeed executePipeline(String topic) {
@@ -48,7 +48,20 @@ public class NewsFeedPipelineService {
     }
 
     /**
+     * 특정 토픽에 대해 파이프라인을 실행하고 생성된 모든 개별 뉴스피드 목록(최대 3건)을 반환합니다.
+     */
+    @Transactional
+    public List<GeneratedNewsFeed> executePipelineMulti(String topic) {
+        NewsPipelineDebugResponse debugResponse = executePipelineWithDebug(topic);
+        if (debugResponse == null || debugResponse.getGeneratedFeeds() == null) {
+            return Collections.emptyList();
+        }
+        return debugResponse.getGeneratedFeeds();
+    }
+
+    /**
      * 디버그/검증용: 각 파이프라인 단계별 메타데이터 및 DB 영속화 PK ID를 포함한 응답을 반환합니다.
+     * 하루 실행 시 선별된 서로 다른 기사 최대 3건에 대해 개별 뉴스피드를 각각 생성 및 저장합니다.
      */
     @Transactional
     public NewsPipelineDebugResponse executePipelineWithDebug(String topic) {
@@ -75,7 +88,7 @@ public class NewsFeedPipelineService {
             return emptyDebugResponse(topic, candidateCount, 0, 0);
         }
 
-        // [3단계] 기사 선별 및 랭킹
+        // [3단계] 기사 선별 및 랭킹 (중복 제거된 고품질 기사들)
         List<CrawledNewsArticle> selectedArticles = selector.selectRelevantArticles(crawledArticles, List.of(topic));
         int selectedCount = selectedArticles.size();
         if (selectedArticles.isEmpty()) {
@@ -83,21 +96,42 @@ public class NewsFeedPipelineService {
             return emptyDebugResponse(topic, candidateCount, crawledCount, 0);
         }
 
-        // [4단계] AI 뉴스피드 콘텐츠 2차 생성 (Gemini LLM)
-        GeneratedNewsFeed generatedFeed = aiNewsFeedGenerator.generate(selectedArticles, topic);
+        // [4단계 & 5단계] 서로 내용이 겹치지 않는 상위 기사 최대 N개(기본 3개) 각각에 대해 독립 뉴스피드 생성 및 DB 저장
+        int maxFeeds = Math.max(1, properties.getMaxFeedsPerTopic());
+        List<CrawledNewsArticle> targetArticles = selectedArticles.stream()
+                .limit(maxFeeds)
+                .toList();
 
-        // [5단계] DB 영속화 (INSERT)
-        Long savedNewsFeedId = null;
-        if (generatedFeed != null) {
-            NewsFeed savedFeed = newsFeedRepository.save(generatedFeed);
-            if (savedFeed != null) {
-                savedNewsFeedId = savedFeed.getNewsFeedId();
+        List<GeneratedNewsFeed> generatedFeeds = new ArrayList<>();
+        List<Long> savedNewsFeedIds = new ArrayList<>();
+
+        for (int i = 0; i < targetArticles.size(); i++) {
+            CrawledNewsArticle article = targetArticles.get(i);
+            try {
+                log.info("▶ [뉴스피드 {}/{} 개별 생성] 기사 제목='{}', 출처={}",
+                        i + 1, targetArticles.size(), article.getTitle(), article.getSource());
+
+                // 단일 기사의 팩트를 바탕으로 독립된 매거진 포맷 뉴스피드 2차 생성
+                GeneratedNewsFeed feed = aiNewsFeedGenerator.generate(List.of(article), topic);
+                if (feed != null) {
+                    generatedFeeds.add(feed);
+
+                    // 5단계: DB 영속화 (INSERT)
+                    NewsFeed saved = newsFeedRepository.save(feed);
+                    if (saved != null && saved.getNewsFeedId() != null) {
+                        savedNewsFeedIds.add(saved.getNewsFeedId());
+                    }
+                }
+            } catch (Exception e) {
+                log.error("개별 기사 뉴스피드 생성 실패 (기사 제목='{}'): cause={}", article.getTitle(), e.getMessage(), e);
             }
         }
 
-        log.info("[뉴스 파이프라인 완료] topic={}, candidates={}, crawled={}, selected={}, savedId={}, title='{}'",
-                topic, candidateCount, crawledCount, selectedCount, savedNewsFeedId,
-                generatedFeed != null ? generatedFeed.getTitle() : "null");
+        GeneratedNewsFeed primaryFeed = !generatedFeeds.isEmpty() ? generatedFeeds.get(0) : null;
+        Long primarySavedId = !savedNewsFeedIds.isEmpty() ? savedNewsFeedIds.get(0) : null;
+
+        log.info("[뉴스 파이프라인 완료] topic={}, candidates={}, crawled={}, selected={}, generatedCount={}, savedIds={}",
+                topic, candidateCount, crawledCount, selectedCount, generatedFeeds.size(), savedNewsFeedIds);
 
         return NewsPipelineDebugResponse.builder()
                 .topic(topic)
@@ -105,8 +139,10 @@ public class NewsFeedPipelineService {
                 .crawledCount(crawledCount)
                 .selectedCount(selectedCount)
                 .selectedArticles(selectedArticles)
-                .generatedFeed(generatedFeed)
-                .savedNewsFeedId(savedNewsFeedId)
+                .generatedFeed(primaryFeed)
+                .generatedFeeds(generatedFeeds)
+                .savedNewsFeedId(primarySavedId)
+                .savedNewsFeedIds(savedNewsFeedIds)
                 .build();
     }
 
@@ -124,9 +160,9 @@ public class NewsFeedPipelineService {
         List<GeneratedNewsFeed> results = new ArrayList<>();
         for (String topic : topics) {
             try {
-                GeneratedNewsFeed feed = executePipeline(topic);
-                if (feed != null) {
-                    results.add(feed);
+                List<GeneratedNewsFeed> feeds = executePipelineMulti(topic);
+                if (feeds != null && !feeds.isEmpty()) {
+                    results.addAll(feeds);
                 }
             } catch (Exception e) {
                 log.error("토픽({}) 뉴스피드 생성 실패: cause={}", topic, e.getMessage(), e);
@@ -143,7 +179,9 @@ public class NewsFeedPipelineService {
                 .selectedCount(selected)
                 .selectedArticles(Collections.emptyList())
                 .generatedFeed(null)
+                .generatedFeeds(Collections.emptyList())
                 .savedNewsFeedId(null)
+                .savedNewsFeedIds(Collections.emptyList())
                 .build();
     }
 }
