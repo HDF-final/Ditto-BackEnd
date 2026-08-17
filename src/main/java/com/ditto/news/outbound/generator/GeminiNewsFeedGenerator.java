@@ -18,8 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 
 /**
  * Google Gemini 기반 AI 뉴스피드 생성기 아웃바운드 어댑터.
- * 선별된 기사들의 사실(Fact)을 참조하여 제목, 3줄 요약, 재작성 본문, 태그를 포함한 완제품 피드를 생성하며,
- * API 미설정 또는 오류 발생 시 템플릿 기반 안전 폴백을 수행합니다.
+ * 프론트엔드 UI 디자인에 맞춘 세련된 매거진 아티클 형식(헤드라인, 3줄 요약, 본문 서식, 인용구, 태그)을 생성합니다.
  */
 @Slf4j
 @Service
@@ -43,10 +42,10 @@ public class GeminiNewsFeedGenerator implements AiNewsFeedGenerator {
         // 1. Gemini LLM 구조화 생성 시도
         GeminiNewsFeedPayload payload = geminiClient.generateRewrittenNews(articles, topic);
         if (payload != null && payload.getTitle() != null && !payload.getTitle().isBlank()) {
-            String title = payload.getTitle().trim();
+            String title = cleanHeadline(payload.getTitle());
             List<String> summaries = payload.getSummaries() != null && !payload.getSummaries().isEmpty()
                     ? payload.getSummaries()
-                    : buildFallbackSummaries(articles, topic);
+                    : buildEditorialSummaries(articles, topic);
 
             StringBuilder bodyBuilder = new StringBuilder();
             if (payload.getBody() != null && !payload.getBody().isBlank()) {
@@ -70,12 +69,12 @@ public class GeminiNewsFeedGenerator implements AiNewsFeedGenerator {
                     .build();
         }
 
-        // 2. Gemini 미사용/실패 시 템플릿 기반 안전 폴백 생성
-        log.info("Gemini 미사용/호출실패로 템플릿 기반 피드 합성 생성을 수행합니다. topic={}", topic);
-        return generateTemplateFallback(articles, topic, representativeImageUrl, slug, sourceAttribution);
+        // 2. Gemini 미사용/실패 시 매거진 템플릿 기반 안전 폴백 생성
+        log.info("Gemini 미사용/호출실패로 고품질 매거진 템플릿 피드 생성을 수행합니다. topic={}", topic);
+        return generateMagazineFallback(articles, topic, representativeImageUrl, slug, sourceAttribution);
     }
 
-    private GeneratedNewsFeed generateTemplateFallback(
+    private GeneratedNewsFeed generateMagazineFallback(
             List<CrawledNewsArticle> articles,
             String topic,
             String representativeImageUrl,
@@ -83,26 +82,29 @@ public class GeminiNewsFeedGenerator implements AiNewsFeedGenerator {
             String sourceAttribution) {
 
         CrawledNewsArticle mainArticle = articles.get(0);
-        String title = String.format("[%s 최신 소식] %s", topic, mainArticle.getTitle());
-        List<String> summaries = buildFallbackSummaries(articles, topic);
+        String title = cleanHeadline(mainArticle.getTitle());
+        List<String> summaries = buildEditorialSummaries(articles, topic);
 
         StringBuilder bodyBuilder = new StringBuilder();
-        bodyBuilder.append(String.format("🔥 오늘의 %s 트렌드 및 주요 소식 요약입니다.\n\n", topic));
 
-        for (CrawledNewsArticle article : articles) {
-            bodyBuilder.append(String.format("📌 [%s] %s\n",
-                    article.getSource() != null ? article.getSource() : "뉴스",
-                    article.getTitle()));
+        // 1문단: 배경 및 도입
+        bodyBuilder.append(String.format("글로벌 %s 트렌드가 빠르게 확산되며 팬덤 중심의 소비와 새로운 콘텐츠 경험이 국내외 시장의 흐름을 바꾸고 있습니다.\n\n", topic));
 
-            if (article.getBody() != null && !article.getBody().isBlank()) {
-                String clean = article.getBody().replaceAll("\\s+", " ").trim();
-                String snippet = clean.length() > 200 ? clean.substring(0, 200) + "..." : clean;
-                bodyBuilder.append(snippet).append("\n\n");
-            }
+        // 2문단: 세부 사실 및 현장 이야기
+        if (mainArticle.getBody() != null && !mainArticle.getBody().isBlank()) {
+            String clean = mainArticle.getBody().replaceAll("\\s+", " ").trim();
+            String snippet = clean.length() > 250 ? clean.substring(0, 250) + "..." : clean;
+            bodyBuilder.append(snippet).append("\n\n");
         }
 
+        // 3문단: 인용구 블록 (UI 디자인 매거진 스타일)
+        bodyBuilder.append(String.format("“현장에서 체감하는 %s 문화 경험이 귀국 후 소비와 글로벌 팬덤으로 이어지는 핵심 동력입니다.”\n- DITTO Trend Lab\n\n", topic));
+
+        // 4문단: DITTO 코스 연계 및 마무리 제언
+        bodyBuilder.append(String.format("DITTO는 앞으로도 %s 콘텐츠와 실제 여행 경험이 만나는 스팟을 지속적으로 추적합니다. 사용자가 저장한 코스와 뉴스 관심사를 연결해 실제 방문 가능한 추천 스팟으로 확장할 예정입니다.", topic));
+
         if (!sourceAttribution.isBlank()) {
-            bodyBuilder.append(sourceAttribution);
+            bodyBuilder.append("\n\n").append(sourceAttribution);
         }
 
         return GeneratedNewsFeed.builder()
@@ -115,16 +117,32 @@ public class GeminiNewsFeedGenerator implements AiNewsFeedGenerator {
                 .build();
     }
 
-    private List<String> buildFallbackSummaries(List<CrawledNewsArticle> articles, String topic) {
+    private List<String> buildEditorialSummaries(List<CrawledNewsArticle> articles, String topic) {
         List<String> summaries = new ArrayList<>();
-        for (int i = 0; i < Math.min(articles.size(), 3); i++) {
-            CrawledNewsArticle a = articles.get(i);
-            summaries.add(a.getTitle());
+        for (CrawledNewsArticle a : articles) {
+            String cleaned = cleanHeadline(a.getTitle());
+            if (!cleaned.isBlank()) {
+                summaries.add(cleaned);
+            }
+            if (summaries.size() >= 3) break;
         }
-        if (summaries.isEmpty()) {
-            summaries.add(topic + " 최신 트렌드 주요 소식");
+        while (summaries.size() < 3) {
+            if (summaries.isEmpty()) summaries.add(topic + " 글로벌 트렌드 및 시장 확장세 지속");
+            else if (summaries.size() == 1) summaries.add("팬덤 및 현장 경험 중심의 새로운 소비 흐름 형성");
+            else summaries.add("여행과 K-컬처가 만나는 주요 브랜드 스팟 주목");
         }
         return summaries;
+    }
+
+    private String cleanHeadline(String rawTitle) {
+        if (rawTitle == null) return "";
+        return rawTitle.replaceAll("\\[.*?\\]", "")
+                .replaceAll("\\|.*$", "")
+                .replaceAll(" - .*$", "")
+                .replaceAll("(?i)yna|연합뉴스|korea herald|korea times", "")
+                .replaceAll("^[\\s:·,]+", "")
+                .replaceAll("[\\s:·,]+$", "")
+                .trim();
     }
 
     private String extractRepresentativeImageUrl(List<CrawledNewsArticle> articles) {
@@ -138,9 +156,9 @@ public class GeminiNewsFeedGenerator implements AiNewsFeedGenerator {
 
     private List<String> buildDefaultKeywords(String topic) {
         List<String> keywords = new ArrayList<>();
-        keywords.add("#" + topic.replaceAll("\\s+", ""));
+        keywords.add("#" + topic.replaceAll("[^a-zA-Z0-9가-힣]", ""));
         keywords.add("#KCulture");
-        keywords.add("#DITTO");
+        keywords.add("#트렌드");
         return keywords;
     }
 

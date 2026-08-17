@@ -19,7 +19,7 @@ import lombok.extern.slf4j.Slf4j;
 
 /**
  * Google Gemini REST API 호출 클라이언트.
- * 저작권 침해 방지를 위해 선별 기사들의 사실(Fact)만 참조하여 JSON 규격에 맞춘 2차 뉴스피드 데이터를 생성합니다.
+ * 저작권 침해 방지를 위해 선별 기사들의 사실(Fact)만 참조하여 DITTO 매거진 스타일의 2차 뉴스피드 데이터를 생성합니다.
  */
 @Slf4j
 @Component
@@ -40,10 +40,6 @@ public class GeminiNewsApiClient {
 
     /**
      * Gemini API를 호출하여 선별된 기사들을 기반으로 구조화된 JSON 뉴스피드 페이로드를 생성합니다.
-     *
-     * @param articles 선별된 원문 기사 목록
-     * @param topic    대상 토픽 (예: "K-POP")
-     * @return 파싱된 GeminiNewsFeedPayload (API 키 부재 또는 호출 실패 시 null)
      */
     public GeminiNewsFeedPayload generateRewrittenNews(List<CrawledNewsArticle> articles, String topic) {
         if (!properties.isEnabled()) {
@@ -117,37 +113,54 @@ public class GeminiNewsApiClient {
     }
 
     /**
-     * 저작권 보호 및 DTO 규격 매핑을 위한 JSON 강제 프롬프트를 구성합니다.
+     * 프론트엔드 UI 디자인에 맞춘 고품질 매거진 형식 프롬프트 구성.
      */
     private String buildPrompt(List<CrawledNewsArticle> articles, String topic) {
         StringBuilder sb = new StringBuilder();
-        sb.append("당신은 DITTO의 전문 K-컬처 뉴스 에디터입니다.\n");
-        sb.append("아래에 제공되는 '").append(topic).append("' 관련 기사들의 핵심 사실(Fact)만 종합하여, ");
-        sb.append("저작권 보호를 위해 원문 문장을 그대로 베끼지 말고 완전히 새로운 문장 구조와 단어로 재작성(Paraphrasing)하세요.\n\n");
+        sb.append("당신은 글로벌 K-컬처 여행/트렌드 플랫폼 'DITTO'의 전문 에디터입니다.\n");
+        sb.append("아래에 제공되는 '").append(topic).append("' 관련 기사들의 핵심 사실(Fact)을 종합하여, ");
+        sb.append("원문 문장을 그대로 베끼지 말고 저작권 침해가 없는 세련되고 매력적인 매거진 아티클로 재작성하세요.\n\n");
 
-        sb.append("[출력 규격: 반드시 아래 JSON 형식으로만 응답하세요. 다른 설명이나 마크다운 백틱 없이 순수 JSON만 반환하세요.]\n");
+        sb.append("### 작성 가이드라인:\n");
+        sb.append("1. **제목(title)**: 언론사명이나 대괄호([K-POP]) 없이, 핵심 트렌드를 한눈에 보여주는 매력적인 헤드라인 1줄 (예: 'K-뷰티 수출 사상 최대, 인디 브랜드가 성장을 이끌었다').\n");
+        sb.append("2. **기사 요약(summaries)**: 오른쪽 요약 카드에 들어갈 3개의 핵심 인사이트 문장 (단순 제목 나열이 아닌, 1줄씩 간결하고 명확한 요약문).\n");
+        sb.append("3. **본문(body)**:\n");
+        sb.append("   - 3~4개의 문단으로 자연스럽게 서술.\n");
+        sb.append("   - 문단 사이에 중요한 인사이트를 담은 인용구 블록(예: “... 흐름이 성장의 중요한 단서입니다.” - DITTO Trend Lab)을 자연스럽게 1개 포함.\n");
+        sb.append("   - 마지막 문단에는 DITTO 여행자 관점에서의 트렌드 제언이나 방문 추천 맥락을 가볍게 연결.\n");
+        sb.append("4. **키워드(keywords)**: 본문과 관련된 해시태그 3~4개 (예: [\"#K뷰티\", \"#수출\", \"#인디브랜드\"]).\n\n");
+
+        sb.append("### 출력 규격 (반드시 순수 JSON만 반환):\n");
         sb.append("{\n");
-        sb.append("  \"title\": \"대표 헤드라인 1줄\",\n");
+        sb.append("  \"title\": \"매력적인 대표 헤드라인\",\n");
         sb.append("  \"summaries\": [\n");
-        sb.append("    \"첫 번째 핵심 요약 문장\",\n");
-        sb.append("    \"두 번째 핵심 요약 문장\",\n");
-        sb.append("    \"세 번째 핵심 요약 문장\"\n");
+        sb.append("    \"첫 번째 핵심 트렌드 요약\",\n");
+        sb.append("    \"두 번째 주요 사실/성장 요약\",\n");
+        sb.append("    \"세 번째 전망/소비 패턴 요약\"\n");
         sb.append("  ],\n");
-        sb.append("  \"body\": \"상세 재작성 본문 (2~3개 문단으로 자연스러운 어조 서술)\",\n");
-        sb.append("  \"keywords\": [\"#주요키워드1\", \"#주요키워드2\", \"#주요키워드3\"]\n");
+        sb.append("  \"body\": \"첫 번째 문단\\n\\n두 번째 문단\\n\\n“핵심 인사이트 인용문”\\n- DITTO Trend Lab\\n\\n마무리 문단\",\n");
+        sb.append("  \"keywords\": [\"#키워드1\", \"#키워드2\", \"#키워드3\"]\n");
         sb.append("}\n\n");
 
-        sb.append("[참고 기사 팩트 정보]\n");
+        sb.append("[참고 원문 팩트 정보]\n");
         int idx = 1;
         for (CrawledNewsArticle article : articles) {
             sb.append(String.format("기사 %d.\n- 제목: %s\n- 출처: %s\n- 내용: %s\n\n",
                     idx++,
-                    article.getTitle(),
+                    cleanArticleTitle(article.getTitle()),
                     article.getSource() != null ? article.getSource() : "언론사",
-                    truncateBody(article.getBody(), 500)));
+                    truncateBody(article.getBody(), 600)));
         }
 
         return sb.toString();
+    }
+
+    private String cleanArticleTitle(String title) {
+        if (title == null) return "";
+        return title.replaceAll("\\[.*?\\]", "")
+                    .replaceAll("\\|.*$", "")
+                    .replaceAll("-.*$", "")
+                    .trim();
     }
 
     private String truncateBody(String body, int maxLength) {
