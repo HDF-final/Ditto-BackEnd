@@ -71,6 +71,14 @@
         OFFSET #{offset} ROWS FETCH NEXT #{size} ROWS ONLY
     </select>
 
+    <select id="findAllForSitemap" resultType="com.ditto.news.outbound.repository.entity.NewsFeedRow">
+        SELECT slug,
+               created_at AS createdAt
+          FROM news_feed
+         WHERE deleted_at IS NULL
+         ORDER BY created_at DESC, news_feed_id DESC
+    </select>
+
     <select id="count" resultType="long">
         SELECT COUNT(*)
           FROM news_feed

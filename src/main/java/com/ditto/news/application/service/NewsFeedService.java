@@ -37,6 +37,13 @@ public class NewsFeedService {
     }
 
     /**
+     * 사이트맵(/sitemap.xml) 생성을 위해 전체 활성 뉴스피드의 경량 정보를 조회합니다.
+     */
+    public List<NewsFeed> getNewsFeedsForSitemap() {
+        return newsFeedRepository.findAllForSitemap();
+    }
+
+    /**
      * PK ID로 뉴스피드 도메인 엔티티를 조회합니다.
      */
     public NewsFeed getNewsFeedById(Long newsFeedId) {

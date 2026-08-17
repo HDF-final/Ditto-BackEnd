@@ -90,6 +90,15 @@ public class NewsFeedRepositoryImpl implements NewsFeedRepository {
     }
 
     @Override
+    public List<NewsFeed> findAllForSitemap() {
+        List<NewsFeedRow> rows = newsFeedMapper.findAllForSitemap();
+        if (rows == null || rows.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return rows.stream().map(this::toDomain).toList();
+    }
+
+    @Override
     public long count() {
         return newsFeedMapper.count();
     }

@@ -72,6 +72,12 @@ class NewsFeedCrudComprehensiveLiveTest {
         assertThat(listPage0).isNotEmpty();
         System.out.println("✓ [R] 페이징 목록 조회 성공: size=" + listPage0.size());
 
+        // 4-1. Read (R) 테스트 - 사이트맵 목록 조회 (GET /api/v1/news/sitemap)
+        List<NewsFeed> sitemapFeeds = newsFeedService.getNewsFeedsForSitemap();
+        assertThat(sitemapFeeds).isNotEmpty();
+        assertThat(sitemapFeeds.stream().anyMatch(f -> uniqueSlug.equals(f.getSlug()))).isTrue();
+        System.out.println("✓ [R] 사이트맵용 경량 목록 조회 성공: sitemap size=" + sitemapFeeds.size());
+
         // 5. Read (R) 예외 케이스 - 존재하지 않는 ID (404)
         assertThatThrownBy(() -> newsFeedService.getNewsFeedById(999999999L))
                 .isInstanceOf(BusinessException.class)

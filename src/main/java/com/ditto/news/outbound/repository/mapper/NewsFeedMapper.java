@@ -45,6 +45,11 @@ public interface NewsFeedMapper {
     );
 
     /**
+     * 사이트맵 생성을 위한 전체 활성 뉴스피드의 slug 및 작성일시 목록을 조회합니다.
+     */
+    List<NewsFeedRow> findAllForSitemap();
+
+    /**
      * 전체 뉴스피드 건수를 조회합니다.
      */
     long count();

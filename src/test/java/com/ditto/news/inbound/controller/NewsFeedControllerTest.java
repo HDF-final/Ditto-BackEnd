@@ -64,6 +64,23 @@ class NewsFeedControllerTest {
     }
 
     @Test
+    @DisplayName("GET /api/v1/news/sitemap - 사이트맵용 목록 조회가 성공하면 200 OK와 slug, createdAt 리스트를 반환한다")
+    void getNewsFeedsForSitemapReturns200() throws Exception {
+        NewsFeed feed = NewsFeed.builder()
+                .slug("k-pop-sitemap-feed")
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        given(newsFeedService.getNewsFeedsForSitemap()).willReturn(List.of(feed));
+
+        mockMvc.perform(get("/api/v1/news/sitemap"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data[0].slug").value("k-pop-sitemap-feed"))
+                .andExpect(jsonPath("$.data[0].createdAt").isNotEmpty());
+    }
+
+    @Test
     @DisplayName("GET /api/v1/news/{newsId} - ID 단건 조회가 성공하면 200 OK와 상세 본문을 반환한다")
     void getNewsFeedByIdReturns200() throws Exception {
         NewsFeed feed = NewsFeed.builder()
