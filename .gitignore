@@ -8,13 +8,13 @@ build/
 *.iml
 *.iws
 *.ipr
-out/
+/out/
 
 ### Eclipse ###
 .settings/
 .project
 .classpath
-bin/
+/bin/
 
 ### VS Code ###
 .vscode/
