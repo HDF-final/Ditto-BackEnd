@@ -20,7 +20,7 @@ import lombok.RequiredArgsConstructor;
 
 /**
  * 사용자용 공개 뉴스피드 조회 REST API 컨트롤러 (Inbound Web Adapter).
- * 목록 페이징 조회 및 Slug/ID 상세 조회를 전담합니다.
+ * 목록 조회, newsId 상세 조회, 검색 유입용 slug 조회를 전담합니다.
  */
 @Tag(name = "News", description = "K-컬처 트렌드 뉴스피드 조회 API")
 @RestController
@@ -30,7 +30,7 @@ public class NewsFeedController {
 
     private final NewsFeedService newsFeedService;
 
-    @Operation(summary = "뉴스피드 목록 페이징 조회", description = "최신순으로 뉴스피드 목록을 조회합니다.")
+    @Operation(summary = "뉴스피드 목록 조회", description = "최신순으로 뉴스피드 목록을 페이징 조회합니다.")
     @GetMapping
     public ApiResponse<List<NewsFeedSummaryResponse>> getNewsFeedList(
             @RequestParam(name = "page", defaultValue = "0") int page,
@@ -43,14 +43,14 @@ public class NewsFeedController {
         return ApiResponse.success(response);
     }
 
-    @Operation(summary = "뉴스피드 상세 조회 (PK ID)", description = "ID로 뉴스피드 상세 본문을 조회합니다.")
-    @GetMapping("/{id}")
-    public ApiResponse<NewsFeedDetailResponse> getNewsFeedById(@PathVariable("id") Long id) {
-        NewsFeed feed = newsFeedService.getNewsFeedById(id);
+    @Operation(summary = "뉴스피드 상세 조회", description = "newsId로 뉴스피드 상세 본문을 조회합니다.")
+    @GetMapping("/{newsId}")
+    public ApiResponse<NewsFeedDetailResponse> getNewsFeedById(@PathVariable("newsId") Long newsId) {
+        NewsFeed feed = newsFeedService.getNewsFeedById(newsId);
         return ApiResponse.success(NewsFeedDetailResponse.from(feed));
     }
 
-    @Operation(summary = "뉴스피드 상세 조회 (URL Slug)", description = "고유 URL 슬러그로 뉴스피드 상세 본문을 조회합니다.")
+    @Operation(summary = "검색 유입 콘텐츠 조회", description = "SEO 및 검색 유입용 고유 URL 슬러그로 뉴스피드 상세 본문을 조회합니다.")
     @GetMapping("/slug/{slug}")
     public ApiResponse<NewsFeedDetailResponse> getNewsFeedBySlug(@PathVariable("slug") String slug) {
         NewsFeed feed = newsFeedService.getNewsFeedBySlug(slug);

@@ -64,7 +64,7 @@ class NewsFeedControllerTest {
     }
 
     @Test
-    @DisplayName("GET /api/v1/news/{id} - ID 단건 조회가 성공하면 200 OK와 상세 본문을 반환한다")
+    @DisplayName("GET /api/v1/news/{newsId} - ID 단건 조회가 성공하면 200 OK와 상세 본문을 반환한다")
     void getNewsFeedByIdReturns200() throws Exception {
         NewsFeed feed = NewsFeed.builder()
                 .newsFeedId(1L)
