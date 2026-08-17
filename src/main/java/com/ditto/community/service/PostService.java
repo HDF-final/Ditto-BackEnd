@@ -34,6 +34,7 @@ public class PostService {
 
     private final CourseMapper courseMapper;
     private final PostMapper postMapper;
+    private final com.ditto.community.repository.PostCommentMapper postCommentMapper;
 
     /**
      * 커뮤니티에 공개된 코스 게시글 목록을 최신순으로 페이징 조회한다.
@@ -51,7 +52,7 @@ public class PostService {
     }
 
     /**
-     * 커뮤니티에 공개된 코스 게시글 상세 정보와 연결된 코스 장소 목록을 조회한다.
+     * 커뮤니티에 공개된 코스 게시글 상세 정보와 연결된 코스 장소 목록 및 댓글 목록을 조회한다.
      */
     public PublicCourseDetailResponse getPublicCourse(Long postId) {
         if (postId == null || postId <= 0) {
@@ -76,12 +77,14 @@ public class PostService {
                 .places(places)
                 .build();
 
+        List<com.ditto.community.dto.response.CommentResponse> comments = postCommentMapper.findCommentsByPostId(postId);
+
         return PublicCourseDetailResponse.builder()
                 .postId(post.getPostId())
                 .title(post.getTitle())
                 .content(post.getContent())
                 .course(courseInfo)
-                .comments(List.of())
+                .comments(comments != null ? comments : List.of())
                 .build();
     }
 

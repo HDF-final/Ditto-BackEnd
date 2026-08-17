@@ -52,6 +52,9 @@ class PostServiceTest {
     @Mock
     private PostMapper postMapper;
 
+    @Mock
+    private com.ditto.community.repository.PostCommentMapper postCommentMapper;
+
     @InjectMocks
     private PostService postService;
 
@@ -468,6 +471,7 @@ class PostServiceTest {
 
         given(postMapper.findPublicCourseDetailById(1L)).willReturn(Optional.of(postRow));
         given(courseMapper.findPlacesByCourseId(3L)).willReturn(List.of(place1, place2));
+        given(postCommentMapper.findCommentsByPostId(1L)).willReturn(List.of());
 
         PublicCourseDetailResponse response = postService.getPublicCourse(1L);
 
@@ -485,6 +489,7 @@ class PostServiceTest {
 
         verify(postMapper).findPublicCourseDetailById(1L);
         verify(courseMapper).findPlacesByCourseId(3L);
+        verify(postCommentMapper).findCommentsByPostId(1L);
     }
 
     @Test
@@ -494,6 +499,7 @@ class PostServiceTest {
 
         given(postMapper.findPublicCourseDetailById(1L)).willReturn(Optional.of(postRow));
         given(courseMapper.findPlacesByCourseId(3L)).willReturn(List.of());
+        given(postCommentMapper.findCommentsByPostId(1L)).willReturn(List.of());
 
         PublicCourseDetailResponse response = postService.getPublicCourse(1L);
 

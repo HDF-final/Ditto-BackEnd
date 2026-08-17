@@ -1,5 +1,7 @@
 package com.ditto.community.controller;
 
+import java.util.List;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -12,12 +14,15 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.ditto.community.dto.request.CreateCommentRequest;
 import com.ditto.community.dto.request.CreateCoursePostRequest;
 import com.ditto.community.dto.request.UpdateCoursePostRequest;
+import com.ditto.community.dto.response.CommentResponse;
 import com.ditto.community.dto.response.CreateCoursePostResponse;
 import com.ditto.community.dto.response.PublicCourseDetailResponse;
 import com.ditto.community.dto.response.PublicCourseResponse;
 import com.ditto.community.dto.response.UpdateCoursePostResponse;
+import com.ditto.community.service.PostCommentService;
 import com.ditto.community.service.PostService;
 import com.ditto.global.common.response.ApiResponse;
 import com.ditto.global.common.response.PageResponse;
@@ -29,13 +34,14 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
-@Tag(name = "Post", description = "커뮤니티 게시글 API")
+@Tag(name = "Post", description = "커뮤니티 게시글 및 댓글 API")
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/community/courses")
 public class PostController {
 
     private final PostService postService;
+    private final PostCommentService postCommentService;
 
     @Operation(
             summary = "공개 코스 목록 조회",
@@ -52,7 +58,7 @@ public class PostController {
 
     @Operation(
             summary = "공개 코스 상세 조회",
-            description = "커뮤니티에 공개된 코스 게시글의 본문과 연결된 코스 및 장소 목록을 상세 조회합니다.")
+            description = "커뮤니티에 공개된 코스 게시글의 본문과 연결된 코스, 장소 목록 및 댓글 목록을 상세 조회합니다.")
     @GetMapping("/{postId}")
     @ResponseStatus(HttpStatus.OK)
     public ApiResponse<PublicCourseDetailResponse> getPublicCourse(
@@ -85,6 +91,38 @@ public class PostController {
     @ResponseStatus(HttpStatus.OK)
     public ApiResponse<Void> deleteCoursePost(@PathVariable Long postId) {
         postService.deleteCoursePost(SecurityUtils.requireUserId(), postId);
+        return ApiResponse.success("성공", null);
+    }
+
+    @Operation(summary = "코스 게시글 댓글 작성", description = "로그인한 고객(ROLE_CUSTOMER)이 코스 게시글에 댓글을 작성합니다.")
+    @PostMapping("/{postId}/comments")
+    @ResponseStatus(HttpStatus.CREATED)
+    public ApiResponse<CommentResponse> createComment(
+            @Parameter(description = "댓글을 작성할 게시글 ID", example = "1")
+            @PathVariable Long postId,
+            @Valid @RequestBody CreateCommentRequest request) {
+        return ApiResponse.success("성공",
+                postCommentService.createComment(SecurityUtils.requireUserId(), postId, request));
+    }
+
+    @Operation(summary = "코스 게시글 댓글 목록 조회", description = "코스 게시글에 등록된 댓글 목록을 순서대로 조회합니다.")
+    @GetMapping("/{postId}/comments")
+    @ResponseStatus(HttpStatus.OK)
+    public ApiResponse<List<CommentResponse>> getComments(
+            @Parameter(description = "댓글을 조회할 게시글 ID", example = "1")
+            @PathVariable Long postId) {
+        return ApiResponse.success("성공", postCommentService.getComments(postId));
+    }
+
+    @Operation(summary = "코스 게시글 댓글 삭제", description = "로그인한 고객(ROLE_CUSTOMER)이 본인이 작성한 댓글을 삭제합니다.")
+    @DeleteMapping("/{postId}/comments/{commentId}")
+    @ResponseStatus(HttpStatus.OK)
+    public ApiResponse<Void> deleteComment(
+            @Parameter(description = "게시글 ID", example = "1")
+            @PathVariable Long postId,
+            @Parameter(description = "삭제할 댓글 ID", example = "1")
+            @PathVariable Long commentId) {
+        postCommentService.deleteComment(SecurityUtils.requireUserId(), postId, commentId);
         return ApiResponse.success("성공", null);
     }
 }

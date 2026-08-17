@@ -67,4 +67,37 @@ public class PostCommentService {
         List<CommentResponse> comments = postCommentMapper.findCommentsByPostId(postId);
         return comments != null ? comments : List.of();
     }
+
+    /**
+     * 본인이 작성한 댓글을 삭제한다. (ROLE_CUSTOMER 전용)
+     */
+    @Transactional
+    public void deleteComment(Long userId, Long postId, Long commentId) {
+        if (postId == null || postId <= 0) {
+            throw new BusinessException(ErrorCode.POST_NOT_FOUND);
+        }
+        if (commentId == null || commentId <= 0) {
+            throw new BusinessException(ErrorCode.COMMENT_NOT_FOUND);
+        }
+
+        // 1. 게시글 존재 여부 확인
+        postMapper.findActiveById(postId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.POST_NOT_FOUND));
+
+        // 2. 댓글 존재 여부 확인
+        CommentResponse comment = postCommentMapper.findCommentById(commentId);
+        if (comment == null || !comment.getPostId().equals(postId)) {
+            throw new BusinessException(ErrorCode.COMMENT_NOT_FOUND);
+        }
+
+        // 3. 본인 작성 댓글인지 확인
+        if (!comment.getUserId().equals(userId)) {
+            throw new BusinessException(ErrorCode.ACCESS_DENIED);
+        }
+
+        // 4. 삭제 실행
+        if (postCommentMapper.delete(commentId, userId) != 1) {
+            throw new BusinessException(ErrorCode.COMMENT_NOT_FOUND);
+        }
+    }
 }

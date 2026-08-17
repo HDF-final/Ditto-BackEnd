@@ -30,7 +30,7 @@ public class PublicCourseDetailResponse {
     private CourseInfo course;
 
     @Schema(description = "댓글 목록")
-    private List<Object> comments;
+    private List<CommentResponse> comments;
 
     @Getter
     @Setter

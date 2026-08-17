@@ -23,6 +23,8 @@ public interface PostCommentMapper {
 
     CommentResponse findCommentById(@Param("commentId") Long commentId);
 
+    int delete(@Param("commentId") Long commentId, @Param("userId") Long userId);
+
     @Getter
     @Setter
     @Builder

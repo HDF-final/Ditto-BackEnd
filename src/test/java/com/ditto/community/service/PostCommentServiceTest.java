@@ -150,4 +150,69 @@ class PostCommentServiceTest {
         assertThat(comments.get(1).getNickname()).isEqualTo("Yuki_T");
         assertThat(comments.get(1).getIsAuthor()).isTrue();
     }
+
+    @Test
+    @DisplayName("작성자 본인이 본인의 댓글을 정상 삭제한다")
+    void deleteCommentSuccess() {
+        PostRow post = new PostRow(POST_ID, 100L, 1L, "제목", "내용", 0, 0, LocalDateTime.now(), null);
+        given(postMapper.findActiveById(POST_ID)).willReturn(Optional.of(post));
+
+        CommentResponse comment = CommentResponse.builder()
+                .commentId(101L)
+                .postId(POST_ID)
+                .userId(USER_ID)
+                .nickname("Chen_Li")
+                .isAuthor(false)
+                .content("삭제할 댓글")
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        given(postCommentMapper.findCommentById(101L)).willReturn(comment);
+        given(postCommentMapper.delete(101L, USER_ID)).willReturn(1);
+
+        postCommentService.deleteComment(USER_ID, POST_ID, 101L);
+
+        verify(postCommentMapper).delete(101L, USER_ID);
+    }
+
+    @Test
+    @DisplayName("다른 사용자가 작성한 댓글을 삭제하려고 하면 ACCESS_DENIED 예외가 발생한다")
+    void rejectDeleteCommentWhenNotAuthor() {
+        PostRow post = new PostRow(POST_ID, 100L, 1L, "제목", "내용", 0, 0, LocalDateTime.now(), null);
+        given(postMapper.findActiveById(POST_ID)).willReturn(Optional.of(post));
+
+        CommentResponse comment = CommentResponse.builder()
+                .commentId(101L)
+                .postId(POST_ID)
+                .userId(99L) // 다른 사용자
+                .nickname("OtherUser")
+                .isAuthor(false)
+                .content("다른 사용자의 댓글")
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        given(postCommentMapper.findCommentById(101L)).willReturn(comment);
+
+        assertThatThrownBy(() -> postCommentService.deleteComment(USER_ID, POST_ID, 101L))
+                .isInstanceOf(BusinessException.class)
+                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.ACCESS_DENIED);
+
+        verify(postCommentMapper, never()).delete(any(), any());
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 댓글 삭제 시 COMMENT_NOT_FOUND 예외가 발생한다")
+    void rejectDeleteCommentWhenNotFound() {
+        PostRow post = new PostRow(POST_ID, 100L, 1L, "제목", "내용", 0, 0, LocalDateTime.now(), null);
+        given(postMapper.findActiveById(POST_ID)).willReturn(Optional.of(post));
+        given(postCommentMapper.findCommentById(999L)).willReturn(null);
+
+        assertThatThrownBy(() -> postCommentService.deleteComment(USER_ID, POST_ID, 999L))
+                .isInstanceOf(BusinessException.class)
+                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.COMMENT_NOT_FOUND);
+
+        verify(postCommentMapper, never()).delete(any(), any());
+    }
 }
