@@ -32,6 +32,7 @@ import com.ditto.course.repository.PlaceMapper;
 import com.ditto.global.common.response.PageResponse;
 import com.ditto.global.exception.BusinessException;
 import com.ditto.global.exception.ErrorCode;
+import com.ditto.global.infrastructure.s3.S3Provider;
 
 import lombok.RequiredArgsConstructor;
 
@@ -49,6 +50,7 @@ public class CourseService {
 
     private final CourseMapper courseMapper;
     private final PlaceMapper placeMapper;
+    private final S3Provider s3Provider;
     private final SecureRandom secureRandom = new SecureRandom();
 
     /**
@@ -81,6 +83,10 @@ public class CourseService {
         validateReadableCourse(course, userId);
 
         List<CoursePlaceResponse> places = courseMapper.findPlacesByCourseId(courseId);
+        // DB에는 S3 object key가 저장되어 있으므로 클라이언트에는 조회용(presigned) URL로 변환해 내려준다.
+        for (CoursePlaceResponse place : places) {
+            place.setImageUrl(s3Provider.resolveImageUrl(place.getImageUrl()));
+        }
         return CourseDetailResponse.from(course, places);
     }
 

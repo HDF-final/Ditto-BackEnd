@@ -463,8 +463,8 @@ class PostServiceTest {
     @DisplayName("공개 코스 게시글 상세와 장소 목록을 정상 조회한다")
     void getPublicCourseSuccess() {
         PublicCourseDetailPostRow postRow = new PublicCourseDetailPostRow(1L, 3L, "내가 다녀온 K-MZ 코스", "추천 동선입니다.");
-        CoursePlaceResponse place1 = new CoursePlaceResponse(11L, "더현대 서울", "1F", 1, null, null, null);
-        CoursePlaceResponse place2 = new CoursePlaceResponse(22L, "IFC 몰", "B1", 2, null, null, null);
+        CoursePlaceResponse place1 = new CoursePlaceResponse(11L, "더현대 서울", null, "1F", 1, null, null, null);
+        CoursePlaceResponse place2 = new CoursePlaceResponse(22L, "IFC 몰", null, "B1", 2, null, null, null);
 
         given(postMapper.findPublicCourseDetailById(1L)).willReturn(Optional.of(postRow));
         given(courseMapper.findPlacesByCourseId(3L)).willReturn(List.of(place1, place2));

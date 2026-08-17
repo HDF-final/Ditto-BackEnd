@@ -39,6 +39,7 @@ import com.ditto.course.repository.CourseMapper.CourseInsertCommand;
 import com.ditto.course.repository.CourseMapper.CoursePlaceInsertCommand;
 import com.ditto.course.repository.PlaceMapper;
 import com.ditto.global.common.response.PageResponse;
+import com.ditto.global.infrastructure.s3.S3Provider;
 import com.ditto.global.exception.BusinessException;
 import com.ditto.global.exception.ErrorCode;
 
@@ -52,6 +53,9 @@ class CourseServiceTest {
 
     @Mock
     private PlaceMapper placeMapper;
+
+    @Mock
+    private S3Provider s3Provider;
 
     @InjectMocks
     private CourseService courseService;
@@ -170,11 +174,17 @@ class CourseServiceTest {
     void getDetailForOwnCourse() {
         Course course = Course.of(5L, USER_ID, null, "나의 코스", "설명", "MANUAL", "ABCD1234");
         CoursePlaceResponse firstPlace = new CoursePlaceResponse(
-                11L, "템버린즈", "1F", 1, "향수 브랜드", VisitStatus.PENDING.name(), null);
+                11L, "템버린즈", "place-picture/74_탬버린즈.jpg", "1F", 1, "향수 브랜드",
+                VisitStatus.PENDING.name(), null);
         CoursePlaceResponse secondPlace = new CoursePlaceResponse(
-                22L, "설화수", "1F", 2, "같은 층", VisitStatus.VISITED.name(), LocalDateTime.now());
+                22L, "설화수", "place-picture/73_설화수.jpg", "1F", 2, "같은 층",
+                VisitStatus.VISITED.name(), LocalDateTime.now());
         given(courseMapper.findById(5L)).willReturn(Optional.of(course));
         given(courseMapper.findPlacesByCourseId(5L)).willReturn(List.of(firstPlace, secondPlace));
+        given(s3Provider.resolveImageUrl("place-picture/74_탬버린즈.jpg"))
+                .willReturn("https://cdn.example.com/place-picture/74_탬버린즈.jpg");
+        given(s3Provider.resolveImageUrl("place-picture/73_설화수.jpg"))
+                .willReturn("https://cdn.example.com/place-picture/73_설화수.jpg");
 
         CourseDetailResponse response = courseService.getDetail(USER_ID, 5L);
 
@@ -187,6 +197,8 @@ class CourseServiceTest {
                 .containsExactly(1, 2);
         assertThat(response.getPlaces().get(0).getPlaceId()).isEqualTo(11L);
         assertThat(response.getPlaces().get(0).getName()).isEqualTo("템버린즈");
+        assertThat(response.getPlaces().get(0).getImageUrl())
+                .isEqualTo("https://cdn.example.com/place-picture/74_탬버린즈.jpg");
         assertThat(response.getPlaces().get(0).getFloorCode()).isEqualTo("1F");
         assertThat(response.getPlaces().get(0).getRecommendationReason()).isEqualTo("향수 브랜드");
         assertThat(response.getPlaces().get(0).getVisitStatus()).isEqualTo(VisitStatus.PENDING.name());

@@ -188,6 +188,53 @@ public class S3Provider {
                 UUID.randomUUID() + "." + extension);
     }
 
+    /**
+     * 앱이 업로드하지 않고 이미 S3에 존재하는 object key(예: {@code place-picture/*})로 조회 URL을 만든다.
+     * 업로드 경로와 달리 {@code images/} prefix 제약과 ASCII 제한을 두지 않으므로 한글·공백이 든
+     * 파일명도 허용하되, 경로 이탈 문자는 막는다. key가 비어 있으면 {@code null}을 반환한다.
+     *
+     * @param objectKey S3 object key (null/빈 문자열 허용)
+     * @return 조회용 URL, key가 없으면 null
+     */
+    public String resolveImageUrl(String objectKey) {
+        if (!StringUtils.hasText(objectKey)) {
+            return null;
+        }
+        validateReadableKey(objectKey);
+
+        if (StringUtils.hasText(properties.getPublicBaseUrl())) {
+            return removeTrailingSlash(properties.getPublicBaseUrl()) + "/" + objectKey;
+        }
+
+        GetObjectRequest getObjectRequest = GetObjectRequest.builder()
+                .bucket(properties.getBucket())
+                .key(objectKey)
+                .build();
+        GetObjectPresignRequest presignRequest = GetObjectPresignRequest.builder()
+                .signatureDuration(properties.getPresignedUrlExpiration())
+                .getObjectRequest(getObjectRequest)
+                .build();
+
+        try {
+            return s3Presigner.presignGetObject(presignRequest).url().toString();
+        } catch (SdkException exception) {
+            log.error("S3 image URL generation failed. bucket={}, key={}",
+                    properties.getBucket(), objectKey, exception);
+            throw new BusinessException(ErrorCode.S3_URL_GENERATION_FAILED);
+        }
+    }
+
+    /** 읽기용 key 검증. prefix·문자셋은 제한하지 않고 경로 이탈만 차단한다. */
+    private void validateReadableKey(String objectKey) {
+        if (objectKey.length() > MAX_OBJECT_KEY_LENGTH
+                || objectKey.startsWith("/")
+                || objectKey.contains("..")
+                || objectKey.contains("//")
+                || objectKey.contains("\\")) {
+            throw new BusinessException(ErrorCode.INVALID_STORAGE_PATH);
+        }
+    }
+
     private void validateObjectKey(String objectKey) {
         if (!StringUtils.hasText(objectKey)
                 || objectKey.length() > MAX_OBJECT_KEY_LENGTH
