@@ -218,9 +218,10 @@ public class S3Provider {
         try {
             return s3Presigner.presignGetObject(presignRequest).url().toString();
         } catch (SdkException exception) {
+            // 이미지 URL 하나가 실패해도 목록/상세 응답 전체가 죽지 않도록 null을 반환한다.
             log.error("S3 image URL generation failed. bucket={}, key={}",
                     properties.getBucket(), objectKey, exception);
-            throw new BusinessException(ErrorCode.S3_URL_GENERATION_FAILED);
+            return null;
         }
     }
 
