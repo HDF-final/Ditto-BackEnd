@@ -1,0 +1,211 @@
+name: Backend CI/CD (ASG Rolling Deployment)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - dev
+
+concurrency:
+  group: backend-dev-deploy
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  ECR_REGISTRY: ${{ vars.ECR_REGISTRY }}
+  ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+  ASG_NAME: ${{ vars.ASG_NAME }}
+  LAUNCH_TEMPLATE_NAME: ${{ vars.LAUNCH_TEMPLATE_NAME }}
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Run tests
+        run: ./gradlew test --no-daemon
+
+  deploy:
+    name: Build, Push & ASG Refresh
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 1. AWS OIDC 인증
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          role-session-name: GitHubActions-DittoBackend
+          aws-region: ${{ env.AWS_REGION }}
+
+      # 2. Amazon ECR 로그인
+      - name: Log in to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # 3. Docker 이미지 빌드 및 ECR 푸시
+      - name: Build and push image
+        shell: bash
+        run: |
+          IMAGE_URI="${ECR_REGISTRY}/${ECR_REPOSITORY}"
+          docker build --platform linux/amd64 \
+            --tag "${IMAGE_URI}:${GITHUB_SHA}" \
+            --tag "${IMAGE_URI}:latest" \
+            .
+          docker push "${IMAGE_URI}:${GITHUB_SHA}"
+          docker push "${IMAGE_URI}:latest"
+
+      # 4. 시작 템플릿 새 버전 생성 (ENV_FILE_CONTENT 주입)
+      - name: Create new Launch Template version
+        id: create-lt
+        env:
+          ENV_CONTENT: ${{ secrets.ENV_FILE_CONTENT }}
+        shell: bash
+        run: |
+          ENV_B64=$(echo -n "$ENV_CONTENT" | base64 -w 0)
+
+          cat << EOF > /tmp/user_data.sh
+          #!/bin/bash
+          set -eux
+          export DEBIAN_FRONTEND=noninteractive
+          apt update -y
+          apt install -y docker.io docker-compose-v2 curl unzip jq
+
+          cd /tmp
+          curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+          unzip -q awscliv2.zip
+          ./aws/install
+          rm -rf awscliv2.zip aws/
+
+          systemctl enable --now docker
+          usermod -aG docker ubuntu
+
+          APP_DIR="/opt/ditto"
+          mkdir -p "\$APP_DIR"
+          chown -R ubuntu:ubuntu "\$APP_DIR"
+
+          AWS_REGION="${{ vars.AWS_REGION }}"
+          ECR_REGISTRY="${{ vars.ECR_REGISTRY }}"
+          ECR_REPOSITORY="${{ vars.ECR_REPOSITORY }}"
+
+          cat << 'COMPOSE_EOF' > "\$APP_DIR/docker-compose.yml"
+          services:
+            backend:
+              image: "\${ECR_REGISTRY}/\${ECR_REPOSITORY}:\${IMAGE_TAG:-latest}"
+              container_name: ditto-backend
+              restart: unless-stopped
+              env_file:
+                - \${ENV_FILE:-.env}
+              ports:
+                - "8080:8080"
+              healthcheck:
+                test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health"]
+                interval: 30s
+                timeout: 5s
+                retries: 5
+                start_period: 60s
+              logging:
+                driver: json-file
+                options:
+                  max-size: "10m"
+                  max-file: "3"
+          COMPOSE_EOF
+
+          echo "${ENV_B64}" | base64 -d > "\$APP_DIR/.env"
+
+          /usr/local/bin/aws ecr get-login-password --region "\$AWS_REGION" | docker login --username AWS --password-stdin "\$ECR_REGISTRY"
+          docker compose -f "\$APP_DIR/docker-compose.yml" pull
+          docker compose -f "\$APP_DIR/docker-compose.yml" up -d
+          EOF
+
+          ENCODED_USER_DATA=$(base64 -w 0 /tmp/user_data.sh)
+
+          NEW_VERSION=$(aws ec2 create-launch-template-version \
+            --launch-template-name "${LAUNCH_TEMPLATE_NAME}" \
+            --source-version '$Latest' \
+            --launch-template-data "{\"UserData\":\"${ENCODED_USER_DATA}\"}" \
+            --query 'LaunchTemplateVersion.VersionNumber' \
+            --output text)
+
+          echo "NEW_VERSION=${NEW_VERSION}" >> $GITHUB_OUTPUT
+
+      # 5. ASG 시작 템플릿 버전 갱신
+      - name: Update ASG Launch Template version
+        shell: bash
+        run: |
+          TARGET_ASG="${{ vars.ASG_NAME }}"
+          TARGET_LT="${{ vars.LAUNCH_TEMPLATE_NAME }}"
+          TARGET_VER="${{ steps.create-lt.outputs.NEW_VERSION }}"
+
+          echo "Updating ASG [${TARGET_ASG}] with Launch Template [${TARGET_LT}] Version [${TARGET_VER}]"
+
+          aws autoscaling update-auto-scaling-group \
+            --auto-scaling-group-name "${TARGET_ASG}" \
+            --launch-template "LaunchTemplateName=${TARGET_LT},Version=${TARGET_VER}"
+
+      # 6. ASG 인스턴스 새로고침(Instance Refresh) 실행 및 완료 대기 (30초 웜업 최적화)
+      - name: Trigger and monitor ASG Instance Refresh
+        shell: bash
+        run: |
+          TARGET_ASG="${{ vars.ASG_NAME }}"
+          echo "Checking existing Instance Refresh for ASG: ${TARGET_ASG}..."
+
+          EXISTING_STATUS=$(aws autoscaling describe-instance-refreshes \
+            --auto-scaling-group-name "${TARGET_ASG}" \
+            --query 'InstanceRefreshes[0].Status' \
+            --output text 2>/dev/null || echo "None")
+
+          if [ "$EXISTING_STATUS" = "InProgress" ] || [ "$EXISTING_STATUS" = "Pending" ]; then
+            echo "Cancelling previous in-progress refresh..."
+            aws autoscaling cancel-instance-refresh --auto-scaling-group-name "${TARGET_ASG}" || true
+            sleep 10
+          fi
+
+          echo "Starting Instance Refresh for ASG: ${TARGET_ASG}..."
+          REFRESH_ID=$(aws autoscaling start-instance-refresh \
+            --auto-scaling-group-name "${TARGET_ASG}" \
+            --preferences '{"MinHealthyPercentage": 100, "MaxHealthyPercentage": 200, "InstanceWarmup": 30}' \
+            --query 'InstanceRefreshId' \
+            --output text)
+
+          echo "Instance Refresh ID: $REFRESH_ID"
+
+          while true; do
+            STATUS=$(aws autoscaling describe-instance-refreshes \
+              --auto-scaling-group-name "${TARGET_ASG}" \
+              --instance-refresh-ids "${REFRESH_ID}" \
+              --query 'InstanceRefreshes[0].Status' \
+              --output text)
+
+            echo "[$(date +'%H:%M:%S')] Current refresh status: ${STATUS}"
+
+            if [ "${STATUS}" = "Successful" ]; then
+              echo "✅ Instance Refresh completed successfully without downtime!"
+              break
+            elif [ "${STATUS}" = "Failed" ] || [ "${STATUS}" = "Cancelled" ]; then
+              echo "❌ Instance Refresh failed or was cancelled."
+              exit 1
+            fi
+
+            sleep 15
+          done

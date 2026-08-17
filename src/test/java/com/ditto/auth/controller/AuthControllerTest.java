@@ -19,7 +19,6 @@ import org.springframework.context.annotation.Import;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.web.cors.CorsConfigurationSource;
 
 import com.ditto.auth.dto.response.AuthUserResponse;
 import com.ditto.auth.service.AuthService;
@@ -28,7 +27,7 @@ import com.ditto.security.AuthUser;
 import com.ditto.security.SecurityConfig;
 
 @WebMvcTest(AuthController.class)
-@Import({SecurityConfig.class, CorsConfig.class})
+@Import({ SecurityConfig.class, CorsConfig.class })
 class AuthControllerTest {
 
     @Autowired
