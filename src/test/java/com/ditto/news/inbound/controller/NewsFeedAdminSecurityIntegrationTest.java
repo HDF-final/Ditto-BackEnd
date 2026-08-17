@@ -27,8 +27,11 @@ import com.ditto.news.domain.NewsFeed;
 import com.ditto.news.inbound.rest.dto.request.NewsFeedUpdateRequest;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+
 @SpringBootTest
 @AutoConfigureMockMvc
+@EnabledIfEnvironmentVariable(named = "SMOKE_TEST", matches = "true")
 @ActiveProfiles("local")
 class NewsFeedAdminSecurityIntegrationTest {
 

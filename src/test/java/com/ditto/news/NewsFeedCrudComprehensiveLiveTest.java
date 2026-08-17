@@ -20,6 +20,7 @@ import com.ditto.news.domain.GeneratedNewsFeed;
 import com.ditto.news.domain.NewsFeed;
 
 @SpringBootTest
+@EnabledIfEnvironmentVariable(named = "SMOKE_TEST", matches = "true")
 class NewsFeedCrudComprehensiveLiveTest {
 
     @Autowired
@@ -29,7 +30,6 @@ class NewsFeedCrudComprehensiveLiveTest {
     private NewsFeedRepository newsFeedRepository;
 
     @Test
-    @EnabledIfEnvironmentVariable(named = "SMOKE_TEST", matches = "true")
     @DisplayName("[R/U/D 종합 검증] 실제 Oracle DB 연동 하에서 모든 정상 및 예외/경계 케이스 테스트")
     @Transactional
     void testAllCrudScenarios() {

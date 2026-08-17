@@ -10,14 +10,14 @@ import com.ditto.news.application.service.NewsFeedPipelineService;
 import com.ditto.news.inbound.rest.dto.response.NewsPipelineDebugResponse;
 
 @SpringBootTest
+@EnabledIfEnvironmentVariable(named = "SMOKE_TEST", matches = "true",
+        disabledReason = "수동 실행 전용 Smoke Test입니다. 실행하려면 SMOKE_TEST=true 환경변수를 전달하세요.")
 class NewsPipelineRealDatabaseSmokeTest {
 
     @Autowired
     private NewsFeedPipelineService pipelineService;
 
     @Test
-    @EnabledIfEnvironmentVariable(named = "SMOKE_TEST", matches = "true",
-            disabledReason = "수동 실행 전용 Smoke Test입니다. 실행하려면 SMOKE_TEST=true 환경변수를 전달하세요.")
     @DisplayName("실제 RSS -> Python 크롤러 -> Gemini AI -> Oracle DB INSERT 5단계 전체 파이프라인 실시간 실행")
     void runFullPipelineAndInsertToOracle() {
         System.out.println("\n" + "=".repeat(80));

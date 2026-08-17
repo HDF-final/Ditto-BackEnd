@@ -14,6 +14,7 @@ import com.ditto.user.repository.UserMapper;
 import com.ditto.user.repository.UserRow;
 
 @SpringBootTest
+@EnabledIfEnvironmentVariable(named = "SMOKE_TEST", matches = "true")
 class AdminAccountSetupTest {
 
     @Autowired
@@ -23,7 +24,6 @@ class AdminAccountSetupTest {
     private PasswordEncoder passwordEncoder;
 
     @Test
-    @EnabledIfEnvironmentVariable(named = "SMOKE_TEST", matches = "true")
     @DisplayName("ROLE_ADMIN 권한을 가진 admin@naver.com 관리자 계정 생성 또는 비밀번호 초기화")
     void createAdminAccount() {
         String adminEmail = "admin@naver.com";
