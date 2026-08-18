@@ -32,6 +32,14 @@ public interface PostMapper {
 
     Optional<PublicCourseDetailPostRow> findPublicCourseDetailById(@Param("postId") Long postId);
 
+    int incrementLikesCount(@Param("postId") Long postId);
+
+    int decrementLikesCount(@Param("postId") Long postId);
+
+    int incrementSaveCount(@Param("postId") Long postId);
+
+    int decrementSaveCount(@Param("postId") Long postId);
+
     @Getter
     @Setter
     @NoArgsConstructor

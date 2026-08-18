@@ -20,9 +20,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.ditto.community.dto.request.CreateCommentRequest;
+import com.ditto.community.dto.request.UpdateCommentRequest;
 import com.ditto.community.dto.response.CommentResponse;
 import com.ditto.community.repository.PostCommentMapper;
 import com.ditto.community.repository.PostCommentMapper.CommentInsertCommand;
+import com.ditto.community.repository.PostCommentMapper.CommentUpdateCommand;
 import com.ditto.course.repository.PostMapper;
 import com.ditto.course.repository.PostMapper.PostRow;
 import com.ditto.global.exception.BusinessException;
@@ -149,5 +151,147 @@ class PostCommentServiceTest {
         assertThat(comments.get(0).getIsAuthor()).isFalse();
         assertThat(comments.get(1).getNickname()).isEqualTo("Yuki_T");
         assertThat(comments.get(1).getIsAuthor()).isTrue();
+    }
+
+    @Test
+    @DisplayName("작성자 본인이 본인의 댓글을 정상 수정한다")
+    void updateCommentSuccess() {
+        PostRow post = new PostRow(POST_ID, 100L, 1L, "제목", "내용", 0, 0, LocalDateTime.now(), null);
+        given(postMapper.findActiveById(POST_ID)).willReturn(Optional.of(post));
+
+        CommentResponse existingComment = CommentResponse.builder()
+                .commentId(101L)
+                .postId(POST_ID)
+                .userId(USER_ID)
+                .nickname("Chen_Li")
+                .isAuthor(false)
+                .content("이전 댓글 내용")
+                .createdAt(LocalDateTime.now().minusHours(1))
+                .build();
+
+        CommentResponse updatedComment = CommentResponse.builder()
+                .commentId(101L)
+                .postId(POST_ID)
+                .userId(USER_ID)
+                .nickname("Chen_Li")
+                .isAuthor(false)
+                .content("수정된 댓글 내용")
+                .createdAt(LocalDateTime.now().minusHours(1))
+                .build();
+
+        given(postCommentMapper.findCommentById(101L))
+                .willReturn(existingComment)
+                .willReturn(updatedComment);
+        given(postCommentMapper.update(any(CommentUpdateCommand.class))).willReturn(1);
+
+        UpdateCommentRequest request = UpdateCommentRequest.builder()
+                .content("수정된 댓글 내용")
+                .build();
+
+        CommentResponse response = postCommentService.updateComment(USER_ID, POST_ID, 101L, request);
+
+        assertThat(response).isNotNull();
+        assertThat(response.getContent()).isEqualTo("수정된 댓글 내용");
+
+        ArgumentCaptor<CommentUpdateCommand> captor = ArgumentCaptor.forClass(CommentUpdateCommand.class);
+        verify(postCommentMapper).update(captor.capture());
+        assertThat(captor.getValue().getCommentId()).isEqualTo(101L);
+        assertThat(captor.getValue().getUserId()).isEqualTo(USER_ID);
+        assertThat(captor.getValue().getContent()).isEqualTo("수정된 댓글 내용");
+    }
+
+    @Test
+    @DisplayName("다른 사용자가 작성한 댓글을 수정하려고 하면 ACCESS_DENIED 예외가 발생한다")
+    void rejectUpdateCommentWhenNotAuthor() {
+        PostRow post = new PostRow(POST_ID, 100L, 1L, "제목", "내용", 0, 0, LocalDateTime.now(), null);
+        given(postMapper.findActiveById(POST_ID)).willReturn(Optional.of(post));
+
+        CommentResponse existingComment = CommentResponse.builder()
+                .commentId(101L)
+                .postId(POST_ID)
+                .userId(99L) // 다른 사용자
+                .nickname("OtherUser")
+                .isAuthor(false)
+                .content("다른 사용자의 댓글")
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        given(postCommentMapper.findCommentById(101L)).willReturn(existingComment);
+
+        UpdateCommentRequest request = UpdateCommentRequest.builder()
+                .content("수정 시도")
+                .build();
+
+        assertThatThrownBy(() -> postCommentService.updateComment(USER_ID, POST_ID, 101L, request))
+                .isInstanceOf(BusinessException.class)
+                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.ACCESS_DENIED);
+
+        verify(postCommentMapper, never()).update(any());
+    }
+
+    @Test
+    @DisplayName("작성자 본인이 본인의 댓글을 정상 삭제한다")
+    void deleteCommentSuccess() {
+        PostRow post = new PostRow(POST_ID, 100L, 1L, "제목", "내용", 0, 0, LocalDateTime.now(), null);
+        given(postMapper.findActiveById(POST_ID)).willReturn(Optional.of(post));
+
+        CommentResponse comment = CommentResponse.builder()
+                .commentId(101L)
+                .postId(POST_ID)
+                .userId(USER_ID)
+                .nickname("Chen_Li")
+                .isAuthor(false)
+                .content("삭제할 댓글")
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        given(postCommentMapper.findCommentById(101L)).willReturn(comment);
+        given(postCommentMapper.delete(101L, USER_ID)).willReturn(1);
+
+        postCommentService.deleteComment(USER_ID, POST_ID, 101L);
+
+        verify(postCommentMapper).delete(101L, USER_ID);
+    }
+
+    @Test
+    @DisplayName("다른 사용자가 작성한 댓글을 삭제하려고 하면 ACCESS_DENIED 예외가 발생한다")
+    void rejectDeleteCommentWhenNotAuthor() {
+        PostRow post = new PostRow(POST_ID, 100L, 1L, "제목", "내용", 0, 0, LocalDateTime.now(), null);
+        given(postMapper.findActiveById(POST_ID)).willReturn(Optional.of(post));
+
+        CommentResponse comment = CommentResponse.builder()
+                .commentId(101L)
+                .postId(POST_ID)
+                .userId(99L) // 다른 사용자
+                .nickname("OtherUser")
+                .isAuthor(false)
+                .content("다른 사용자의 댓글")
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        given(postCommentMapper.findCommentById(101L)).willReturn(comment);
+
+        assertThatThrownBy(() -> postCommentService.deleteComment(USER_ID, POST_ID, 101L))
+                .isInstanceOf(BusinessException.class)
+                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.ACCESS_DENIED);
+
+        verify(postCommentMapper, never()).delete(any(), any());
+    }
+
+    @Test
+    @DisplayName("존재하지 않는 댓글 삭제 시 COMMENT_NOT_FOUND 예외가 발생한다")
+    void rejectDeleteCommentWhenNotFound() {
+        PostRow post = new PostRow(POST_ID, 100L, 1L, "제목", "내용", 0, 0, LocalDateTime.now(), null);
+        given(postMapper.findActiveById(POST_ID)).willReturn(Optional.of(post));
+        given(postCommentMapper.findCommentById(999L)).willReturn(null);
+
+        assertThatThrownBy(() -> postCommentService.deleteComment(USER_ID, POST_ID, 999L))
+                .isInstanceOf(BusinessException.class)
+                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.COMMENT_NOT_FOUND);
+
+        verify(postCommentMapper, never()).delete(any(), any());
     }
 }

@@ -23,6 +23,10 @@ public interface PostCommentMapper {
 
     CommentResponse findCommentById(@Param("commentId") Long commentId);
 
+    int update(CommentUpdateCommand command);
+
+    int delete(@Param("commentId") Long commentId, @Param("userId") Long userId);
+
     @Getter
     @Setter
     @Builder
@@ -34,5 +38,16 @@ public interface PostCommentMapper {
         private Long userId;
         private String content;
         private LocalDateTime createdAt;
+    }
+
+    @Getter
+    @Setter
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    class CommentUpdateCommand {
+        private Long commentId;
+        private Long userId;
+        private String content;
     }
 }

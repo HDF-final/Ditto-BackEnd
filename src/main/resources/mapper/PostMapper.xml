@@ -11,7 +11,6 @@
         INSERT INTO post (
             course_id,
             user_id,
-            title,
             content,
             likes_count,
             save_count,
@@ -20,7 +19,6 @@
         ) VALUES (
             #{courseId,jdbcType=NUMERIC},
             #{userId,jdbcType=NUMERIC},
-            #{title,jdbcType=VARCHAR},
             #{content,jdbcType=CLOB},
             0,
             0,
@@ -31,24 +29,24 @@
 
     <select id="findActiveById" resultType="com.ditto.course.repository.PostMapper$PostRow">
         SELECT
-            post_id AS postId,
-            course_id AS courseId,
-            user_id AS userId,
-            title,
-            content,
-            likes_count AS likesCount,
-            save_count AS saveCount,
-            created_at AS createdAt,
-            deleted_at AS deletedAt
-        FROM post
-        WHERE post_id = #{postId,jdbcType=NUMERIC}
-          AND deleted_at IS NULL
+            p.post_id AS postId,
+            p.course_id AS courseId,
+            p.user_id AS userId,
+            c.name AS title,
+            p.content,
+            p.likes_count AS likesCount,
+            p.save_count AS saveCount,
+            p.created_at AS createdAt,
+            p.deleted_at AS deletedAt
+        FROM post p
+        LEFT JOIN course c ON c.course_id = p.course_id
+        WHERE p.post_id = #{postId,jdbcType=NUMERIC}
+          AND p.deleted_at IS NULL
     </select>
 
     <update id="update" parameterType="com.ditto.course.repository.PostMapper$PostUpdateCommand">
         UPDATE post
-           SET title = #{title,jdbcType=VARCHAR},
-               content = #{content,jdbcType=CLOB}
+           SET content = #{content,jdbcType=CLOB}
          WHERE post_id = #{postId,jdbcType=NUMERIC}
            AND user_id = #{userId,jdbcType=NUMERIC}
            AND deleted_at IS NULL
@@ -65,7 +63,7 @@
     <select id="findPublicCourses" resultType="com.ditto.community.dto.response.PublicCourseResponse">
         SELECT p.post_id,
                p.course_id,
-               p.title,
+               c.name AS title,
                p.likes_count AS like_count,
                p.save_count AS bookmark_count
           FROM post p
@@ -94,7 +92,7 @@
             resultType="com.ditto.course.repository.PostMapper$PublicCourseDetailPostRow">
         SELECT p.post_id AS postId,
                p.course_id AS courseId,
-               p.title,
+               c.name AS title,
                p.content
           FROM post p
           JOIN course c
@@ -104,5 +102,33 @@
            AND p.course_id IS NOT NULL
            AND c.deleted_at IS NULL
     </select>
+
+    <update id="incrementLikesCount">
+        UPDATE post
+           SET likes_count = likes_count + 1
+         WHERE post_id = #{postId,jdbcType=NUMERIC}
+           AND deleted_at IS NULL
+    </update>
+
+    <update id="decrementLikesCount">
+        UPDATE post
+           SET likes_count = CASE WHEN likes_count > 0 THEN likes_count - 1 ELSE 0 END
+         WHERE post_id = #{postId,jdbcType=NUMERIC}
+           AND deleted_at IS NULL
+    </update>
+
+    <update id="incrementSaveCount">
+        UPDATE post
+           SET save_count = save_count + 1
+         WHERE post_id = #{postId,jdbcType=NUMERIC}
+           AND deleted_at IS NULL
+    </update>
+
+    <update id="decrementSaveCount">
+        UPDATE post
+           SET save_count = CASE WHEN save_count > 0 THEN save_count - 1 ELSE 0 END
+         WHERE post_id = #{postId,jdbcType=NUMERIC}
+           AND deleted_at IS NULL
+    </update>
 
 </mapper>
