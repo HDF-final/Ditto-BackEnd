@@ -1,5 +1,6 @@
 package com.ditto.auth.dto.request;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -13,11 +14,12 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@JsonIgnoreProperties(ignoreUnknown = false)
+@JsonIgnoreProperties(ignoreUnknown = true)
 @Schema(description = "회원가입 요청 DTO")
 public class SignupRequest {
 
     @NotBlank(message = "이메일은 필수 입력값입니다.")
+    @JsonAlias({"email", "userEmail"})
     @Schema(description = "사용자 이메일", example = "yuki@example.com")
     private String userEmail;
 
@@ -26,13 +28,16 @@ public class SignupRequest {
     private String password;
 
     @NotBlank(message = "이름(닉네임)은 필수 입력값입니다.")
+    @JsonAlias({"name", "nickname", "userName"})
     @Schema(description = "이름 또는 닉네임", example = "사토 유키")
     private String name;
 
     @NotBlank(message = "국가 코드는 필수 입력값입니다.")
-    @Schema(description = "국가 코드 (2자리 알파벳)", example = "JP")
+    @JsonAlias({"countryCode", "country"})
+    @Schema(description = "국가 코드 (2자리 알파벳)", example = "KR")
     private String countryCode;
 
+    @JsonAlias({"persona", "shoppingType", "personaType"})
     @Schema(description = "쇼핑 페르소나 (OPEN_RUN_LOVER, FLEX_SPENDER, LITTLE_JOY, ULTIMATE_STAN)", example = "OPEN_RUN_LOVER")
     private String persona;
 }

@@ -52,7 +52,8 @@ public class AuthService {
         validateEmail(request.getUserEmail());
         validateDuplicateEmail(request.getUserEmail());
 
-        CountryRow country = countryMapper.findActiveByCode(request.getCountryCode())
+        String countryCode = request.getCountryCode() != null ? request.getCountryCode().trim().toUpperCase() : "";
+        CountryRow country = countryMapper.findActiveByCode(countryCode)
                 .orElseThrow(() -> new BusinessException(ErrorCode.DEFAULT_COUNTRY_NOT_FOUND));
 
         String personaCode = null;
