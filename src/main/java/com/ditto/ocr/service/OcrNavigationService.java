@@ -1,0 +1,124 @@
+package com.ditto.ocr.service;
+
+import java.util.Collections;
+import java.util.List;
+import java.util.UUID;
+
+import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+
+import com.ditto.global.exception.BusinessException;
+import com.ditto.global.exception.ErrorCode;
+import com.ditto.ocr.client.ClovaOcrClient;
+import com.ditto.ocr.client.ClovaOcrResult;
+import com.ditto.ocr.domain.OcrSession;
+import com.ditto.ocr.dto.request.OcrSessionStartRequest;
+import com.ditto.ocr.dto.response.OcrCandidateResponse;
+import com.ditto.ocr.dto.response.OcrRecognitionResponse;
+import com.ditto.ocr.dto.response.OcrSessionStartResponse;
+import com.ditto.ocr.repository.OcrPlaceMapper;
+import com.ditto.ocr.repository.OcrPlaceMapper.CandidateRow;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
+/**
+ * OCR 길찾기.
+ *
+ * <p>세션 시작은 DB(장소 식별자 조회)만 쓰고, 인식은 외부 CLOVA OCR 호출 + 후보 매칭이다.
+ * 인식은 외부 응답을 수십 ms~수 초 기다리므로 트랜잭션으로 커넥션을 잡지 않는다.
+ */
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class OcrNavigationService {
+
+    private final OcrSessionStore sessionStore;
+    private final OcrPlaceMapper ocrPlaceMapper;
+    private final ClovaOcrClient clovaOcrClient;
+    private final com.ditto.ocr.config.OcrProperties properties;
+
+    /** 세션을 시작하고 시작 장소의 길찾기 식별자를 함께 돌려준다. */
+    public OcrSessionStartResponse startSession(OcrSessionStartRequest request) {
+        String navigationKey = ocrPlaceMapper.findNavigationKeyByPlaceId(request.getPlaceId());
+        if (navigationKey == null) {
+            throw new BusinessException(ErrorCode.PLACE_NOT_FOUND);
+        }
+
+        OcrSession session = sessionStore.create(request.getPlaceId(), request.getSource());
+
+        return OcrSessionStartResponse.builder()
+                .sessionId(session.getSessionId())
+                .currentPlaceId(session.getPlaceId())
+                .startNavigationKey(navigationKey)
+                .build();
+    }
+
+    /** 이미지를 인식해 브랜드명과 매칭 장소 후보를 돌려준다. */
+    public OcrRecognitionResponse recognize(String sessionId, MultipartFile image) {
+        sessionStore.require(sessionId);
+        validateImage(image);
+
+        ClovaOcrResult result = clovaOcrClient.recognize(
+                readBytes(image), formatOf(image), image.getOriginalFilename());
+
+        String recognitionId = "ocr_" + UUID.randomUUID().toString().replace("-", "");
+
+        if (result.isEmpty()) {
+            log.debug("OCR 인식 텍스트 없음. sessionId={}", sessionId);
+            return OcrRecognitionResponse.builder()
+                    .recognitionId(recognitionId)
+                    .recognizedBrandName(null)
+                    .candidates(Collections.emptyList())
+                    .build();
+        }
+
+        List<OcrCandidateResponse> candidates = toCandidates(result);
+
+        return OcrRecognitionResponse.builder()
+                .recognitionId(recognitionId)
+                .recognizedBrandName(result.getBrandName())
+                .candidates(candidates)
+                .build();
+    }
+
+    private List<OcrCandidateResponse> toCandidates(ClovaOcrResult result) {
+        List<CandidateRow> rows = ocrPlaceMapper.findCandidatesByBrandName(
+                result.getBrandName(), properties.getMaxCandidates());
+        return rows.stream()
+                .map(row -> OcrCandidateResponse.builder()
+                        .placeId(row.getPlaceId())
+                        .name(row.getName())
+                        .floor(row.getFloor())
+                        .confidence(result.getConfidence())
+                        .build())
+                .toList();
+    }
+
+    private void validateImage(MultipartFile image) {
+        if (image == null || image.isEmpty()) {
+            throw new BusinessException(ErrorCode.INVALID_IMAGE_FILE);
+        }
+    }
+
+    private byte[] readBytes(MultipartFile image) {
+        try {
+            return image.getBytes();
+        } catch (java.io.IOException e) {
+            log.error("OCR 이미지 읽기 실패. cause={}", e.getMessage());
+            throw new BusinessException(ErrorCode.INVALID_IMAGE_FILE);
+        }
+    }
+
+    /** 파일명 확장자에서 포맷 힌트를 뽑는다. 알 수 없으면 jpg 로 본다. */
+    private String formatOf(MultipartFile image) {
+        String name = image.getOriginalFilename();
+        if (name != null) {
+            int dot = name.lastIndexOf('.');
+            if (dot >= 0 && dot < name.length() - 1) {
+                return name.substring(dot + 1).toLowerCase();
+            }
+        }
+        return "jpg";
+    }
+}
