@@ -55,6 +55,18 @@ ditto:
     # 첫 요청은 BGE-m3 적재(약 2GB)가 붙고, 한 턴에 LLM 을 2~3회 호출한다.
     read-timeout: 120s
 
+  # ===== OCR 간판 인식 길찾기 =====
+  # 세션은 인메모리로 관리한다. 인식은 네이버 CLOVA OCR(외부) 에 맡긴다.
+  # invoke-url·secret 은 CLOVA 콘솔에서 발급하며 소스에 두지 않고 .env 로 공급한다.
+  ocr:
+    session-ttl: 30m
+    max-candidates: 5
+    clova:
+      invoke-url: ${CLOVA_OCR_INVOKE_URL:}
+      secret: ${CLOVA_OCR_SECRET:}
+      connect-timeout: 5s
+      read-timeout: 30s
+
 # ===== MyBatis =====
 mybatis:
   mapper-locations: classpath:mapper/**/*.xml

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ditto.ocr.repository.OcrPlaceMapper">
+
+    <select id="findNavigationKeyByPlaceId" resultType="java.lang.String">
+        SELECT p.navigation_key
+          FROM place p
+         WHERE p.place_id = #{placeId}
+           AND p.navigation_key IS NOT NULL
+    </select>
+
+    <!--
+      브랜드명으로 상호를 부분 일치 검색한다. OCR 텍스트(예: TAMBURINS)가 상호에
+      섞여 있어도 잡히도록 대소문자를 무시하고 LIKE 로 매칭한다.
+    -->
+    <select id="findCandidatesByBrandName"
+            resultType="com.ditto.ocr.repository.OcrPlaceMapper$CandidateRow">
+        SELECT p.place_id,
+               p.name,
+               f.floor_code AS floor
+          FROM place p
+          JOIN floor f ON f.floor_id = p.floor_id
+         WHERE UPPER(p.name) LIKE '%' || UPPER(#{brandName}) || '%'
+         ORDER BY p.name
+         FETCH FIRST #{limit} ROWS ONLY
+    </select>
+
+</mapper>
