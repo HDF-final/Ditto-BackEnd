@@ -52,6 +52,9 @@ class PostControllerTest {
     @MockBean
     private PostCommentService postCommentService;
 
+    @MockBean
+    private com.ditto.community.service.PostLikeService postLikeService;
+
     @Test
     @DisplayName("공개 코스 목록 조회 성공 시 ApiResponse와 PageResponse 형태로 반환한다")
     void getPublicCoursesSuccess() throws Exception {
@@ -306,5 +309,57 @@ class PostControllerTest {
                 .andExpect(jsonPath("$.data.content").value("수정된 댓글 내용입니다."));
 
         verify(postCommentService).updateComment(eq(2L), eq(10L), eq(101L), any(com.ditto.community.dto.request.UpdateCommentRequest.class));
+    }
+
+    @Test
+    @DisplayName("좋아요 등록 성공 시 200 OK와 업데이트된 좋아요 정보를 반환한다")
+    void addLikeSuccess() throws Exception {
+        AuthUser principal = new AuthUser(2L, "customer@test.com", "ROLE_CUSTOMER");
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(principal, null, List.of(new SimpleGrantedAuthority("ROLE_CUSTOMER"))));
+
+        com.ditto.community.dto.response.LikeResponse response = com.ditto.community.dto.response.LikeResponse.builder()
+                .postId(10L)
+                .likesCount(78)
+                .isLiked(true)
+                .build();
+
+        given(postLikeService.addLike(2L, 10L)).willReturn(response);
+
+        mockMvc.perform(post("/api/v1/community/courses/10/likes"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.code").value("SUCCESS"))
+                .andExpect(jsonPath("$.data.postId").value(10L))
+                .andExpect(jsonPath("$.data.likesCount").value(78))
+                .andExpect(jsonPath("$.data.isLiked").value(true));
+
+        verify(postLikeService).addLike(2L, 10L);
+    }
+
+    @Test
+    @DisplayName("좋아요 취소 성공 시 200 OK와 업데이트된 좋아요 정보를 반환한다")
+    void removeLikeSuccess() throws Exception {
+        AuthUser principal = new AuthUser(2L, "customer@test.com", "ROLE_CUSTOMER");
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(principal, null, List.of(new SimpleGrantedAuthority("ROLE_CUSTOMER"))));
+
+        com.ditto.community.dto.response.LikeResponse response = com.ditto.community.dto.response.LikeResponse.builder()
+                .postId(10L)
+                .likesCount(77)
+                .isLiked(false)
+                .build();
+
+        given(postLikeService.removeLike(2L, 10L)).willReturn(response);
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/v1/community/courses/10/likes"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.code").value("SUCCESS"))
+                .andExpect(jsonPath("$.data.postId").value(10L))
+                .andExpect(jsonPath("$.data.likesCount").value(77))
+                .andExpect(jsonPath("$.data.isLiked").value(false));
+
+        verify(postLikeService).removeLike(2L, 10L);
     }
 }

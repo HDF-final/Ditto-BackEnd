@@ -103,4 +103,18 @@
            AND c.deleted_at IS NULL
     </select>
 
+    <update id="incrementLikesCount">
+        UPDATE post
+           SET likes_count = likes_count + 1
+         WHERE post_id = #{postId,jdbcType=NUMERIC}
+           AND deleted_at IS NULL
+    </update>
+
+    <update id="decrementLikesCount">
+        UPDATE post
+           SET likes_count = CASE WHEN likes_count > 0 THEN likes_count - 1 ELSE 0 END
+         WHERE post_id = #{postId,jdbcType=NUMERIC}
+           AND deleted_at IS NULL
+    </update>
+
 </mapper>

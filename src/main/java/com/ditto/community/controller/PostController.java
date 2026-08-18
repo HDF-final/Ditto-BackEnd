@@ -20,10 +20,12 @@ import com.ditto.community.dto.request.UpdateCommentRequest;
 import com.ditto.community.dto.request.UpdateCoursePostRequest;
 import com.ditto.community.dto.response.CommentResponse;
 import com.ditto.community.dto.response.CreateCoursePostResponse;
+import com.ditto.community.dto.response.LikeResponse;
 import com.ditto.community.dto.response.PublicCourseDetailResponse;
 import com.ditto.community.dto.response.PublicCourseResponse;
 import com.ditto.community.dto.response.UpdateCoursePostResponse;
 import com.ditto.community.service.PostCommentService;
+import com.ditto.community.service.PostLikeService;
 import com.ditto.community.service.PostService;
 import com.ditto.global.common.response.ApiResponse;
 import com.ditto.global.common.response.PageResponse;
@@ -35,7 +37,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
-@Tag(name = "Post", description = "커뮤니티 게시글 및 댓글 API")
+@Tag(name = "Post", description = "커뮤니티 게시글, 댓글 및 좋아요 API")
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/community/courses")
@@ -43,6 +45,7 @@ public class PostController {
 
     private final PostService postService;
     private final PostCommentService postCommentService;
+    private final PostLikeService postLikeService;
 
     @Operation(
             summary = "공개 코스 목록 조회",
@@ -138,5 +141,25 @@ public class PostController {
             @PathVariable Long commentId) {
         postCommentService.deleteComment(SecurityUtils.requireUserId(), postId, commentId);
         return ApiResponse.success("성공", null);
+    }
+
+    @Operation(summary = "공개 코스 좋아요 등록", description = "로그인한 고객(ROLE_CUSTOMER)이 공개 코스 게시글에 좋아요를 등록합니다.")
+    @PostMapping("/{postId}/likes")
+    @ResponseStatus(HttpStatus.OK)
+    public ApiResponse<LikeResponse> addLike(
+            @Parameter(description = "좋아요를 등록할 게시글 ID", example = "1")
+            @PathVariable Long postId) {
+        return ApiResponse.success("성공",
+                postLikeService.addLike(SecurityUtils.requireUserId(), postId));
+    }
+
+    @Operation(summary = "공개 코스 좋아요 취소", description = "로그인한 고객(ROLE_CUSTOMER)이 공개 코스 게시글의 좋아요를 취소합니다.")
+    @DeleteMapping("/{postId}/likes")
+    @ResponseStatus(HttpStatus.OK)
+    public ApiResponse<LikeResponse> removeLike(
+            @Parameter(description = "좋아요를 취소할 게시글 ID", example = "1")
+            @PathVariable Long postId) {
+        return ApiResponse.success("성공",
+                postLikeService.removeLike(SecurityUtils.requireUserId(), postId));
     }
 }

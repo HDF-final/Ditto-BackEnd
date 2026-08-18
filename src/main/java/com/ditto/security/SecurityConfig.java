@@ -78,6 +78,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/v1/community/courses/*/comments").hasRole("CUSTOMER")
                         .requestMatchers(HttpMethod.PATCH, "/api/v1/community/courses/*/comments/*").hasRole("CUSTOMER")
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/community/courses/*/comments/*").hasRole("CUSTOMER")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/community/courses/*/likes").hasRole("CUSTOMER")
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/community/courses/*/likes").hasRole("CUSTOMER")
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .logout(logout -> logout.disable());
