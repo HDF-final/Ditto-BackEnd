@@ -77,10 +77,11 @@ dependencies {
     // 버전은 Spring AI BOM이 관리하는 AWS SDK v2와 맞춘다.
     implementation 'software.amazon.awssdk:s3'
 
-    // AWS SigV4 서명 — AI 엔진(Lambda Function URL, AuthType=AWS_IAM)을 IAM 역할로 호출한다.
-    // s3 를 통해 이미 전이 의존으로 들어오지만, 직접 쓰는 모듈이므로 명시한다.
-    implementation 'software.amazon.awssdk:auth'
-    implementation 'software.amazon.awssdk:http-auth-aws'
+    // AWS Lambda — AI 엔진을 함수 이름으로 직접 호출한다.
+    // SigV4 서명은 SDK 가 처리하므로 서명 코드를 들고 있지 않는다.
+    implementation 'software.amazon.awssdk:lambda'
+    // 동기 HTTP 클라이언트. 타임아웃을 직접 잡아야 해서 명시적으로 고른다.
+    implementation 'software.amazon.awssdk:apache-client'
 
     // Test
     testImplementation 'org.springframework.boot:spring-boot-starter-test'

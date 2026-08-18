@@ -10,48 +10,47 @@ import lombok.Setter;
 /**
  * AI 추천 엔진(외부 서비스) 접속 설정.
  *
- * <p>엔진이 로컬 파이썬 서비스든 AWS Lambda 든 자바 코드는 그대로다.
- * 바뀌는 것은 {@code base-url}, {@code chat-path}, {@code auth} 세 줄이다.
+ * <p>로컬은 파이썬 서비스를 HTTP 로, 배포 환경은 Lambda 를 함수 이름으로 부른다.
+ * 바뀌는 것은 {@code mode} 한 줄이고 서비스 계층 코드는 그대로다.
  */
 @Getter
 @Setter
 @ConfigurationProperties(prefix = "ditto.ai-engine")
 public class AiEngineProperties {
 
-    /**
-     * AI 엔진 base URL.
-     * 예: {@code http://127.0.0.1:8000},
-     * {@code https://xxx.lambda-url.ap-northeast-2.on.aws} (끝에 / 를 붙이지 않는다)
-     */
+    /** 엔진을 어떻게 부를 것인가 */
+    private Mode mode = Mode.HTTP;
+
+    /** HTTP 모드 전용. AI 엔진 base URL. 예: {@code http://127.0.0.1:8000} */
     private String baseUrl;
 
-    /** 대화 요청 경로. Lambda Function URL 은 함수가 경로를 나누지 않으므로 보통 {@code /} 다. */
+    /** HTTP 모드 전용. 대화 요청 경로 */
     private String chatPath = "/chat";
+
+    /** LAMBDA 모드 전용. 호출할 함수 이름 또는 ARN. 예: {@code ditto-chat} */
+    private String functionName;
+
+    /** LAMBDA 모드 전용. 함수가 있는 리전 */
+    private String region = "ap-northeast-2";
 
     private Duration connectTimeout = Duration.ofSeconds(5);
 
     /**
      * 응답 대기 시간. 넉넉해야 한다 —
-     * 첫 요청은 BGE-m3 모델 적재(약 2GB)가 붙고, 한 턴에 LLM 을 2~3회 호출한다.
+     * 한 턴에 LLM 을 여러 번 호출하고 웹 검색까지 붙어 수십 초가 걸린다.
      */
     private Duration readTimeout = Duration.ofSeconds(120);
 
-    /** 엔진 호출 인증 방식 */
-    private Auth auth = Auth.NONE;
+    public enum Mode {
 
-    /** SigV4 서명 리전. {@code auth=aws-iam} 일 때만 쓰인다. */
-    private String region = "ap-northeast-2";
-
-    public enum Auth {
-
-        /** 서명 없이 그대로 호출한다. 로컬 파이썬 엔진용. */
-        NONE,
+        /** HTTP 로 부른다. 인증 없는 로컬 파이썬 엔진용. */
+        HTTP,
 
         /**
-         * 기본 자격증명 체인으로 SigV4 서명해 호출한다.
-         * Lambda Function URL 의 {@code AuthType=AWS_IAM} 용이며,
-         * EC2 에서는 인스턴스 역할이 자격증명을 공급하므로 액세스 키를 어디에도 두지 않는다.
+         * Lambda 를 함수 이름으로 직접 부른다.
+         * SigV4 서명은 SDK 가 처리하고 자격증명은 기본 체인(EC2 인스턴스 역할)에서 나온다.
+         * 역할에 {@code lambda:InvokeFunction} 권한이 있어야 한다.
          */
-        AWS_IAM
+        LAMBDA
     }
 }

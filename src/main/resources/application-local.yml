@@ -37,22 +37,22 @@ spring:
     #     dimensions: 1024   # 예: Titan Text Embeddings v2
 
 # ===== AI 추천 엔진 (외부 서비스) =====
-# 로컬은 파이썬 서비스, 운영은 Lambda Function URL. 바뀌는 것은 아래 세 줄뿐이고 자바 코드는 그대로다.
+# 로컬은 파이썬 서비스를 HTTP 로, 배포 환경은 Lambda 를 함수 이름으로 직접 부른다.
 #
-#   로컬 : base-url=http://127.0.0.1:8000  chat-path=/chat  auth=none
-#   운영 : base-url=https://xxx.lambda-url.ap-northeast-2.on.aws  chat-path=/  auth=aws-iam
+#   로컬 : mode=http    base-url=http://127.0.0.1:8000  chat-path=/chat
+#   운영 : mode=lambda  function-name=ditto-chat
+#
+# lambda 모드는 SigV4 서명을 SDK 가 처리하고 자격증명은 EC2 인스턴스 역할에서 나온다.
+# 역할에 lambda:InvokeFunction 권한이 있어야 하며, 엔진을 인터넷에 노출하지 않는다.
 ditto:
   ai-engine:
+    mode: ${AI_ENGINE_MODE:http}
     base-url: ${AI_ENGINE_BASE_URL:http://127.0.0.1:8000}
     chat-path: ${AI_ENGINE_CHAT_PATH:/chat}
-    # none    : 서명 없이 호출
-    # aws-iam : 기본 자격증명 체인으로 SigV4 서명해 호출한다.
-    #           Function URL 이 AuthType=AWS_IAM 이면 필수이며,
-    #           EC2 에서는 인스턴스 역할이 자격증명을 주므로 액세스 키를 두지 않는다.
-    auth: ${AI_ENGINE_AUTH:none}
+    function-name: ${AI_ENGINE_FUNCTION_NAME:ditto-chat}
     region: ${AWS_REGION:ap-northeast-2}
     connect-timeout: 5s
-    # 첫 요청은 BGE-m3 적재(약 2GB)가 붙고, 한 턴에 LLM 을 2~3회 호출한다.
+    # 한 턴에 LLM 을 여러 번 호출하고 웹 검색까지 붙는다.
     read-timeout: 120s
 
   # ===== OCR 간판 인식 길찾기 =====
