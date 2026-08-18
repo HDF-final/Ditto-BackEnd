@@ -4,6 +4,7 @@ import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
+import org.springframework.web.client.RestClientResponseException;
 
 import com.ditto.aicourse.config.AiEngineProperties;
 import com.ditto.global.exception.BusinessException;
@@ -12,6 +13,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import lombok.extern.slf4j.Slf4j;
+import software.amazon.awssdk.core.exception.SdkException;
 
 /**
  * AI 추천 엔진 HTTP 클라이언트.
@@ -67,11 +69,25 @@ public class AiEngineClient {
             }
             return response;
 
+        } catch (RestClientResponseException e) {
+            // 엔진이 응답은 했으나 4xx·5xx 인 경우. 상태 코드를 남겨야 원인을 좁힐 수 있다 —
+            // Lambda Function URL 의 403 은 대개 서명 실패나 IAM 권한 누락이고 본문에는 단서가 없다.
+            log.error("AI 엔진이 오류를 반환했다. baseUrl={}, path={}, status={}",
+                    properties.getBaseUrl(), properties.getChatPath(), e.getStatusCode());
+            throw new BusinessException(ErrorCode.AI_SERVICE_ERROR);
+
         } catch (RestClientException e) {
-            // 연결 거부 / 타임아웃 / 4xx·5xx 를 한 곳에서 502 로 바꾼다.
+            // 연결 거부 / 타임아웃 / 자격증명 조회 실패를 한 곳에서 502 로 바꾼다.
             // 대화 내용은 개인정보일 수 있어 남기지 않는다.
             log.error("AI 엔진 호출 실패. baseUrl={}, path={}, cause={}",
                     properties.getBaseUrl(), properties.getChatPath(), e.getMessage());
+            throw new BusinessException(ErrorCode.AI_SERVICE_ERROR);
+
+        } catch (SdkException e) {
+            // SigV4 서명에 쓸 자격증명을 못 구한 경우 — EC2 라면 IMDS 미도달(도커 hop limit 등)이 대표적이다.
+            // RestClientException 계층이 아니라서 그냥 두면 500 으로 새어나간다. 여기서 502 로 맞춘다.
+            log.error("AI 엔진 호출용 AWS 자격증명 확보 실패. region={}, cause={}",
+                    properties.getRegion(), e.getMessage());
             throw new BusinessException(ErrorCode.AI_SERVICE_ERROR);
         }
     }

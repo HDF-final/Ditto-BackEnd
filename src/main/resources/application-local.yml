@@ -37,11 +37,20 @@ spring:
     #     dimensions: 1024   # 예: Titan Text Embeddings v2
 
 # ===== AI 추천 엔진 (외부 서비스) =====
-# 지금은 로컬 파이썬 서비스. AWS Lambda 로 이전하면 base-url 만 바꾼다 — 자바 코드는 그대로다.
+# 로컬은 파이썬 서비스, 운영은 Lambda Function URL. 바뀌는 것은 아래 세 줄뿐이고 자바 코드는 그대로다.
+#
+#   로컬 : base-url=http://127.0.0.1:8000  chat-path=/chat  auth=none
+#   운영 : base-url=https://xxx.lambda-url.ap-northeast-2.on.aws  chat-path=/  auth=aws-iam
 ditto:
   ai-engine:
     base-url: ${AI_ENGINE_BASE_URL:http://127.0.0.1:8000}
-    chat-path: /chat
+    chat-path: ${AI_ENGINE_CHAT_PATH:/chat}
+    # none    : 서명 없이 호출
+    # aws-iam : 기본 자격증명 체인으로 SigV4 서명해 호출한다.
+    #           Function URL 이 AuthType=AWS_IAM 이면 필수이며,
+    #           EC2 에서는 인스턴스 역할이 자격증명을 주므로 액세스 키를 두지 않는다.
+    auth: ${AI_ENGINE_AUTH:none}
+    region: ${AWS_REGION:ap-northeast-2}
     connect-timeout: 5s
     # 첫 요청은 BGE-m3 적재(약 2GB)가 붙고, 한 턴에 LLM 을 2~3회 호출한다.
     read-timeout: 120s
