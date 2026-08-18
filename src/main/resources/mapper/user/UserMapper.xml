@@ -11,12 +11,13 @@
 
     <select id="findActiveByEmail" parameterType="string" resultType="com.ditto.user.repository.UserRow">
         SELECT user_id,
-               name,
-               email,
-               password_hash,
-               preferred_language_code,
-               status,
-               role
+                name,
+                email,
+                password_hash,
+                preferred_language_code,
+                status,
+                role,
+                persona
           FROM app_user
          WHERE email = #{_parameter}
            AND status = 'ACTIVE'
@@ -25,12 +26,13 @@
 
     <select id="findActiveById" parameterType="long" resultType="com.ditto.user.repository.UserRow">
         SELECT user_id,
-               name,
-               email,
-               password_hash,
-               preferred_language_code,
-               status,
-               role
+                name,
+                email,
+                password_hash,
+                preferred_language_code,
+                status,
+                role,
+                persona
           FROM app_user
          WHERE user_id = #{_parameter}
            AND status = 'ACTIVE'
@@ -46,6 +48,7 @@
             preferred_language_code,
             status,
             role,
+            persona,
             created_at
         ) VALUES (
             #{countryId},
@@ -55,7 +58,17 @@
             #{preferredLanguageCode},
             #{status},
             #{role},
+            #{persona,jdbcType=VARCHAR},
             SYSTIMESTAMP
         )
     </insert>
+
+    <update id="updatePersona">
+        UPDATE app_user
+           SET persona = #{persona,jdbcType=VARCHAR}
+         WHERE user_id = #{userId,jdbcType=NUMERIC}
+           AND status = 'ACTIVE'
+           AND deleted_at IS NULL
+    </update>
+
 </mapper>

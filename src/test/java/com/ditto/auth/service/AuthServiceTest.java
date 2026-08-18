@@ -245,6 +245,31 @@ class AuthServiceTest {
     }
 
     @Test
+    @DisplayName("회원가입 시 페르소나가 전달되면 Persona를 정규화하여 저장한다")
+    void signupStoresPersonaWhenProvided() {
+        given(userMapper.countByEmail("persona@example.com")).willReturn(0);
+        given(countryMapper.findActiveByCode("JP"))
+                .willReturn(Optional.of(CountryRow.builder()
+                        .countryId(2L)
+                        .defaultLanguageCode("ja")
+                        .build()));
+
+        SignupResponse response = authService.signup(SignupRequest.builder()
+                .userEmail("persona@example.com")
+                .password("password123!")
+                .name("사토 유키")
+                .countryCode("JP")
+                .persona("오픈런러버")
+                .build());
+
+        ArgumentCaptor<SignupUserCommand> captor = ArgumentCaptor.forClass(SignupUserCommand.class);
+        verify(userMapper).insert(captor.capture());
+        SignupUserCommand command = captor.getValue();
+        assertThat(command.getPersona()).isEqualTo("OPEN_RUN_LOVER");
+        assertThat(response.getUserEmail()).isEqualTo("persona@example.com");
+    }
+
+    @Test
     @DisplayName("중복 이메일 회원가입은 insert 하지 않는다")
     void rejectSignupWhenEmailDuplicated() {
         given(userMapper.countByEmail("new@example.com")).willReturn(1);

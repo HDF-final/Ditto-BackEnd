@@ -18,4 +18,5 @@ public class SignupUserCommand {
     private String preferredLanguageCode;
     private String status;
     private String role;
+    private String persona;
 }
