@@ -117,4 +117,18 @@
            AND deleted_at IS NULL
     </update>
 
+    <update id="incrementSaveCount">
+        UPDATE post
+           SET save_count = save_count + 1
+         WHERE post_id = #{postId,jdbcType=NUMERIC}
+           AND deleted_at IS NULL
+    </update>
+
+    <update id="decrementSaveCount">
+        UPDATE post
+           SET save_count = CASE WHEN save_count > 0 THEN save_count - 1 ELSE 0 END
+         WHERE post_id = #{postId,jdbcType=NUMERIC}
+           AND deleted_at IS NULL
+    </update>
+
 </mapper>

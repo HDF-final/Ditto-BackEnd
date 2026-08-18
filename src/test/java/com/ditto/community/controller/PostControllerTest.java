@@ -55,6 +55,9 @@ class PostControllerTest {
     @MockBean
     private com.ditto.community.service.PostLikeService postLikeService;
 
+    @MockBean
+    private com.ditto.community.service.PostBookmarkService postBookmarkService;
+
     @Test
     @DisplayName("공개 코스 목록 조회 성공 시 ApiResponse와 PageResponse 형태로 반환한다")
     void getPublicCoursesSuccess() throws Exception {
@@ -361,5 +364,57 @@ class PostControllerTest {
                 .andExpect(jsonPath("$.data.isLiked").value(false));
 
         verify(postLikeService).removeLike(2L, 10L);
+    }
+
+    @Test
+    @DisplayName("북마크 등록 성공 시 200 OK와 업데이트된 북마크 정보를 반환한다")
+    void addBookmarkSuccess() throws Exception {
+        AuthUser principal = new AuthUser(2L, "customer@test.com", "ROLE_CUSTOMER");
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(principal, null, List.of(new SimpleGrantedAuthority("ROLE_CUSTOMER"))));
+
+        com.ditto.community.dto.response.BookmarkResponse response = com.ditto.community.dto.response.BookmarkResponse.builder()
+                .postId(10L)
+                .bookmarkCount(35)
+                .isBookmarked(true)
+                .build();
+
+        given(postBookmarkService.addBookmark(2L, 10L)).willReturn(response);
+
+        mockMvc.perform(post("/api/v1/community/courses/10/bookmarks"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.code").value("SUCCESS"))
+                .andExpect(jsonPath("$.data.postId").value(10L))
+                .andExpect(jsonPath("$.data.bookmarkCount").value(35))
+                .andExpect(jsonPath("$.data.isBookmarked").value(true));
+
+        verify(postBookmarkService).addBookmark(2L, 10L);
+    }
+
+    @Test
+    @DisplayName("북마크 취소 성공 시 200 OK와 업데이트된 북마크 정보를 반환한다")
+    void removeBookmarkSuccess() throws Exception {
+        AuthUser principal = new AuthUser(2L, "customer@test.com", "ROLE_CUSTOMER");
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(principal, null, List.of(new SimpleGrantedAuthority("ROLE_CUSTOMER"))));
+
+        com.ditto.community.dto.response.BookmarkResponse response = com.ditto.community.dto.response.BookmarkResponse.builder()
+                .postId(10L)
+                .bookmarkCount(34)
+                .isBookmarked(false)
+                .build();
+
+        given(postBookmarkService.removeBookmark(2L, 10L)).willReturn(response);
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/v1/community/courses/10/bookmarks"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.code").value("SUCCESS"))
+                .andExpect(jsonPath("$.data.postId").value(10L))
+                .andExpect(jsonPath("$.data.bookmarkCount").value(34))
+                .andExpect(jsonPath("$.data.isBookmarked").value(false));
+
+        verify(postBookmarkService).removeBookmark(2L, 10L);
     }
 }

@@ -36,6 +36,10 @@ public interface PostMapper {
 
     int decrementLikesCount(@Param("postId") Long postId);
 
+    int incrementSaveCount(@Param("postId") Long postId);
+
+    int decrementSaveCount(@Param("postId") Long postId);
+
     @Getter
     @Setter
     @NoArgsConstructor

@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ditto.community.repository.PostBookmarkMapper">
+
+    <insert id="insertBookmark">
+        INSERT INTO post_bookmark (
+            post_id,
+            user_id,
+            created_at
+        ) VALUES (
+            #{postId,jdbcType=NUMERIC},
+            #{userId,jdbcType=NUMERIC},
+            SYSTIMESTAMP
+        )
+    </insert>
+
+    <delete id="deleteBookmark">
+        DELETE FROM post_bookmark
+         WHERE post_id = #{postId,jdbcType=NUMERIC}
+           AND user_id = #{userId,jdbcType=NUMERIC}
+    </delete>
+
+    <select id="existsByPostIdAndUserId" resultType="boolean">
+        SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END
+          FROM post_bookmark
+         WHERE post_id = #{postId,jdbcType=NUMERIC}
+           AND user_id = #{userId,jdbcType=NUMERIC}
+    </select>
+
+    <select id="countByPostId" resultType="int">
+        SELECT COUNT(*)
+          FROM post_bookmark
+         WHERE post_id = #{postId,jdbcType=NUMERIC}
+    </select>
+
+    <select id="findBookmarksByUserId" resultType="com.ditto.user.dto.response.UserBookmarkResponse">
+        SELECT p.post_id AS postId,
+               p.course_id AS courseId,
+               c.name AS title,
+               p.likes_count AS likeCount,
+               p.save_count AS bookmarkCount,
+               b.created_at AS bookmarkedAt
+          FROM post_bookmark b
+          JOIN post p ON p.post_id = b.post_id
+          JOIN course c ON c.course_id = p.course_id
+         WHERE b.user_id = #{userId,jdbcType=NUMERIC}
+           AND p.deleted_at IS NULL
+           AND c.deleted_at IS NULL
+         ORDER BY b.created_at DESC, b.bookmark_id DESC
+        OFFSET #{offset} ROWS
+        FETCH NEXT #{size} ROWS ONLY
+    </select>
+
+    <select id="countBookmarksByUserId" resultType="long">
+        SELECT COUNT(*)
+          FROM post_bookmark b
+          JOIN post p ON p.post_id = b.post_id
+          JOIN course c ON c.course_id = p.course_id
+         WHERE b.user_id = #{userId,jdbcType=NUMERIC}
+           AND p.deleted_at IS NULL
+           AND c.deleted_at IS NULL
+    </select>
+
+</mapper>

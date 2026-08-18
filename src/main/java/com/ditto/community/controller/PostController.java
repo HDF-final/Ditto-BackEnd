@@ -18,12 +18,14 @@ import com.ditto.community.dto.request.CreateCommentRequest;
 import com.ditto.community.dto.request.CreateCoursePostRequest;
 import com.ditto.community.dto.request.UpdateCommentRequest;
 import com.ditto.community.dto.request.UpdateCoursePostRequest;
+import com.ditto.community.dto.response.BookmarkResponse;
 import com.ditto.community.dto.response.CommentResponse;
 import com.ditto.community.dto.response.CreateCoursePostResponse;
 import com.ditto.community.dto.response.LikeResponse;
 import com.ditto.community.dto.response.PublicCourseDetailResponse;
 import com.ditto.community.dto.response.PublicCourseResponse;
 import com.ditto.community.dto.response.UpdateCoursePostResponse;
+import com.ditto.community.service.PostBookmarkService;
 import com.ditto.community.service.PostCommentService;
 import com.ditto.community.service.PostLikeService;
 import com.ditto.community.service.PostService;
@@ -37,7 +39,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
-@Tag(name = "Post", description = "커뮤니티 게시글, 댓글 및 좋아요 API")
+@Tag(name = "Post", description = "커뮤니티 게시글, 댓글, 좋아요 및 북마크 API")
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/community/courses")
@@ -46,6 +48,7 @@ public class PostController {
     private final PostService postService;
     private final PostCommentService postCommentService;
     private final PostLikeService postLikeService;
+    private final PostBookmarkService postBookmarkService;
 
     @Operation(
             summary = "공개 코스 목록 조회",
@@ -161,5 +164,25 @@ public class PostController {
             @PathVariable Long postId) {
         return ApiResponse.success("성공",
                 postLikeService.removeLike(SecurityUtils.requireUserId(), postId));
+    }
+
+    @Operation(summary = "공개 코스 북마크 등록", description = "로그인한 고객(ROLE_CUSTOMER)이 공개 코스 게시글을 북마크(저장)에 등록합니다.")
+    @PostMapping("/{postId}/bookmarks")
+    @ResponseStatus(HttpStatus.OK)
+    public ApiResponse<BookmarkResponse> addBookmark(
+            @Parameter(description = "북마크를 등록할 게시글 ID", example = "1")
+            @PathVariable Long postId) {
+        return ApiResponse.success("성공",
+                postBookmarkService.addBookmark(SecurityUtils.requireUserId(), postId));
+    }
+
+    @Operation(summary = "공개 코스 북마크 취소", description = "로그인한 고객(ROLE_CUSTOMER)이 공개 코스 게시글의 북마크(저장)를 취소합니다.")
+    @DeleteMapping("/{postId}/bookmarks")
+    @ResponseStatus(HttpStatus.OK)
+    public ApiResponse<BookmarkResponse> removeBookmark(
+            @Parameter(description = "북마크를 취소할 게시글 ID", example = "1")
+            @PathVariable Long postId) {
+        return ApiResponse.success("성공",
+                postBookmarkService.removeBookmark(SecurityUtils.requireUserId(), postId));
     }
 }
