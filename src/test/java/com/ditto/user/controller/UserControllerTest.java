@@ -28,8 +28,10 @@ import com.ditto.community.service.PostBookmarkService;
 import com.ditto.global.common.response.PageResponse;
 import com.ditto.security.AuthUser;
 import com.ditto.user.dto.request.UpdatePersonaRequest;
+import com.ditto.user.dto.request.UpdateUserProfileRequest;
 import com.ditto.user.dto.response.PersonaResponse;
 import com.ditto.user.dto.response.UserBookmarkResponse;
+import com.ditto.user.dto.response.UserProfileResponse;
 import com.ditto.user.service.UserService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -48,6 +50,76 @@ class UserControllerTest {
 
     @MockBean
     private UserService userService;
+
+    @Test
+    @DisplayName("내 프로필 조회 성공 시 200 OK와 사용자 프로필 정보를 반환한다")
+    void getMyProfileSuccess() throws Exception {
+        AuthUser principal = new AuthUser(1L, "yuki@example.com", "ROLE_CUSTOMER");
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(principal, null, List.of(new SimpleGrantedAuthority("ROLE_CUSTOMER"))));
+
+        UserProfileResponse response = UserProfileResponse.builder()
+                .userId(1L)
+                .email("yuki@example.com")
+                .nickname("사토 유키")
+                .countryId(1L)
+                .preferredLanguageCode("ko")
+                .role("ROLE_CUSTOMER")
+                .persona("OPEN_RUN_LOVER")
+                .personaDisplayName("오픈런러버")
+                .build();
+
+        given(userService.getMyProfile(1L)).willReturn(response);
+
+        mockMvc.perform(get("/api/v1/users/me"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.code").value("SUCCESS"))
+                .andExpect(jsonPath("$.data.userId").value(1L))
+                .andExpect(jsonPath("$.data.email").value("yuki@example.com"))
+                .andExpect(jsonPath("$.data.nickname").value("사토 유키"))
+                .andExpect(jsonPath("$.data.persona").value("OPEN_RUN_LOVER"));
+
+        verify(userService).getMyProfile(1L);
+    }
+
+    @Test
+    @DisplayName("내 프로필 정보(닉네임/비밀번호/페르소나) 수정 성공 시 200 OK와 수정된 정보를 반환한다")
+    void updateMyProfileSuccess() throws Exception {
+        AuthUser principal = new AuthUser(1L, "yuki@example.com", "ROLE_CUSTOMER");
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(principal, null, List.of(new SimpleGrantedAuthority("ROLE_CUSTOMER"))));
+
+        UpdateUserProfileRequest request = UpdateUserProfileRequest.builder()
+                .nickname("새로운닉네임")
+                .password("newPassword123!")
+                .persona("FLEX_SPENDER")
+                .build();
+
+        UserProfileResponse response = UserProfileResponse.builder()
+                .userId(1L)
+                .email("yuki@example.com")
+                .nickname("새로운닉네임")
+                .countryId(1L)
+                .preferredLanguageCode("ko")
+                .role("ROLE_CUSTOMER")
+                .persona("FLEX_SPENDER")
+                .personaDisplayName("플렉스족")
+                .build();
+
+        given(userService.updateProfile(eq(1L), any(UpdateUserProfileRequest.class))).willReturn(response);
+
+        mockMvc.perform(patch("/api/v1/users/me")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.code").value("SUCCESS"))
+                .andExpect(jsonPath("$.data.nickname").value("새로운닉네임"))
+                .andExpect(jsonPath("$.data.persona").value("FLEX_SPENDER"));
+
+        verify(userService).updateProfile(eq(1L), any(UpdateUserProfileRequest.class));
+    }
 
     @Test
     @DisplayName("내 북마크 목록 조회 성공 시 ApiResponse와 PageResponse 형태로 반환한다")

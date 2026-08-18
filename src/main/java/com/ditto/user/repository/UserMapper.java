@@ -3,6 +3,7 @@ package com.ditto.user.repository;
 import java.util.Optional;
 
 import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Param;
 
 @Mapper
 public interface UserMapper {
@@ -15,5 +16,7 @@ public interface UserMapper {
 
     int insert(SignupUserCommand command);
 
-    int updatePersona(@org.apache.ibatis.annotations.Param("userId") Long userId, @org.apache.ibatis.annotations.Param("persona") String persona);
+    int updatePersona(@Param("userId") Long userId, @Param("persona") String persona);
+
+    int updateProfile(UpdateUserCommand command);
 }

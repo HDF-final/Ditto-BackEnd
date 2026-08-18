@@ -4,22 +4,15 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 
 @Getter
-@Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class UserRow {
+public class UpdateUserCommand {
 
     private Long userId;
-    private Long countryId;
     private String name;
-    private String email;
     private String passwordHash;
-    private String preferredLanguageCode;
-    private String status;
-    private String role;
     private String persona;
 }
