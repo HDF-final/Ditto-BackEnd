@@ -51,6 +51,13 @@
          WHERE c.comment_id = #{commentId,jdbcType=NUMERIC}
     </select>
 
+    <update id="update" parameterType="com.ditto.community.repository.PostCommentMapper$CommentUpdateCommand">
+        UPDATE post_comment
+           SET contents = #{content,jdbcType=CLOB}
+         WHERE comment_id = #{commentId,jdbcType=NUMERIC}
+           AND user_id = #{userId,jdbcType=NUMERIC}
+    </update>
+
     <delete id="delete">
         DELETE FROM post_comment
          WHERE comment_id = #{commentId,jdbcType=NUMERIC}

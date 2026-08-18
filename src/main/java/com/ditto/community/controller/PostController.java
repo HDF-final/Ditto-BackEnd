@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.ditto.community.dto.request.CreateCommentRequest;
 import com.ditto.community.dto.request.CreateCoursePostRequest;
+import com.ditto.community.dto.request.UpdateCommentRequest;
 import com.ditto.community.dto.request.UpdateCoursePostRequest;
 import com.ditto.community.dto.response.CommentResponse;
 import com.ditto.community.dto.response.CreateCoursePostResponse;
@@ -112,6 +113,19 @@ public class PostController {
             @Parameter(description = "댓글을 조회할 게시글 ID", example = "1")
             @PathVariable Long postId) {
         return ApiResponse.success("성공", postCommentService.getComments(postId));
+    }
+
+    @Operation(summary = "코스 게시글 댓글 수정", description = "로그인한 고객(ROLE_CUSTOMER)이 본인이 작성한 댓글을 수정합니다.")
+    @PatchMapping("/{postId}/comments/{commentId}")
+    @ResponseStatus(HttpStatus.OK)
+    public ApiResponse<CommentResponse> updateComment(
+            @Parameter(description = "게시글 ID", example = "1")
+            @PathVariable Long postId,
+            @Parameter(description = "수정할 댓글 ID", example = "1")
+            @PathVariable Long commentId,
+            @Valid @RequestBody UpdateCommentRequest request) {
+        return ApiResponse.success("성공",
+                postCommentService.updateComment(SecurityUtils.requireUserId(), postId, commentId, request));
     }
 
     @Operation(summary = "코스 게시글 댓글 삭제", description = "로그인한 고객(ROLE_CUSTOMER)이 본인이 작성한 댓글을 삭제합니다.")

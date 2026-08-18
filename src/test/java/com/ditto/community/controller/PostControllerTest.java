@@ -270,4 +270,41 @@ class PostControllerTest {
 
         verify(postCommentService).deleteComment(2L, 10L, 101L);
     }
+
+    @Test
+    @DisplayName("댓글 수정 성공 시 200 OK와 수정된 댓글 정보를 반환한다")
+    void updateCommentSuccess() throws Exception {
+        AuthUser principal = new AuthUser(2L, "customer@test.com", "ROLE_CUSTOMER");
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(principal, null, List.of(new SimpleGrantedAuthority("ROLE_CUSTOMER"))));
+
+        com.ditto.community.dto.request.UpdateCommentRequest request =
+                com.ditto.community.dto.request.UpdateCommentRequest.builder()
+                        .content("수정된 댓글 내용입니다.")
+                        .build();
+
+        CommentResponse response = CommentResponse.builder()
+                .commentId(101L)
+                .postId(10L)
+                .userId(2L)
+                .nickname("Chen_Li")
+                .isAuthor(false)
+                .content("수정된 댓글 내용입니다.")
+                .createdAt(LocalDateTime.of(2026, 8, 17, 14, 26, 0))
+                .build();
+
+        given(postCommentService.updateComment(eq(2L), eq(10L), eq(101L), any(com.ditto.community.dto.request.UpdateCommentRequest.class)))
+                .willReturn(response);
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch("/api/v1/community/courses/10/comments/101")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.code").value("SUCCESS"))
+                .andExpect(jsonPath("$.data.commentId").value(101L))
+                .andExpect(jsonPath("$.data.content").value("수정된 댓글 내용입니다."));
+
+        verify(postCommentService).updateComment(eq(2L), eq(10L), eq(101L), any(com.ditto.community.dto.request.UpdateCommentRequest.class));
+    }
 }

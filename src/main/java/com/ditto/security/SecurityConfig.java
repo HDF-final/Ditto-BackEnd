@@ -76,6 +76,7 @@ public class SecurityConfig {
                         .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/community/courses", "/api/v1/community/courses/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/community/courses/*/comments").hasRole("CUSTOMER")
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/community/courses/*/comments/*").hasRole("CUSTOMER")
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/community/courses/*/comments/*").hasRole("CUSTOMER")
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
