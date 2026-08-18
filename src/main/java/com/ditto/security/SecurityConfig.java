@@ -82,7 +82,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/community/courses/*/likes").hasRole("CUSTOMER")
                         .requestMatchers(HttpMethod.POST, "/api/v1/community/courses/*/bookmarks").hasRole("CUSTOMER")
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/community/courses/*/bookmarks").hasRole("CUSTOMER")
-                        .requestMatchers(HttpMethod.GET, "/api/v1/users/me/bookmarks").hasRole("CUSTOMER")
+                        .requestMatchers("/api/v1/users/me/**").hasRole("CUSTOMER")
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .logout(logout -> logout.disable());

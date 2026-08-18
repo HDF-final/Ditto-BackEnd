@@ -20,4 +20,5 @@ public class UserRow {
     private String preferredLanguageCode;
     private String status;
     private String role;
+    private String persona;
 }

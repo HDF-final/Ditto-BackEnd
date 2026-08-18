@@ -55,6 +55,12 @@ public class AuthService {
         CountryRow country = countryMapper.findActiveByCode(request.getCountryCode())
                 .orElseThrow(() -> new BusinessException(ErrorCode.DEFAULT_COUNTRY_NOT_FOUND));
 
+        String personaCode = null;
+        if (request.getPersona() != null && !request.getPersona().isBlank()) {
+            com.ditto.user.domain.Persona persona = com.ditto.user.domain.Persona.from(request.getPersona());
+            personaCode = (persona != null) ? persona.name() : request.getPersona().trim();
+        }
+
         SignupUserCommand command = SignupUserCommand.builder()
                 .countryId(country.getCountryId())
                 .name(request.getName())
@@ -63,6 +69,7 @@ public class AuthService {
                 .preferredLanguageCode(country.getDefaultLanguageCode())
                 .status(UserStatus.ACTIVE.name())
                 .role(UserRole.ROLE_CUSTOMER.name())
+                .persona(personaCode)
                 .build();
 
         userMapper.insert(command);

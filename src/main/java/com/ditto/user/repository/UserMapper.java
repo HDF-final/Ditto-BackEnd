@@ -14,4 +14,6 @@ public interface UserMapper {
     Optional<UserRow> findActiveById(Long userId);
 
     int insert(SignupUserCommand command);
+
+    int updatePersona(@org.apache.ibatis.annotations.Param("userId") Long userId, @org.apache.ibatis.annotations.Param("persona") String persona);
 }
