@@ -28,7 +28,7 @@ public class CourseChatResponse {
     @Schema(description = "이 대화의 몇 번째 턴인가", example = "1")
     private final Integer turn;
 
-    @Schema(description = "추천된 코스. 방문 순서 그대로이며, 장소마다 navigationKey 와 reason 이 담긴다. "
-            + "조건에 맞는 장소를 못 찾으면 빈 배열이 온다.")
+    @Schema(description = "추천된 코스. 방문 순서 그대로이며, 장소마다 navigationKey 와 reason, "
+            + "그리고 사진(imageUrl)이 담긴다. 조건에 맞는 장소를 못 찾으면 빈 배열이 온다.")
     private final List<RecommendedPlaceResponse> places;
 }
