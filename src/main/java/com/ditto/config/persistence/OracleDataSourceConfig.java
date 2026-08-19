@@ -22,6 +22,7 @@ import com.zaxxer.hikari.HikariDataSource;
 @Configuration
 @MapperScan(
         basePackages = {
+                "com.ditto.brand.repository",
                 "com.ditto.course.repository",
                 "com.ditto.community.repository",
                 "com.ditto.country.repository",
