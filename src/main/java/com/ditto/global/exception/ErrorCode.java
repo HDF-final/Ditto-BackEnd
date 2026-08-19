@@ -55,6 +55,9 @@ public enum ErrorCode {
     MAP_MANIFEST_NOT_FOUND(HttpStatus.NOT_FOUND, "N001", "지도 매니페스트를 찾을 수 없습니다."),
     INVALID_ACCESS_CODE(HttpStatus.BAD_REQUEST, "N002", "유효하지 않은 접속 코드입니다."),
 
+    // ===== Brand =====
+    BRAND_NOT_FOUND(HttpStatus.NOT_FOUND, "BR001", "브랜드를 찾을 수 없습니다."),
+
     // ===== Storage / S3 =====
     INVALID_IMAGE_FILE(HttpStatus.BAD_REQUEST, "ST001", "업로드할 이미지가 올바르지 않습니다."),
     IMAGE_SIZE_EXCEEDED(HttpStatus.PAYLOAD_TOO_LARGE, "ST002", "이미지 크기는 10MB를 초과할 수 없습니다."),
