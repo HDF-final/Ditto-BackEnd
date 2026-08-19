@@ -7,9 +7,11 @@ import org.springframework.stereotype.Service;
 
 import com.ditto.aicourse.client.AiEngineChatResponse;
 import com.ditto.aicourse.client.AiEngineClient;
+import com.ditto.aicourse.client.AiEngineImage;
 import com.ditto.aicourse.client.AiEnginePlace;
 import com.ditto.aicourse.dto.request.CourseChatRequest;
 import com.ditto.aicourse.dto.response.CourseChatResponse;
+import com.ditto.aicourse.dto.response.PlaceImageResponse;
 import com.ditto.aicourse.dto.response.RecommendedPlaceResponse;
 
 import lombok.RequiredArgsConstructor;
@@ -54,8 +56,26 @@ public class AiCourseRecommendationService {
                         .navigationKey(place.getNavigationKey())
                         .placeName(place.getPlaceName())
                         .reason(place.getReason())
+                        .imageUrl(place.resolveImageUrl())
+                        .image(toImageResponse(place.getImage()))
                         .build())
                 .toList();
+    }
+
+    /**
+     * 사진이 없는 장소도 있으므로 통째로 null 을 받아 넘긴다.
+     * 사진 하나 때문에 코스 전체가 실패하면 안 된다 — 엔진도 같은 태도로 짜여 있다.
+     */
+    private PlaceImageResponse toImageResponse(AiEngineImage image) {
+        if (image == null) {
+            return null;
+        }
+        return PlaceImageResponse.builder()
+                .kind(image.getKind())
+                .url(image.getUrl())
+                .source(image.getSource())
+                .caption(image.getCaption())
+                .build();
     }
 
     private int sizeOf(List<AiEnginePlace> places) {

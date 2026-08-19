@@ -31,7 +31,12 @@ public class AiCourseRecommendationController {
             summary = "AI 코스 추천 대화 (맞춤 생성·재추천 포함)",
             description = """
                     손님의 말을 받아 추천 코스를 돌려준다. 결과물은 장소마다의 \
-                    **navigationKey**(실내지도 위치)와 **reason**(추천 이유) 이다.
+                    **navigationKey**(실내지도 위치), **reason**(추천 이유), \
+                    **imageUrl**(장소 카드에 걸 사진) 이다.
+
+                    사진은 두 종류가 섞여 온다. `image.kind` 가 `place` 면 매장 자체 사진이고, \
+                    `evidence` 면 셀럽이 그 브랜드를 착용한 보도사진이라 매장 외관이 아니다 — \
+                    이 경우 `image.caption` 과 `image.source` 를 함께 노출해야 한다.
 
                     엔드포인트가 하나인 이유 — 아래 세 가지가 모두 같은 호출이다.
 
