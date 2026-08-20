@@ -10,35 +10,39 @@
     </select>
 
     <select id="findActiveByEmail" parameterType="string" resultType="com.ditto.user.repository.UserRow">
-        SELECT user_id,
-               country_id,
-               name,
-               email,
-               password_hash,
-               preferred_language_code,
-               status,
-               role,
-               persona
-          FROM app_user
-         WHERE email = #{_parameter}
-           AND status = 'ACTIVE'
-           AND deleted_at IS NULL
+        SELECT u.user_id,
+               u.country_id,
+               c.code AS country_code,
+               u.name,
+               u.email,
+               u.password_hash,
+               u.preferred_language_code,
+               u.status,
+               u.role,
+               u.persona
+          FROM app_user u
+          JOIN country c ON c.country_id = u.country_id
+         WHERE u.email = #{_parameter}
+           AND u.status = 'ACTIVE'
+           AND u.deleted_at IS NULL
     </select>
 
     <select id="findActiveById" parameterType="long" resultType="com.ditto.user.repository.UserRow">
-        SELECT user_id,
-               country_id,
-               name,
-               email,
-               password_hash,
-               preferred_language_code,
-               status,
-               role,
-               persona
-          FROM app_user
-         WHERE user_id = #{_parameter}
-           AND status = 'ACTIVE'
-           AND deleted_at IS NULL
+        SELECT u.user_id,
+               u.country_id,
+               c.code AS country_code,
+               u.name,
+               u.email,
+               u.password_hash,
+               u.preferred_language_code,
+               u.status,
+               u.role,
+               u.persona
+          FROM app_user u
+          JOIN country c ON c.country_id = u.country_id
+         WHERE u.user_id = #{_parameter}
+           AND u.status = 'ACTIVE'
+           AND u.deleted_at IS NULL
     </select>
 
     <insert id="insert" parameterType="com.ditto.user.repository.SignupUserCommand">
@@ -86,6 +90,15 @@
                   persona = #{persona,jdbcType=VARCHAR},
               </if>
           </set>
+         WHERE user_id = #{userId,jdbcType=NUMERIC}
+           AND status = 'ACTIVE'
+           AND deleted_at IS NULL
+    </update>
+
+    <update id="updatePreferences" parameterType="com.ditto.user.repository.UpdateUserPreferencesCommand">
+        UPDATE app_user
+           SET country_id = #{countryId,jdbcType=NUMERIC},
+               preferred_language_code = #{languageCode,jdbcType=VARCHAR}
          WHERE user_id = #{userId,jdbcType=NUMERIC}
            AND status = 'ACTIVE'
            AND deleted_at IS NULL

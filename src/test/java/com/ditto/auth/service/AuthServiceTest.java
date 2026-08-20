@@ -245,6 +245,72 @@ class AuthServiceTest {
     }
 
     @Test
+    @DisplayName("회원가입에서 언어를 명시하면 국가 기본 언어 대신 선택 언어를 저장한다")
+    void signupStoresExplicitLanguage() {
+        given(userMapper.countByEmail("english@example.com")).willReturn(0);
+        given(countryMapper.findActiveByCode("JP"))
+                .willReturn(Optional.of(CountryRow.builder()
+                        .countryId(2L)
+                        .defaultLanguageCode("ja")
+                        .build()));
+
+        authService.signup(SignupRequest.builder()
+                .userEmail("english@example.com")
+                .password("password123!")
+                .name("English User")
+                .countryCode("JP")
+                .languageCode("EN")
+                .build());
+
+        ArgumentCaptor<SignupUserCommand> captor = ArgumentCaptor.forClass(SignupUserCommand.class);
+        verify(userMapper).insert(captor.capture());
+        assertThat(captor.getValue().getPreferredLanguageCode()).isEqualTo("en");
+    }
+
+    @Test
+    @DisplayName("회원가입에서 미지원 언어를 지정하면 U004로 거절한다")
+    void rejectSignupWhenLanguageUnsupported() {
+        given(userMapper.countByEmail("french@example.com")).willReturn(0);
+        given(countryMapper.findActiveByCode("US"))
+                .willReturn(Optional.of(CountryRow.builder()
+                        .countryId(4L)
+                        .defaultLanguageCode("en")
+                        .build()));
+
+        assertThatThrownBy(() -> authService.signup(SignupRequest.builder()
+                .userEmail("french@example.com")
+                .password("password123!")
+                .name("French User")
+                .countryCode("US")
+                .languageCode("fr")
+                .build()))
+                .isInstanceOf(BusinessException.class)
+                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.INVALID_LANGUAGE_CODE);
+
+        verify(userMapper, never()).insert(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    @DisplayName("회원가입에서 미지원 국가를 지정하면 U003으로 거절한다")
+    void rejectSignupWhenCountryUnsupported() {
+        given(userMapper.countByEmail("france@example.com")).willReturn(0);
+
+        assertThatThrownBy(() -> authService.signup(SignupRequest.builder()
+                .userEmail("france@example.com")
+                .password("password123!")
+                .name("France User")
+                .countryCode("FR")
+                .languageCode("en")
+                .build()))
+                .isInstanceOf(BusinessException.class)
+                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.INVALID_COUNTRY_CODE);
+
+        verify(userMapper, never()).insert(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
     @DisplayName("회원가입 시 페르소나가 전달되면 Persona를 정규화하여 저장한다")
     void signupStoresPersonaWhenProvided() {
         given(userMapper.countByEmail("persona@example.com")).willReturn(0);

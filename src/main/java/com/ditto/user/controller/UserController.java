@@ -14,9 +14,11 @@ import com.ditto.global.common.response.ApiResponse;
 import com.ditto.global.common.response.PageResponse;
 import com.ditto.security.SecurityUtils;
 import com.ditto.user.dto.request.UpdatePersonaRequest;
+import com.ditto.user.dto.request.UpdateUserPreferencesRequest;
 import com.ditto.user.dto.request.UpdateUserProfileRequest;
 import com.ditto.user.dto.response.PersonaResponse;
 import com.ditto.user.dto.response.UserBookmarkResponse;
+import com.ditto.user.dto.response.UserPreferencesResponse;
 import com.ditto.user.dto.response.UserProfileResponse;
 import com.ditto.user.service.UserService;
 
@@ -54,6 +56,17 @@ public class UserController {
             @Valid @RequestBody UpdateUserProfileRequest request) {
         return ApiResponse.success("성공",
                 userService.updateProfile(SecurityUtils.requireUserId(), request));
+    }
+
+    @Operation(
+            summary = "국가·언어 환경설정 변경",
+            description = "콘텐츠 대상 국가와 표시 언어를 서로 독립적으로 변경합니다.")
+    @PatchMapping("/preferences")
+    @ResponseStatus(HttpStatus.OK)
+    public ApiResponse<UserPreferencesResponse> updateMyPreferences(
+            @Valid @RequestBody UpdateUserPreferencesRequest request) {
+        return ApiResponse.success("성공",
+                userService.updatePreferences(SecurityUtils.requireUserId(), request));
     }
 
     @Operation(

@@ -37,6 +37,9 @@ public class SignupRequest {
     @Schema(description = "국가 코드 (2자리 알파벳)", example = "KR")
     private String countryCode;
 
+    @Schema(description = "선호 언어 코드 (미입력 시 국가 기본 언어)", example = "ko")
+    private String languageCode;
+
     @JsonAlias({"persona", "shoppingType", "personaType"})
     @Schema(description = "쇼핑 페르소나 (OPEN_RUN_LOVER, FLEX_SPENDER, LITTLE_JOY, ULTIMATE_STAN)", example = "OPEN_RUN_LOVER")
     private String persona;

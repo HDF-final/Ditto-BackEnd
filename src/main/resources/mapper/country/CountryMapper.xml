@@ -5,11 +5,13 @@
 
     <resultMap id="CountryRowMap" type="com.ditto.country.repository.CountryRow">
         <id property="countryId" column="country_id" />
+        <result property="code" column="code" />
         <result property="defaultLanguageCode" column="default_language_code" />
     </resultMap>
 
     <select id="findActiveByCode" parameterType="string" resultMap="CountryRowMap">
         SELECT country_id,
+               code,
                default_language_code
           FROM country
          WHERE code = #{_parameter}

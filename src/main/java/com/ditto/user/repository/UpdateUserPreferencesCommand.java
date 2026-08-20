@@ -1,4 +1,4 @@
-package com.ditto.country.repository;
+package com.ditto.user.repository;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -9,9 +9,9 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class CountryRow {
+public class UpdateUserPreferencesCommand {
 
+    private Long userId;
     private Long countryId;
-    private String code;
-    private String defaultLanguageCode;
+    private String languageCode;
 }

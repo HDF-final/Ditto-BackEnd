@@ -11,17 +11,23 @@ import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import com.ditto.country.repository.CountryMapper;
+import com.ditto.country.repository.CountryRow;
 import com.ditto.global.exception.BusinessException;
 import com.ditto.global.exception.ErrorCode;
 import com.ditto.user.dto.request.UpdatePersonaRequest;
+import com.ditto.user.dto.request.UpdateUserPreferencesRequest;
 import com.ditto.user.dto.request.UpdateUserProfileRequest;
 import com.ditto.user.dto.response.PersonaResponse;
+import com.ditto.user.dto.response.UserPreferencesResponse;
 import com.ditto.user.dto.response.UserProfileResponse;
+import com.ditto.user.repository.UpdateUserPreferencesCommand;
 import com.ditto.user.repository.UpdateUserCommand;
 import com.ditto.user.repository.UserMapper;
 import com.ditto.user.repository.UserRow;
@@ -35,6 +41,9 @@ class UserServiceTest {
     private UserMapper userMapper;
 
     @Mock
+    private CountryMapper countryMapper;
+
+    @Mock
     private PasswordEncoder passwordEncoder;
 
     @InjectMocks
@@ -46,6 +55,7 @@ class UserServiceTest {
         UserRow user = UserRow.builder()
                 .userId(USER_ID)
                 .countryId(1L)
+                .countryCode("JP")
                 .name("사토 유키")
                 .email("yuki@example.com")
                 .preferredLanguageCode("ja")
@@ -61,6 +71,7 @@ class UserServiceTest {
         assertThat(response.getUserId()).isEqualTo(USER_ID);
         assertThat(response.getEmail()).isEqualTo("yuki@example.com");
         assertThat(response.getNickname()).isEqualTo("사토 유키");
+        assertThat(response.getCountryCode()).isEqualTo("JP");
         assertThat(response.getPersona()).isEqualTo("OPEN_RUN_LOVER");
         assertThat(response.getPersonaDisplayName()).isEqualTo("오픈런러버");
     }
@@ -108,6 +119,93 @@ class UserServiceTest {
         assertThat(response.getPersonaDisplayName()).isEqualTo("플렉스족");
 
         verify(userMapper).updateProfile(any(UpdateUserCommand.class));
+    }
+
+    @Test
+    @DisplayName("국가와 언어를 서로 다른 조합으로 정상 저장한다")
+    void updatePreferencesSuccess() {
+        UserRow user = UserRow.builder()
+                .userId(USER_ID)
+                .countryId(1L)
+                .countryCode("KR")
+                .preferredLanguageCode("ko")
+                .build();
+        CountryRow japan = CountryRow.builder()
+                .countryId(3L)
+                .code("JP")
+                .defaultLanguageCode("ja")
+                .build();
+
+        given(userMapper.findActiveById(USER_ID)).willReturn(Optional.of(user));
+        given(countryMapper.findActiveByCode("JP")).willReturn(Optional.of(japan));
+        given(userMapper.updatePreferences(any(UpdateUserPreferencesCommand.class))).willReturn(1);
+
+        UserPreferencesResponse response = userService.updatePreferences(
+                USER_ID,
+                UpdateUserPreferencesRequest.builder()
+                        .countryCode("jp")
+                        .languageCode("EN")
+                        .build());
+
+        assertThat(response.getCountryCode()).isEqualTo("JP");
+        assertThat(response.getLanguageCode()).isEqualTo("en");
+        ArgumentCaptor<UpdateUserPreferencesCommand> captor =
+                ArgumentCaptor.forClass(UpdateUserPreferencesCommand.class);
+        verify(userMapper).updatePreferences(captor.capture());
+        assertThat(captor.getValue().getUserId()).isEqualTo(USER_ID);
+        assertThat(captor.getValue().getCountryId()).isEqualTo(3L);
+        assertThat(captor.getValue().getLanguageCode()).isEqualTo("en");
+    }
+
+    @Test
+    @DisplayName("비활성 또는 미지원 국가는 U003으로 거절한다")
+    void rejectPreferencesWhenCountryIsUnsupported() {
+        given(userMapper.findActiveById(USER_ID)).willReturn(Optional.of(UserRow.builder().userId(USER_ID).build()));
+
+        assertThatThrownBy(() -> userService.updatePreferences(
+                USER_ID,
+                UpdateUserPreferencesRequest.builder()
+                        .countryCode("FR")
+                        .languageCode("en")
+                        .build()))
+                .isInstanceOf(BusinessException.class)
+                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.INVALID_COUNTRY_CODE);
+    }
+
+    @Test
+    @DisplayName("지원 국가가 비활성 상태이면 U003으로 거절한다")
+    void rejectPreferencesWhenCountryIsInactive() {
+        given(userMapper.findActiveById(USER_ID)).willReturn(Optional.of(UserRow.builder().userId(USER_ID).build()));
+        given(countryMapper.findActiveByCode("CN")).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> userService.updatePreferences(
+                USER_ID,
+                UpdateUserPreferencesRequest.builder()
+                        .countryCode("CN")
+                        .languageCode("zh")
+                        .build()))
+                .isInstanceOf(BusinessException.class)
+                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.INVALID_COUNTRY_CODE);
+    }
+
+    @Test
+    @DisplayName("미지원 언어는 U004로 거절한다")
+    void rejectPreferencesWhenLanguageIsUnsupported() {
+        given(userMapper.findActiveById(USER_ID)).willReturn(Optional.of(UserRow.builder().userId(USER_ID).build()));
+        given(countryMapper.findActiveByCode("US")).willReturn(Optional.of(
+                CountryRow.builder().countryId(4L).code("US").defaultLanguageCode("en").build()));
+
+        assertThatThrownBy(() -> userService.updatePreferences(
+                USER_ID,
+                UpdateUserPreferencesRequest.builder()
+                        .countryCode("US")
+                        .languageCode("fr")
+                        .build()))
+                .isInstanceOf(BusinessException.class)
+                .extracting(ex -> ((BusinessException) ex).getErrorCode())
+                .isEqualTo(ErrorCode.INVALID_LANGUAGE_CODE);
     }
 
     @Test

@@ -18,6 +18,7 @@ import com.ditto.auth.dto.request.SignupRequest;
 import com.ditto.auth.dto.response.AuthUserResponse;
 import com.ditto.auth.dto.response.LoginResponse;
 import com.ditto.auth.dto.response.SignupResponse;
+import com.ditto.country.domain.SupportedCountry;
 import com.ditto.country.repository.CountryMapper;
 import com.ditto.country.repository.CountryRow;
 import com.ditto.global.exception.BusinessException;
@@ -25,6 +26,7 @@ import com.ditto.global.exception.ErrorCode;
 import com.ditto.security.AuthUser;
 import com.ditto.user.domain.UserStatus;
 import com.ditto.user.domain.UserRole;
+import com.ditto.user.domain.PreferredLanguage;
 import com.ditto.user.repository.UserMapper;
 import com.ditto.user.repository.SignupUserCommand;
 import com.ditto.user.repository.UserRow;
@@ -52,9 +54,14 @@ public class AuthService {
         validateEmail(request.getUserEmail());
         validateDuplicateEmail(request.getUserEmail());
 
-        String countryCode = request.getCountryCode() != null ? request.getCountryCode().trim().toUpperCase() : "";
+        SupportedCountry supportedCountry = SupportedCountry.fromCode(request.getCountryCode());
+        if (supportedCountry == null) {
+            throw new BusinessException(ErrorCode.INVALID_COUNTRY_CODE);
+        }
+        String countryCode = supportedCountry.name();
         CountryRow country = countryMapper.findActiveByCode(countryCode)
-                .orElseThrow(() -> new BusinessException(ErrorCode.DEFAULT_COUNTRY_NOT_FOUND));
+                .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_COUNTRY_CODE));
+        String languageCode = resolveSignupLanguage(request.getLanguageCode(), country.getDefaultLanguageCode());
 
         String personaCode = null;
         if (request.getPersona() != null && !request.getPersona().isBlank()) {
@@ -67,7 +74,7 @@ public class AuthService {
                 .name(request.getName())
                 .email(request.getUserEmail())
                 .passwordHash(passwordEncoder.encode(request.getPassword()))
-                .preferredLanguageCode(country.getDefaultLanguageCode())
+                .preferredLanguageCode(languageCode)
                 .status(UserStatus.ACTIVE.name())
                 .role(UserRole.ROLE_CUSTOMER.name())
                 .persona(personaCode)
@@ -77,6 +84,18 @@ public class AuthService {
         return SignupResponse.builder()
                 .userEmail(request.getUserEmail())
                 .build();
+    }
+
+    private String resolveSignupLanguage(String requestedLanguageCode, String defaultLanguageCode) {
+        if (!StringUtils.hasText(requestedLanguageCode)) {
+            return defaultLanguageCode;
+        }
+
+        PreferredLanguage language = PreferredLanguage.fromCode(requestedLanguageCode);
+        if (language == null) {
+            throw new BusinessException(ErrorCode.INVALID_LANGUAGE_CODE);
+        }
+        return language.getCode();
     }
 
     public LoginResponse login(LoginRequest request, HttpServletRequest httpRequest, HttpServletResponse response) {

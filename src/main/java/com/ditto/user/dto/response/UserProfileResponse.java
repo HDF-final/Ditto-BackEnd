@@ -28,6 +28,9 @@ public class UserProfileResponse {
     @Schema(description = "국가 ID", example = "1")
     private Long countryId;
 
+    @Schema(description = "국가 코드", example = "JP")
+    private String countryCode;
+
     @Schema(description = "선호 언어 코드", example = "ko")
     private String preferredLanguageCode;
 
@@ -47,6 +50,7 @@ public class UserProfileResponse {
                 .email(user.getEmail())
                 .nickname(user.getName())
                 .countryId(user.getCountryId())
+                .countryCode(user.getCountryCode())
                 .preferredLanguageCode(user.getPreferredLanguageCode())
                 .role(user.getRole())
                 .persona(user.getPersona())

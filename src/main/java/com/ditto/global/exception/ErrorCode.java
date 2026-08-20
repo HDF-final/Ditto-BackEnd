@@ -38,6 +38,8 @@ public enum ErrorCode {
     // ===== User =====
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "U001", "사용자를 찾을 수 없습니다."),
     DUPLICATE_EMAIL(HttpStatus.CONFLICT, "U002", "이미 가입된 이메일입니다."),
+    INVALID_COUNTRY_CODE(HttpStatus.BAD_REQUEST, "U003", "지원하지 않거나 비활성화된 국가 코드입니다."),
+    INVALID_LANGUAGE_CODE(HttpStatus.BAD_REQUEST, "U004", "지원하지 않는 언어 코드입니다."),
 
     // ===== Course =====
     COURSE_NOT_FOUND(HttpStatus.NOT_FOUND, "CR001", "코스를 찾을 수 없습니다."),
