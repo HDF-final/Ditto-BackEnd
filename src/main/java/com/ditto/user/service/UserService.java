@@ -4,13 +4,20 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.ditto.country.domain.SupportedCountry;
+import com.ditto.country.repository.CountryMapper;
+import com.ditto.country.repository.CountryRow;
 import com.ditto.global.exception.BusinessException;
 import com.ditto.global.exception.ErrorCode;
 import com.ditto.user.domain.Persona;
+import com.ditto.user.domain.PreferredLanguage;
 import com.ditto.user.dto.request.UpdatePersonaRequest;
+import com.ditto.user.dto.request.UpdateUserPreferencesRequest;
 import com.ditto.user.dto.request.UpdateUserProfileRequest;
 import com.ditto.user.dto.response.PersonaResponse;
+import com.ditto.user.dto.response.UserPreferencesResponse;
 import com.ditto.user.dto.response.UserProfileResponse;
+import com.ditto.user.repository.UpdateUserPreferencesCommand;
 import com.ditto.user.repository.UpdateUserCommand;
 import com.ditto.user.repository.UserMapper;
 import com.ditto.user.repository.UserRow;
@@ -23,6 +30,7 @@ import lombok.RequiredArgsConstructor;
 public class UserService {
 
     private final UserMapper userMapper;
+    private final CountryMapper countryMapper;
     private final PasswordEncoder passwordEncoder;
 
     /**
@@ -75,6 +83,43 @@ public class UserService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         return UserProfileResponse.from(updatedUser);
+    }
+
+    /**
+     * 콘텐츠 대상 국가와 표시 언어를 서로 독립적으로 업데이트한다.
+     */
+    @Transactional
+    public UserPreferencesResponse updatePreferences(Long userId, UpdateUserPreferencesRequest request) {
+        userMapper.findActiveById(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        SupportedCountry supportedCountry = SupportedCountry.fromCode(request.getCountryCode());
+        if (supportedCountry == null) {
+            throw new BusinessException(ErrorCode.INVALID_COUNTRY_CODE);
+        }
+        String countryCode = supportedCountry.name();
+        CountryRow country = countryMapper.findActiveByCode(countryCode)
+                .orElseThrow(() -> new BusinessException(ErrorCode.INVALID_COUNTRY_CODE));
+
+        PreferredLanguage language = PreferredLanguage.fromCode(request.getLanguageCode());
+        if (language == null) {
+            throw new BusinessException(ErrorCode.INVALID_LANGUAGE_CODE);
+        }
+
+        UpdateUserPreferencesCommand command = UpdateUserPreferencesCommand.builder()
+                .userId(userId)
+                .countryId(country.getCountryId())
+                .languageCode(language.getCode())
+                .build();
+
+        if (userMapper.updatePreferences(command) != 1) {
+            throw new BusinessException(ErrorCode.USER_NOT_FOUND);
+        }
+
+        return UserPreferencesResponse.builder()
+                .countryCode(countryCode)
+                .languageCode(language.getCode())
+                .build();
     }
 
     /**

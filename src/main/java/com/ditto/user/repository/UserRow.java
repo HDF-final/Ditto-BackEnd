@@ -15,6 +15,7 @@ public class UserRow {
 
     private Long userId;
     private Long countryId;
+    private String countryCode;
     private String name;
     private String email;
     private String passwordHash;

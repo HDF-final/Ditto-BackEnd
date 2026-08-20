@@ -19,4 +19,6 @@ public interface UserMapper {
     int updatePersona(@Param("userId") Long userId, @Param("persona") String persona);
 
     int updateProfile(UpdateUserCommand command);
+
+    int updatePreferences(UpdateUserPreferencesCommand command);
 }

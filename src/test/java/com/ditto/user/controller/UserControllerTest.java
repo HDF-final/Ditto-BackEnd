@@ -28,9 +28,11 @@ import com.ditto.community.service.PostBookmarkService;
 import com.ditto.global.common.response.PageResponse;
 import com.ditto.security.AuthUser;
 import com.ditto.user.dto.request.UpdatePersonaRequest;
+import com.ditto.user.dto.request.UpdateUserPreferencesRequest;
 import com.ditto.user.dto.request.UpdateUserProfileRequest;
 import com.ditto.user.dto.response.PersonaResponse;
 import com.ditto.user.dto.response.UserBookmarkResponse;
+import com.ditto.user.dto.response.UserPreferencesResponse;
 import com.ditto.user.dto.response.UserProfileResponse;
 import com.ditto.user.service.UserService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -63,6 +65,7 @@ class UserControllerTest {
                 .email("yuki@example.com")
                 .nickname("사토 유키")
                 .countryId(1L)
+                .countryCode("JP")
                 .preferredLanguageCode("ko")
                 .role("ROLE_CUSTOMER")
                 .persona("OPEN_RUN_LOVER")
@@ -78,6 +81,7 @@ class UserControllerTest {
                 .andExpect(jsonPath("$.data.userId").value(1L))
                 .andExpect(jsonPath("$.data.email").value("yuki@example.com"))
                 .andExpect(jsonPath("$.data.nickname").value("사토 유키"))
+                .andExpect(jsonPath("$.data.countryCode").value("JP"))
                 .andExpect(jsonPath("$.data.persona").value("OPEN_RUN_LOVER"));
 
         verify(userService).getMyProfile(1L);
@@ -119,6 +123,50 @@ class UserControllerTest {
                 .andExpect(jsonPath("$.data.persona").value("FLEX_SPENDER"));
 
         verify(userService).updateProfile(eq(1L), any(UpdateUserProfileRequest.class));
+    }
+
+    @Test
+    @DisplayName("국가·언어 환경설정 변경 성공 시 독립된 코드를 반환한다")
+    void updateMyPreferencesSuccess() throws Exception {
+        AuthUser principal = new AuthUser(1L, "yuki@example.com", "ROLE_CUSTOMER");
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(principal, null, List.of(new SimpleGrantedAuthority("ROLE_CUSTOMER"))));
+
+        UpdateUserPreferencesRequest request = UpdateUserPreferencesRequest.builder()
+                .countryCode("JP")
+                .languageCode("en")
+                .build();
+        UserPreferencesResponse response = UserPreferencesResponse.builder()
+                .countryCode("JP")
+                .languageCode("en")
+                .build();
+
+        given(userService.updatePreferences(eq(1L), any(UpdateUserPreferencesRequest.class))).willReturn(response);
+
+        mockMvc.perform(patch("/api/v1/users/me/preferences")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.countryCode").value("JP"))
+                .andExpect(jsonPath("$.data.languageCode").value("en"));
+
+        verify(userService).updatePreferences(eq(1L), any(UpdateUserPreferencesRequest.class));
+    }
+
+    @Test
+    @DisplayName("국가·언어가 누락되면 400을 반환한다")
+    void updateMyPreferencesRejectsBlankValues() throws Exception {
+        AuthUser principal = new AuthUser(1L, "yuki@example.com", "ROLE_CUSTOMER");
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(principal, null, List.of(new SimpleGrantedAuthority("ROLE_CUSTOMER"))));
+
+        mockMvc.perform(patch("/api/v1/users/me/preferences")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.code").value("C001"));
     }
 
     @Test

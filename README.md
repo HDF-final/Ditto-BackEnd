@@ -408,6 +408,22 @@ Ditto-BackEnd/
 | 내 정보 조회 | `GET` | `/api/v1/users/me` | O |
 | 국가·언어 설정 변경 | `PATCH` | `/api/v1/users/me/preferences` | O |
 
+국가와 언어는 1:1로 묶지 않고 독립된 환경설정으로 저장합니다. 콘텐츠·트렌드 대상 국가는
+`KR`, `CN`, `JP`, `US`, 표시 언어는 `ko`, `zh`, `ja`, `en`을 지원합니다. 예를 들어
+일본 콘텐츠를 영어 화면으로 보는 `JP + en` 조합도 유효합니다.
+
+```json
+{
+  "countryCode": "JP",
+  "languageCode": "en"
+}
+```
+
+성공 응답의 `data`는 저장된 `countryCode`, `languageCode`를 반환합니다. 비활성·미지원 국가는
+`U003`, 미지원 언어는 `U004`(각각 400)로 거절합니다. `GET /api/v1/users/me`에서도
+`countryCode`와 `preferredLanguageCode`를 확인할 수 있습니다. 회원가입의 `languageCode`는
+선택값이며, 생략하면 선택 국가의 `default_language_code`를 사용합니다.
+
 ### AI 코스 (AI Course) — `/api/v1/ai`
 
 | 기능 | Method | Endpoint | 인증 | 상태 |
@@ -664,13 +680,13 @@ securityContextRepository.saveContext(context, request, response);
 
 ### 프론트엔드 온보딩 흐름과의 정합성
 
-프론트엔드는 현재 실제 인증 없이 화면 전환만 하는 임시 온보딩(`/signup → /country → /persona → /`, `/login → /`)을 사용합니다. 백엔드는 이 흐름을 다음과 같이 실제 API로 대응시킵니다.
+프론트엔드 온보딩은 `/signup → /country → /persona → /` 순서로 진행하며, 백엔드는 다음 API로 대응합니다.
 
-- 회원가입(`POST /auth/signup`) 성공 → 국가·언어 설정(`PATCH /users/me/preferences`)
-- 로그인(`POST /auth/login`) 성공 → 세션 생성(`JSESSIONID` 발급)
-- 온보딩에서 선택한 국가·언어·페르소나는 사용자 설정 API로 저장
+- 회원가입(`POST /auth/signup`) 및 로그인(`POST /auth/login`) → 세션 생성(`JSESSIONID` 발급)
+- 국가·언어 선택 → `PATCH /users/me/preferences`
+- 페르소나 선택 → `PATCH /users/me`
 
-프론트엔드 인증이 임시 단계인 동안, 백엔드는 공개(`X`) 엔드포인트만으로도 화면이 동작하도록 공개 범위를 위 표대로 유지합니다.
+로그인 이후 인증은 서버 세션과 HttpOnly `JSESSIONID` 쿠키로 유지합니다.
 
 ## 코딩 컨벤션
 
