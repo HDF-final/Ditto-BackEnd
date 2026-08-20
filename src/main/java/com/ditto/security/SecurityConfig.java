@@ -44,6 +44,7 @@ public class SecurityConfig {
             "/api/v1/courses/public/**",
             "/api/v1/news/**",
             "/api/v1/mobile/access-codes/verify",
+            "/api/v1/ocr/locations/recognize",
             // /swagger-ui.html 은 /swagger-ui/** 와 다른 경로다. 둘 다 열어둬야 리다이렉트가 된다.
             "/swagger-ui.html",
             "/swagger-ui.html/**",

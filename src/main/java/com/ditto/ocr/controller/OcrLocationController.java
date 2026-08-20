@@ -21,7 +21,7 @@ import lombok.RequiredArgsConstructor;
 @Tag(name = "OCR Location", description = "OCR 현재 위치 인식 API")
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/ocr/locations")
+@RequestMapping("/api/v1/ocr/locations")
 public class OcrLocationController {
 
     private final OcrNavigationService ocrNavigationService;
