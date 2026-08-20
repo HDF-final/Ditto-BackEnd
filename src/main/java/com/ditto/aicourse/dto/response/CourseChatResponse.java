@@ -31,4 +31,7 @@ public class CourseChatResponse {
     @Schema(description = "추천된 코스. 방문 순서 그대로이며, 장소마다 navigationKey 와 reason, "
             + "그리고 사진(imageUrl)이 담긴다. 조건에 맞는 장소를 못 찾으면 빈 배열이 온다.")
     private final List<RecommendedPlaceResponse> places;
+
+    @Schema(description = "이 턴에 엔진이 쓴 시간과 토큰. 코스 내용이 아니라 시험·운영용 수치다.")
+    private final CourseMetricsResponse metrics;
 }

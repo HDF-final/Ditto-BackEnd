@@ -11,8 +11,9 @@ import lombok.Setter;
  * 엔진이 장소마다 붙여 주는 사진 한 장.
  *
  * <pre>
- * {"kind": "evidence", "url": "https://...", "source": "cdn.straightnews.co.kr",
- *  "caption": "카리나 × Prada"}
+ * {"kind": "evidence", "url": "https://...", "source": "brunch.co.kr",
+ *  "caption": "카리나 × 프라다", "article": "https://brunch.co.kr/@jennafashion/8",
+ *  "width": 1080, "height": 1350}
  * </pre>
  *
  * <p>{@code kind} 를 반드시 같이 내보내야 한다 — 두 사진은 성격이 전혀 다르다.
@@ -37,4 +38,16 @@ public class AiEngineImage {
 
     @JsonProperty("caption")
     private String caption;
+
+    /** 사진이 실려 있던 기사 주소. evidence 사진에만 붙는다. */
+    @JsonProperty("article")
+    private String article;
+
+    /** 원본 가로 픽셀. 화면이 자리를 미리 잡을 때 쓴다. */
+    @JsonProperty("width")
+    private Integer width;
+
+    /** 원본 세로 픽셀 */
+    @JsonProperty("height")
+    private Integer height;
 }

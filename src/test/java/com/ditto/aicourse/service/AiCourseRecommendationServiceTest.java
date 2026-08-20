@@ -81,6 +81,77 @@ class AiCourseRecommendationServiceTest {
         assertThat(place.getImage()).isNull();
     }
 
+    @Test
+    @DisplayName("ditto-chat-v2 가 실제로 돌려준 모양을 그대로 옮긴다")
+    void mapsLiveV2Payload() throws IOException {
+        // ditto-chat-v2 를 실제로 호출해 받은 응답에서 장소 한 곳을 그대로 가져왔다.
+        // url·image_url·image.url 이 셋 다 같은 값으로 오고, image 에 article·width·height 가 붙는다.
+        stub("""
+                {"session":"Kx7mQ2vLpNa","reply":"준비했습니다","turn":1,"llm_calls":7,"seconds":40.4,
+                 "warnings":[],"_engine":"tavily","_input_tokens":75806,"_output_tokens":2810,
+                 "places":[{"place_name":"프라다","navigation_key":"1F_STORE_0035","reason":"앰배서더",
+                            "url":"https://img1.kakaocdn.net/a.webp",
+                            "image_url":"https://img1.kakaocdn.net/a.webp",
+                            "image":{"kind":"evidence","url":"https://img1.kakaocdn.net/a.webp",
+                                     "source":"brunch.co.kr","caption":"카리나 × 프라다",
+                                     "article":"https://brunch.co.kr/@jennafashion/8",
+                                     "width":1080,"height":1350}}]}
+                """);
+
+        RecommendedPlaceResponse place = firstPlace();
+
+        assertThat(place.getImageUrl()).isEqualTo("https://img1.kakaocdn.net/a.webp");
+        assertThat(place.getImage().getArticle()).isEqualTo("https://brunch.co.kr/@jennafashion/8");
+        assertThat(place.getImage().getWidth()).isEqualTo(1080);
+        assertThat(place.getImage().getHeight()).isEqualTo(1350);
+        // 엔진이 새로 붙인 _engine·_input_tokens 같은 키는 무시하고 넘어가야 한다.
+        assertThat(place.getPlaceName()).isEqualTo("프라다");
+    }
+
+    @Test
+    @DisplayName("평평한 필드가 없고 image 만 와도 사진을 찾아낸다")
+    void fallsBackToNestedUrl() throws IOException {
+        stub("""
+                {"session":"s","reply":"r","turn":1,
+                 "places":[{"place_name":"로바","navigation_key":"6F_STORE_0027","reason":"식사",
+                            "image":{"kind":"place","url":"https://nested.example/b.jpg"}}]}
+                """);
+
+        assertThat(firstPlace().getImageUrl()).isEqualTo("https://nested.example/b.jpg");
+    }
+
+    @Test
+    @DisplayName("응답시간과 토큰을 metrics 로 실어 보낸다")
+    void reportsMetrics() throws IOException {
+        stub("""
+                {"session":"T8J2Q4kzq_o","reply":"준비했습니다","turn":2,"llm_calls":5,
+                 "seconds":15.0,"_resumed":true,"_input_tokens":31797,"_output_tokens":765,
+                 "places":[]}
+                """);
+
+        CourseChatResponse response = service.chat(1L,
+                CourseChatRequest.builder().sessionId("T8J2Q4kzq_o").message("밥집만 바꿔줘").build());
+
+        assertThat(response.getTurn()).isEqualTo(2);
+        assertThat(response.getMetrics().getSeconds()).isEqualTo(15.0);
+        assertThat(response.getMetrics().getLlmCalls()).isEqualTo(5);
+        assertThat(response.getMetrics().getInputTokens()).isEqualTo(31797);
+        assertThat(response.getMetrics().getOutputTokens()).isEqualTo(765);
+    }
+
+    @Test
+    @DisplayName("엔진이 수치를 안 줘도 metrics 자리는 비워 두고 넘어간다")
+    void toleratesMissingMetrics() throws IOException {
+        stub("{\"session\":\"s\",\"reply\":\"r\",\"turn\":1,\"places\":[]}");
+
+        CourseChatResponse response = service.chat(1L,
+                CourseChatRequest.builder().message("코스 짜줘").build());
+
+        assertThat(response.getMetrics()).isNotNull();
+        assertThat(response.getMetrics().getSeconds()).isNull();
+        assertThat(response.getMetrics().getInputTokens()).isNull();
+    }
+
     private RecommendedPlaceResponse firstPlace() {
         CourseChatResponse response = service.chat(1L,
                 CourseChatRequest.builder().message("카리나 좋아하는 브랜드 보고 싶어").build());

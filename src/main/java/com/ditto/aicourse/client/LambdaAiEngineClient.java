@@ -45,6 +45,7 @@ public class LambdaAiEngineClient implements AiEngineClient, AutoCloseable {
         AiEngineChatRequest request = AiEngineChatRequest.builder()
                 .session(session)
                 .message(message)
+                .engine(properties.getEngine())
                 .build();
 
         try {
@@ -85,13 +86,44 @@ public class LambdaAiEngineClient implements AiEngineClient, AutoCloseable {
             log.error("AI 엔진 응답 본문이 비어 있다. functionName={}", properties.getFunctionName());
             throw new BusinessException(ErrorCode.AI_SERVICE_ERROR);
         }
+
+        JsonNode root;
         try {
-            return objectMapper.readValue(payload.asByteArray(), AiEngineChatResponse.class);
+            root = objectMapper.readTree(payload.asByteArray());
         } catch (java.io.IOException e) {
             log.error("AI 엔진 응답 파싱 실패. functionName={}, cause={}",
                     properties.getFunctionName(), e.getMessage());
             throw new BusinessException(ErrorCode.AI_SERVICE_ERROR);
         }
+
+        // 엔진은 실패를 예외로 올리지 않고 {"error": "..."} 를 200 으로 돌려준다.
+        // functionError 만 보면 이걸 정상 응답으로 삼아 필드가 전부 null 인 코스가
+        // success:true 로 나간다 — 조용히 틀리는 쪽이라 반드시 여기서 막는다.
+        JsonNode error = root.path("error");
+        if (!error.isMissingNode() && !error.isNull()) {
+            log.error("AI 엔진이 오류를 돌려줬다. functionName={}, error={}",
+                    properties.getFunctionName(), summarize(error.asText("")));
+            throw new BusinessException(ErrorCode.AI_SERVICE_ERROR);
+        }
+
+        try {
+            return objectMapper.treeToValue(root, AiEngineChatResponse.class);
+        } catch (JsonProcessingException e) {
+            log.error("AI 엔진 응답 파싱 실패. functionName={}, cause={}",
+                    properties.getFunctionName(), e.getMessage());
+            throw new BusinessException(ErrorCode.AI_SERVICE_ERROR);
+        }
+    }
+
+    /**
+     * 오류 문구에서 예외 종류만 남긴다.
+     *
+     * <p>{@code "KeyError: '카리나가 좋아하는…'"} 처럼 파이썬 예외 메시지에 손님이 보낸 말이
+     * 딸려 오는 일이 있어 뒤쪽을 버린다. 전문이 필요하면 CloudWatch 로그를 본다.
+     */
+    private String summarize(String message) {
+        int colon = message.indexOf(':');
+        return colon > 0 ? message.substring(0, colon) : message;
     }
 
     /**
