@@ -54,9 +54,23 @@ public class OcrNavigationService {
                 .build();
     }
 
-    /** 이미지를 인식해 브랜드명과 매칭 장소 후보를 돌려준다. */
+    /** 세션을 검증한 뒤 이미지를 인식해 브랜드명과 매칭 장소 후보를 돌려준다. */
     public OcrRecognitionResponse recognize(String sessionId, MultipartFile image) {
         sessionStore.require(sessionId);
+        return recognizeImage(image);
+    }
+
+    /**
+     * 세션 없이 이미지만으로 현재 위치를 인식한다.
+     *
+     * <p>모바일 진입 시점처럼 아직 세션이 없는 단계에서 간판 이미지를 바로 인식하는 용도다.
+     */
+    public OcrRecognitionResponse recognizeLocation(MultipartFile image) {
+        return recognizeImage(image);
+    }
+
+    /** 이미지를 인식해 브랜드명과 매칭 장소 후보를 돌려준다. */
+    private OcrRecognitionResponse recognizeImage(MultipartFile image) {
         validateImage(image);
 
         ClovaOcrResult result = clovaOcrClient.recognize(
@@ -65,7 +79,7 @@ public class OcrNavigationService {
         String recognitionId = "ocr_" + UUID.randomUUID().toString().replace("-", "");
 
         if (result.isEmpty()) {
-            log.debug("OCR 인식 텍스트 없음. sessionId={}", sessionId);
+            log.debug("OCR 인식 텍스트 없음. recognitionId={}", recognitionId);
             return OcrRecognitionResponse.builder()
                     .recognitionId(recognitionId)
                     .recognizedBrandName(null)
