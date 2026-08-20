@@ -50,6 +50,14 @@ app:
       prefix: ${AWS_S3_PREFIX:images}
       public-base-url: ${AWS_S3_PUBLIC_BASE_URL:}
       presigned-url-expiration: ${AWS_S3_PRESIGNED_URL_EXPIRATION:30m}
+  translation:
+    enabled: ${AWS_TRANSLATE_ENABLED:false}
+    region: ${AWS_TRANSLATE_REGION:${AWS_REGION:ap-northeast-2}}
+    monthly-character-limit: ${AWS_TRANSLATE_MONTHLY_CHARACTER_LIMIT:2000000}
+    max-request-bytes: ${AWS_TRANSLATE_MAX_REQUEST_BYTES:9000}
+    pending-lease: ${AWS_TRANSLATE_PENDING_LEASE:2m}
+    retry-base: ${AWS_TRANSLATE_RETRY_BASE:5m}
+    retry-max: ${AWS_TRANSLATE_RETRY_MAX:24h}
 
 # Actuator Health Check
 management:
@@ -78,5 +86,4 @@ gemini:
   connect-timeout-seconds: 5
   read-timeout-seconds: 30
   enabled: true
-
 

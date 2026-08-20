@@ -37,6 +37,7 @@ docker-compose.*.yml
 .docker/
 src/main/resources/sql/
 *.sql
+!database/oracle/*.sql
 
 
 

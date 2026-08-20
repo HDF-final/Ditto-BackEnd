@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ditto.global.infrastructure.translation.repository.TranslationCacheMapper">
+
+    <select id="find"
+            resultType="com.ditto.global.infrastructure.translation.repository.TranslationCacheEntry">
+        SELECT source_hash,
+               translated_text,
+               status,
+               failure_count,
+               retry_after,
+               lease_until
+          FROM content_translation
+         WHERE source_type = #{sourceType}
+           AND source_key = #{sourceKey}
+           AND source_field = #{sourceField}
+           AND target_language = #{targetLanguage}
+    </select>
+
+    <update id="ensureCacheRow">
+        MERGE INTO content_translation target
+        USING (
+            SELECT #{sourceType} AS source_type,
+                   #{sourceKey} AS source_key,
+                   #{sourceField} AS source_field,
+                   #{targetLanguage} AS target_language,
+                   #{sourceHash} AS source_hash
+              FROM dual
+        ) source
+           ON (target.source_type = source.source_type
+               AND target.source_key = source.source_key
+               AND target.source_field = source.source_field
+               AND target.target_language = source.target_language)
+        WHEN NOT MATCHED THEN
+            INSERT (source_type, source_key, source_field, target_language,
+                    source_hash, status, failure_count, created_at, updated_at)
+            VALUES (source.source_type, source.source_key, source.source_field, source.target_language,
+                    source.source_hash, 'IDLE', 0, SYSTIMESTAMP, SYSTIMESTAMP)
+    </update>
+
+    <update id="claim">
+        UPDATE content_translation
+           SET source_hash = #{sourceHash},
+               translated_text = NULL,
+               status = 'PENDING',
+               failure_count = CASE WHEN source_hash = #{sourceHash} THEN failure_count ELSE 0 END,
+               retry_after = NULL,
+               lease_until = SYSTIMESTAMP + NUMTODSINTERVAL(#{leaseSeconds}, 'SECOND'),
+               last_error = NULL,
+               updated_at = SYSTIMESTAMP
+         WHERE source_type = #{sourceType}
+           AND source_key = #{sourceKey}
+           AND source_field = #{sourceField}
+           AND target_language = #{targetLanguage}
+           AND (
+                source_hash &lt;&gt; #{sourceHash}
+                OR status = 'IDLE'
+                OR (status = 'SUCCESS' AND translated_text IS NULL)
+                OR (status = 'FAILED' AND (retry_after IS NULL OR retry_after &lt;= SYSTIMESTAMP))
+                OR (status = 'PENDING' AND (lease_until IS NULL OR lease_until &lt;= SYSTIMESTAMP))
+           )
+    </update>
+
+    <update id="markSuccess">
+        UPDATE content_translation
+           SET translated_text = #{translatedText,jdbcType=CLOB},
+               status = 'SUCCESS',
+               failure_count = 0,
+               retry_after = NULL,
+               lease_until = NULL,
+               last_error = NULL,
+               updated_at = SYSTIMESTAMP
+         WHERE source_type = #{sourceType}
+           AND source_key = #{sourceKey}
+           AND source_field = #{sourceField}
+           AND target_language = #{targetLanguage}
+           AND source_hash = #{sourceHash}
+           AND status = 'PENDING'
+    </update>
+
+    <update id="markFailure">
+        UPDATE content_translation
+           SET translated_text = NULL,
+               status = 'FAILED',
+               failure_count = failure_count + 1,
+               retry_after = #{retryAfter,jdbcType=TIMESTAMP},
+               lease_until = NULL,
+               last_error = #{lastError,jdbcType=VARCHAR},
+               updated_at = SYSTIMESTAMP
+         WHERE source_type = #{sourceType}
+           AND source_key = #{sourceKey}
+           AND source_field = #{sourceField}
+           AND target_language = #{targetLanguage}
+           AND source_hash = #{sourceHash}
+           AND status = 'PENDING'
+    </update>
+
+    <update id="ensureMonthlyUsage">
+        MERGE INTO translation_monthly_usage target
+        USING (SELECT #{usageMonth} AS usage_month FROM dual) source
+           ON (target.usage_month = source.usage_month)
+        WHEN NOT MATCHED THEN
+            INSERT (usage_month, used_characters, created_at, updated_at)
+            VALUES (source.usage_month, 0, SYSTIMESTAMP, SYSTIMESTAMP)
+    </update>
+
+    <update id="reserveCharacters">
+        UPDATE translation_monthly_usage
+           SET used_characters = used_characters + #{characters},
+               updated_at = SYSTIMESTAMP
+         WHERE usage_month = #{usageMonth}
+           AND used_characters + #{characters} &lt;= #{monthlyLimit}
+    </update>
+
+</mapper>

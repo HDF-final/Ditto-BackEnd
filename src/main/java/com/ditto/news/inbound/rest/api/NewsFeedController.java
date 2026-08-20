@@ -3,12 +3,16 @@ package com.ditto.news.inbound.rest.api;
 import java.util.List;
 
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.http.HttpHeaders;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.ditto.global.common.response.ApiResponse;
+import com.ditto.global.i18n.AcceptLanguageResolver;
+import com.ditto.global.i18n.ContentLanguage;
 import com.ditto.news.application.service.NewsFeedService;
 import com.ditto.news.domain.NewsFeed;
 import com.ditto.news.inbound.rest.dto.response.NewsFeedDetailResponse;
@@ -35,8 +39,10 @@ public class NewsFeedController {
     @GetMapping
     public ApiResponse<List<NewsFeedSummaryResponse>> getNewsFeedList(
             @RequestParam(name = "page", defaultValue = "0") int page,
-            @RequestParam(name = "size", defaultValue = "10") int size) {
-        List<NewsFeed> feeds = newsFeedService.getNewsFeeds(page, size);
+            @RequestParam(name = "size", defaultValue = "10") int size,
+            @RequestHeader(name = HttpHeaders.ACCEPT_LANGUAGE, required = false) String acceptLanguage) {
+        ContentLanguage language = AcceptLanguageResolver.resolve(acceptLanguage);
+        List<NewsFeed> feeds = newsFeedService.getNewsFeeds(page, size, language);
 
         List<NewsFeedSummaryResponse> response = feeds.stream()
                 .map(NewsFeedSummaryResponse::from)
@@ -57,15 +63,21 @@ public class NewsFeedController {
 
     @Operation(summary = "뉴스피드 상세 조회", description = "newsId로 뉴스피드 상세 본문을 조회합니다.")
     @GetMapping("/{newsId}")
-    public ApiResponse<NewsFeedDetailResponse> getNewsFeedById(@PathVariable("newsId") Long newsId) {
-        NewsFeed feed = newsFeedService.getNewsFeedById(newsId);
+    public ApiResponse<NewsFeedDetailResponse> getNewsFeedById(
+            @PathVariable("newsId") Long newsId,
+            @RequestHeader(name = HttpHeaders.ACCEPT_LANGUAGE, required = false) String acceptLanguage) {
+        NewsFeed feed = newsFeedService.getNewsFeedById(
+                newsId, AcceptLanguageResolver.resolve(acceptLanguage));
         return ApiResponse.success(NewsFeedDetailResponse.from(feed));
     }
 
     @Operation(summary = "검색 유입 콘텐츠 조회", description = "SEO 및 검색 유입용 고유 URL 슬러그로 뉴스피드 상세 본문을 조회합니다.")
     @GetMapping("/slug/{slug}")
-    public ApiResponse<NewsFeedDetailResponse> getNewsFeedBySlug(@PathVariable("slug") String slug) {
-        NewsFeed feed = newsFeedService.getNewsFeedBySlug(slug);
+    public ApiResponse<NewsFeedDetailResponse> getNewsFeedBySlug(
+            @PathVariable("slug") String slug,
+            @RequestHeader(name = HttpHeaders.ACCEPT_LANGUAGE, required = false) String acceptLanguage) {
+        NewsFeed feed = newsFeedService.getNewsFeedBySlug(
+                slug, AcceptLanguageResolver.resolve(acceptLanguage));
         return ApiResponse.success(NewsFeedDetailResponse.from(feed));
     }
 }

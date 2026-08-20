@@ -80,6 +80,8 @@ dependencies {
     // AWS Lambda — AI 엔진을 함수 이름으로 직접 호출한다.
     // SigV4 서명은 SDK 가 처리하므로 서명 코드를 들고 있지 않는다.
     implementation 'software.amazon.awssdk:lambda'
+    // AWS Translate — 동적 콘텐츠를 요청 언어로 번역한다.
+    implementation 'software.amazon.awssdk:translate'
     // 동기 HTTP 클라이언트. 타임아웃을 직접 잡아야 해서 명시적으로 고른다.
     implementation 'software.amazon.awssdk:apache-client'
 
