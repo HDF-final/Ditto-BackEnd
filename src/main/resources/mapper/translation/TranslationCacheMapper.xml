@@ -96,21 +96,4 @@
            AND status = 'PENDING'
     </update>
 
-    <update id="ensureMonthlyUsage">
-        MERGE INTO translation_monthly_usage target
-        USING (SELECT #{usageMonth} AS usage_month FROM dual) source
-           ON (target.usage_month = source.usage_month)
-        WHEN NOT MATCHED THEN
-            INSERT (usage_month, used_characters, created_at, updated_at)
-            VALUES (source.usage_month, 0, SYSTIMESTAMP, SYSTIMESTAMP)
-    </update>
-
-    <update id="reserveCharacters">
-        UPDATE translation_monthly_usage
-           SET used_characters = used_characters + #{characters},
-               updated_at = SYSTIMESTAMP
-         WHERE usage_month = #{usageMonth}
-           AND used_characters + #{characters} &lt;= #{monthlyLimit}
-    </update>
-
 </mapper>

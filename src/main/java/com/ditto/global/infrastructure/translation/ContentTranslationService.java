@@ -6,7 +6,6 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.time.YearMonth;
 import java.util.HexFormat;
 
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -88,14 +87,6 @@ public class ContentTranslationService {
                         : sourceText;
             }
 
-            long characters = sourceText.codePointCount(0, sourceText.length());
-            if (!reserveMonthlyBudget(characters, now)) {
-                markFailure(
-                        sourceType, sourceKey, sourceField, targetLanguage, sourceHash,
-                        firstMomentOfNextMonth(now), "MONTHLY_CHARACTER_LIMIT_REACHED");
-                return sourceText;
-            }
-
             String translatedText = textTranslator.translate(sourceText, targetLanguage);
             if (!StringUtils.hasText(translatedText)) {
                 markFailure(
@@ -133,16 +124,6 @@ public class ContentTranslationService {
                     exception.getClass().getSimpleName());
             return sourceText;
         }
-    }
-
-    private boolean reserveMonthlyBudget(long characters, LocalDateTime now) {
-        if (characters <= 0 || characters > properties.getMonthlyCharacterLimit()) {
-            return false;
-        }
-        String usageMonth = YearMonth.from(now).toString();
-        translationCacheMapper.ensureMonthlyUsage(usageMonth);
-        return translationCacheMapper.reserveCharacters(
-                usageMonth, characters, properties.getMonthlyCharacterLimit()) == 1;
     }
 
     private void safelyMarkFailure(
@@ -194,13 +175,6 @@ public class ContentTranslationService {
                 ? maxSeconds
                 : Math.min(baseSeconds * multiplier, maxSeconds);
         return now.plusSeconds(delaySeconds);
-    }
-
-    private LocalDateTime firstMomentOfNextMonth(LocalDateTime now) {
-        return YearMonth.from(now)
-                .plusMonths(1)
-                .atDay(1)
-                .atStartOfDay();
     }
 
     private int previousFailureCount(TranslationCacheEntry cached, String sourceHash) {

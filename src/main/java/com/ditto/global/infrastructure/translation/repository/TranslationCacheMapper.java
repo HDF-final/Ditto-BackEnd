@@ -44,10 +44,4 @@ public interface TranslationCacheMapper {
             @Param("retryAfter") java.time.LocalDateTime retryAfter,
             @Param("lastError") String lastError);
 
-    int ensureMonthlyUsage(@Param("usageMonth") String usageMonth);
-
-    int reserveCharacters(
-            @Param("usageMonth") String usageMonth,
-            @Param("characters") long characters,
-            @Param("monthlyLimit") long monthlyLimit);
 }

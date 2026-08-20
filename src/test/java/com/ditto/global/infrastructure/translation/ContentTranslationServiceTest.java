@@ -60,7 +60,6 @@ class ContentTranslationServiceTest {
 
         assertThat(result).isEqualTo("Hello");
         verify(textTranslator, never()).translate(anyString(), any());
-        verify(translationCacheMapper, never()).reserveCharacters(anyString(), anyLong(), anyLong());
     }
 
     @Test
@@ -69,8 +68,6 @@ class ContentTranslationServiceTest {
                 .thenReturn(null);
         when(translationCacheMapper.claim(
                 anyString(), anyString(), anyString(), anyString(), anyString(), anyLong()))
-                .thenReturn(1);
-        when(translationCacheMapper.reserveCharacters("2026-08", 5, 2_000_000L))
                 .thenReturn(1);
         when(textTranslator.translate("안녕하세요", ContentLanguage.ENGLISH)).thenReturn("Hello");
 
@@ -89,8 +86,6 @@ class ContentTranslationServiceTest {
         when(translationCacheMapper.claim(
                 anyString(), anyString(), anyString(), anyString(), anyString(), anyLong()))
                 .thenReturn(1);
-        when(translationCacheMapper.reserveCharacters("2026-08", 2, 2_000_000L))
-                .thenReturn(1);
         when(textTranslator.translate("원문", ContentLanguage.JAPANESE))
                 .thenThrow(new IllegalStateException("network failure"));
 
@@ -104,26 +99,6 @@ class ContentTranslationServiceTest {
                 any(LocalDateTime.class), anyString());
         verify(translationCacheMapper, never()).markSuccess(
                 anyString(), anyString(), anyString(), anyString(), anyString(), anyString());
-    }
-
-    @Test
-    void monthlyLimitStopsAwsCallAndFallsBackToSource() {
-        when(translationCacheMapper.find(anyString(), anyString(), anyString(), anyString()))
-                .thenReturn(null);
-        when(translationCacheMapper.claim(
-                anyString(), anyString(), anyString(), anyString(), anyString(), anyLong()))
-                .thenReturn(1);
-        when(translationCacheMapper.reserveCharacters("2026-08", 2, 2_000_000L))
-                .thenReturn(0);
-
-        String result = service.translate(
-                "course", "2", "name", "코스", ContentLanguage.ENGLISH);
-
-        assertThat(result).isEqualTo("코스");
-        verify(textTranslator, never()).translate(anyString(), any());
-        verify(translationCacheMapper).markFailure(
-                anyString(), anyString(), anyString(), anyString(), anyString(),
-                any(LocalDateTime.class), anyString());
     }
 
     @Test
@@ -154,8 +129,6 @@ class ContentTranslationServiceTest {
                 .thenReturn(stale);
         when(translationCacheMapper.claim(
                 anyString(), anyString(), anyString(), anyString(), anyString(), anyLong()))
-                .thenReturn(1);
-        when(translationCacheMapper.reserveCharacters("2026-08", 6, 2_000_000L))
                 .thenReturn(1);
         when(textTranslator.translate("새로운 원문", ContentLanguage.ENGLISH))
                 .thenReturn("New translation");

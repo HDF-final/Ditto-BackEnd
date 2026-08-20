@@ -14,7 +14,6 @@ public class TranslationProperties {
 
     private boolean enabled;
     private String region = "ap-northeast-2";
-    private long monthlyCharacterLimit = 2_000_000L;
     private int maxRequestBytes = 9_000;
     private Duration pendingLease = Duration.ofMinutes(2);
     private Duration retryBase = Duration.ofMinutes(5);
