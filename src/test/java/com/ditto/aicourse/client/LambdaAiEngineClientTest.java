@@ -34,7 +34,7 @@ class LambdaAiEngineClientTest {
         lambdaClient = mock(LambdaClient.class);
         AiEngineProperties properties = new AiEngineProperties();
         properties.setMode(AiEngineProperties.Mode.LAMBDA);
-        properties.setFunctionName("ditto-chat");
+        properties.setFunctionName("ditto-chat-v2");
         client = new LambdaAiEngineClient(lambdaClient, properties, new ObjectMapper());
     }
 
@@ -65,7 +65,7 @@ class LambdaAiEngineClientTest {
         org.mockito.Mockito.verify(lambdaClient).invoke(captor.capture());
         InvokeRequest sent = captor.getValue();
 
-        assertThat(sent.functionName()).isEqualTo("ditto-chat");
+        assertThat(sent.functionName()).isEqualTo("ditto-chat-v2");
         // Function URL 이 아니라 직접 호출이므로 이벤트가 곧 본문이다.
         // requestContext 를 싣지 않아야 핸들러가 invoke 경로로 처리한다.
         assertThat(sent.payload().asUtf8String())
@@ -102,6 +102,49 @@ class LambdaAiEngineClientTest {
         assertThatThrownBy(() -> client.chat(null, "안녕"))
                 .isInstanceOf(BusinessException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.AI_SERVICE_ERROR);
+    }
+
+    @Test
+    @DisplayName("엔진이 {\"error\"} 를 200 으로 돌려줘도 정상 응답으로 삼지 않는다")
+    void rejectsErrorPayload() {
+        // ditto-chat-v2 는 실패를 예외로 올리지 않는다. HTTP 200, functionError 없음,
+        // 본문만 {"error": ...} 다. 이걸 놓치면 필드가 전부 null 인 코스가
+        // success:true 로 손님에게 나간다.
+        stubPayload("{\"error\":\"message 가 비어 있습니다\"}");
+
+        assertThatThrownBy(() -> client.chat(null, "안녕"))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.AI_SERVICE_ERROR);
+    }
+
+    @Test
+    @DisplayName("engine 을 안 정하면 필드를 아예 싣지 않는다 — 엔진 기본값을 쓰게")
+    void omitsEngineWhenUnset() {
+        stubPayload("{\"session\":\"s\",\"reply\":\"r\",\"turn\":1,\"places\":[]}");
+
+        client.chat(null, "코스 짜줘");
+
+        assertThat(sentPayload()).doesNotContain("engine");
+    }
+
+    @Test
+    @DisplayName("engine 을 정하면 그대로 실어 보낸다")
+    void sendsEngineWhenSet() {
+        AiEngineProperties properties = new AiEngineProperties();
+        properties.setFunctionName("ditto-chat-v2");
+        properties.setEngine("builtin");
+        client = new LambdaAiEngineClient(lambdaClient, properties, new ObjectMapper());
+        stubPayload("{\"session\":\"s\",\"reply\":\"r\",\"turn\":1,\"places\":[]}");
+
+        client.chat(null, "코스 짜줘");
+
+        assertThat(sentPayload()).contains("\"engine\":\"builtin\"");
+    }
+
+    private String sentPayload() {
+        ArgumentCaptor<InvokeRequest> captor = ArgumentCaptor.forClass(InvokeRequest.class);
+        org.mockito.Mockito.verify(lambdaClient).invoke(captor.capture());
+        return captor.getValue().payload().asUtf8String();
     }
 
     private void stubPayload(String json) {

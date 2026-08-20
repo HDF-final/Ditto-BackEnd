@@ -36,6 +36,18 @@ public class PlaceImageResponse {
             example = "cdn.straightnews.co.kr")
     private final String source;
 
-    @Schema(description = "사진 설명", example = "카리나 × Prada")
+    @Schema(description = "사진 설명", example = "카리나 × 프라다")
     private final String caption;
+
+    @Schema(description = "사진이 실려 있던 기사 주소. evidence 사진에만 붙는다. "
+            + "출처를 링크로 걸어 줄 때 쓴다.",
+            example = "https://brunch.co.kr/@jennafashion/8")
+    private final String article;
+
+    @Schema(description = "원본 가로 픽셀. 사진이 뜨기 전에 자리를 잡아 두면 화면이 안 튄다.",
+            example = "1080")
+    private final Integer width;
+
+    @Schema(description = "원본 세로 픽셀", example = "1350")
+    private final Integer height;
 }

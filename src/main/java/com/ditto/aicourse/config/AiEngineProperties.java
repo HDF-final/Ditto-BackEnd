@@ -27,8 +27,16 @@ public class AiEngineProperties {
     /** HTTP 모드 전용. 대화 요청 경로 */
     private String chatPath = "/chat";
 
-    /** LAMBDA 모드 전용. 호출할 함수 이름 또는 ARN. 예: {@code ditto-chat} */
+    /** LAMBDA 모드 전용. 호출할 함수 이름 또는 ARN. 예: {@code ditto-chat-v2} */
     private String functionName;
+
+    /**
+     * LAMBDA 모드 전용. 셀럽 조사 방식 — {@code tavily}(웹 검색) 또는 {@code builtin}(모델 지식).
+     *
+     * <p>비워 두면 요청에 안 싣고 엔진 기본값({@code tavily})을 따른다.
+     * Tavily 가 느리거나 막힐 때 재배포 없이 {@code builtin} 으로 되돌리는 손잡이다.
+     */
+    private String engine;
 
     /** LAMBDA 모드 전용. 함수가 있는 리전 */
     private String region = "ap-northeast-2";
