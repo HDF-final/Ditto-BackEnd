@@ -26,6 +26,12 @@ public class RecommendedPlaceResponse {
             example = "프라다")
     private final String placeName;
 
+    @Schema(description = "장소 종류. 아이콘·필터에 쓰라고 4가지로 묶어서 준다. "
+            + "엔진 쪽 세부 카테고리는 23종이지만 화면에 걸기엔 너무 잘아 묶은 값이다.",
+            allowableValues = {"매장", "음식점", "카페", "여가"},
+            example = "매장")
+    private final String category;
+
     @Schema(description = "이 장소를 코스에 넣은 이유",
             example = "카리나가 2024년부터 프라다 앰버서더로 활동하며 평소에도 애정을 보여 "
                     + "럭셔리 브랜드를 첫 코스로 잡았습니다.")

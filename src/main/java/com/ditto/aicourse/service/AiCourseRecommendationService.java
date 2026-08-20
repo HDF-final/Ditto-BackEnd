@@ -72,6 +72,7 @@ public class AiCourseRecommendationService {
                 .map(place -> RecommendedPlaceResponse.builder()
                         .navigationKey(place.getNavigationKey())
                         .placeName(place.getPlaceName())
+                        .category(place.getCategory())
                         .reason(place.getReason())
                         .imageUrl(place.resolveImageUrl())
                         .image(toImageResponse(place.getImage()))

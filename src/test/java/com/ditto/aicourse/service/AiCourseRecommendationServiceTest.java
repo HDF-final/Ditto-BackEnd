@@ -152,6 +152,35 @@ class AiCourseRecommendationServiceTest {
         assertThat(response.getMetrics().getInputTokens()).isNull();
     }
 
+    @Test
+    @DisplayName("장소 4분류를 그대로 내보낸다 — 매장·음식점·카페·여가")
+    void keepsPlaceCategory() throws IOException {
+        // ditto-chat-v2 를 실제로 호출해 받은 한 턴에서 네 종류가 다 나온 것을 옮겼다.
+        stub("""
+                {"session":"s","reply":"r","turn":1,"places":[
+                  {"place_name":"프라다","navigation_key":"1F_STORE_0035","category":"매장","reason":"a"},
+                  {"place_name":"나의 가야","navigation_key":"6F_STORE_0035","category":"음식점","reason":"b"},
+                  {"place_name":"스타벅스 리저브","navigation_key":"B2_STORE_0028","category":"카페","reason":"c"},
+                  {"place_name":"에픽서울","navigation_key":"5F_STORE_0047","category":"여가","reason":"d"}]}
+                """);
+
+        CourseChatResponse response = service.chat(1L,
+                CourseChatRequest.builder().message("밥이랑 커피랑 전시").build());
+
+        assertThat(response.getPlaces())
+                .extracting(RecommendedPlaceResponse::getCategory)
+                .containsExactly("매장", "음식점", "카페", "여가");
+    }
+
+    @Test
+    @DisplayName("엔진이 category 를 안 주던 시절 응답도 그대로 흘려보낸다")
+    void toleratesMissingCategory() throws IOException {
+        stub("{\"session\":\"s\",\"reply\":\"r\",\"turn\":1,"
+                + "\"places\":[{\"place_name\":\"프라다\",\"navigation_key\":\"1F_STORE_0035\"}]}");
+
+        assertThat(firstPlace().getCategory()).isNull();
+    }
+
     private RecommendedPlaceResponse firstPlace() {
         CourseChatResponse response = service.chat(1L,
                 CourseChatRequest.builder().message("카리나 좋아하는 브랜드 보고 싶어").build());
