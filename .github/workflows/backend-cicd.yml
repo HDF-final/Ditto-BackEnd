@@ -136,6 +136,9 @@ jobs:
           COMPOSE_EOF
 
           echo "${ENV_B64}" | base64 -d > "\$APP_DIR/.env"
+          # ENV_FILE_CONTENT may not end with a newline. Ensure the appended
+          # deployment variables always start on their own line.
+          printf '\n' >> "\$APP_DIR/.env"
           sed -i \
             -e '/^AWS_TRANSLATE_ENABLED=/d' \
             -e '/^AWS_TRANSLATE_REGION=/d' \
@@ -145,9 +148,16 @@ jobs:
           AWS_TRANSLATE_REGION=${TRANSLATE_REGION}
           TRANSLATE_ENV_EOF
 
+          grep -Fqx "AWS_TRANSLATE_ENABLED=${TRANSLATE_ENABLED}" "\$APP_DIR/.env"
+          grep -Fqx "AWS_TRANSLATE_REGION=${TRANSLATE_REGION}" "\$APP_DIR/.env"
+
           /usr/local/bin/aws ecr get-login-password --region "\$AWS_REGION" | docker login --username AWS --password-stdin "\$ECR_REGISTRY"
           docker compose -f "\$APP_DIR/docker-compose.yml" pull
           docker compose -f "\$APP_DIR/docker-compose.yml" up -d
+          docker inspect ditto-backend --format '{{range .Config.Env}}{{println .}}{{end}}' \
+            | grep -Fqx "AWS_TRANSLATE_ENABLED=${TRANSLATE_ENABLED}"
+          docker inspect ditto-backend --format '{{range .Config.Env}}{{println .}}{{end}}' \
+            | grep -Fqx "AWS_TRANSLATE_REGION=${TRANSLATE_REGION}"
           EOF
 
           ENCODED_USER_DATA=$(base64 -w 0 /tmp/user_data.sh)
