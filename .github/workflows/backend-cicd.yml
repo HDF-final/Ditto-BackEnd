@@ -80,9 +80,13 @@ jobs:
         id: create-lt
         env:
           ENV_CONTENT: ${{ secrets.ENV_FILE_CONTENT }}
+          TRANSLATE_ENABLED: ${{ vars.AWS_TRANSLATE_ENABLED }}
+          TRANSLATE_REGION: ${{ vars.AWS_TRANSLATE_REGION }}
         shell: bash
         run: |
           ENV_B64=$(echo -n "$ENV_CONTENT" | base64 -w 0)
+          TRANSLATE_ENABLED=${TRANSLATE_ENABLED:-false}
+          TRANSLATE_REGION=${TRANSLATE_REGION:-ap-northeast-2}
 
           cat << EOF > /tmp/user_data.sh
           #!/bin/bash
@@ -132,6 +136,14 @@ jobs:
           COMPOSE_EOF
 
           echo "${ENV_B64}" | base64 -d > "\$APP_DIR/.env"
+          sed -i \
+            -e '/^AWS_TRANSLATE_ENABLED=/d' \
+            -e '/^AWS_TRANSLATE_REGION=/d' \
+            "\$APP_DIR/.env"
+          cat << 'TRANSLATE_ENV_EOF' >> "\$APP_DIR/.env"
+          AWS_TRANSLATE_ENABLED=${TRANSLATE_ENABLED}
+          AWS_TRANSLATE_REGION=${TRANSLATE_REGION}
+          TRANSLATE_ENV_EOF
 
           /usr/local/bin/aws ecr get-login-password --region "\$AWS_REGION" | docker login --username AWS --password-stdin "\$ECR_REGISTRY"
           docker compose -f "\$APP_DIR/docker-compose.yml" pull

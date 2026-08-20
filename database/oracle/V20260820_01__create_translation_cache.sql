@@ -29,16 +29,5 @@ CREATE TABLE content_translation (
 CREATE INDEX ix_content_translation_retry
     ON content_translation (status, retry_after, lease_until);
 
-CREATE TABLE translation_monthly_usage (
-    usage_month       VARCHAR2(7 CHAR) NOT NULL,
-    used_characters   NUMBER(19)       DEFAULT 0 NOT NULL,
-    created_at        TIMESTAMP        DEFAULT SYSTIMESTAMP NOT NULL,
-    updated_at        TIMESTAMP        DEFAULT SYSTIMESTAMP NOT NULL,
-    CONSTRAINT pk_translation_monthly_usage PRIMARY KEY (usage_month),
-    CONSTRAINT ck_translation_usage_chars CHECK (used_characters >= 0)
-);
-
 COMMENT ON TABLE content_translation IS
     'Amazon Translate 결과 캐시. 원문 해시 변경 시 같은 키의 번역을 갱신한다.';
-COMMENT ON TABLE translation_monthly_usage IS
-    '월별 Amazon Translate 요청 문자 예약량. YYYY-MM 단위로 집계한다.';
