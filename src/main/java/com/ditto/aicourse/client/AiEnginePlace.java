@@ -35,6 +35,15 @@ public class AiEnginePlace {
     @JsonProperty("place_name")
     private String placeName;
 
+    /**
+     * 화면용 4분류 — {@code 매장} · {@code 음식점} · {@code 카페} · {@code 여가}.
+     *
+     * <p>엔진 DB 카테고리는 23종(여성패션·컨템포러리·베이커리…)이라 화면 필터로 쓰기엔
+     * 너무 잘아서, 엔진이 묶어서 내려준다.
+     */
+    @JsonProperty("category")
+    private String category;
+
     @JsonProperty("reason")
     private String reason;
 
