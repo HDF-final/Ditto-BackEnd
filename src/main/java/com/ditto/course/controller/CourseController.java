@@ -1,6 +1,7 @@
 package com.ditto.course.controller;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpHeaders;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -9,6 +10,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -24,6 +26,7 @@ import com.ditto.course.dto.response.UpdateCourseResponse;
 import com.ditto.course.service.CourseService;
 import com.ditto.global.common.response.ApiResponse;
 import com.ditto.global.common.response.PageResponse;
+import com.ditto.global.i18n.AcceptLanguageResolver;
 import com.ditto.security.SecurityUtils;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -62,9 +65,14 @@ public class CourseController {
             @Parameter(description = "페이지 번호(0부터 시작)", example = "0")
             @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "페이지 크기(1~100, 기본 20)", example = "20")
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "20") int size,
+            @RequestHeader(name = HttpHeaders.ACCEPT_LANGUAGE, required = false) String acceptLanguage) {
         return ApiResponse.success("성공",
-                courseService.getMyCourses(SecurityUtils.requireUserId(), page, size));
+                courseService.getMyCourses(
+                        SecurityUtils.requireUserId(),
+                        page,
+                        size,
+                        AcceptLanguageResolver.resolve(acceptLanguage)));
     }
 
     @Operation(
@@ -73,9 +81,13 @@ public class CourseController {
     @GetMapping("/{courseId}")
     public ApiResponse<CourseDetailResponse> getDetail(
             @Parameter(description = "조회할 코스 ID", example = "3")
-            @PathVariable Long courseId) {
+            @PathVariable Long courseId,
+            @RequestHeader(name = HttpHeaders.ACCEPT_LANGUAGE, required = false) String acceptLanguage) {
         return ApiResponse.success("성공",
-                courseService.getDetail(SecurityUtils.requireUserId(), courseId));
+                courseService.getDetail(
+                        SecurityUtils.requireUserId(),
+                        courseId,
+                        AcceptLanguageResolver.resolve(acceptLanguage)));
     }
 
     @Operation(

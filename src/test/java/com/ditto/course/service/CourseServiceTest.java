@@ -40,6 +40,8 @@ import com.ditto.course.repository.CourseMapper.CoursePlaceInsertCommand;
 import com.ditto.course.repository.PlaceMapper;
 import com.ditto.global.common.response.PageResponse;
 import com.ditto.global.infrastructure.s3.S3Provider;
+import com.ditto.global.infrastructure.translation.ContentTranslationService;
+import com.ditto.global.i18n.ContentLanguage;
 import com.ditto.global.exception.BusinessException;
 import com.ditto.global.exception.ErrorCode;
 
@@ -56,6 +58,9 @@ class CourseServiceTest {
 
     @Mock
     private S3Provider s3Provider;
+
+    @Mock
+    private ContentTranslationService contentTranslationService;
 
     @InjectMocks
     private CourseService courseService;
@@ -204,6 +209,37 @@ class CourseServiceTest {
         assertThat(response.getPlaces().get(0).getVisitStatus()).isEqualTo(VisitStatus.PENDING.name());
         assertThat(response.getPlaces().get(0).getVisitedAt()).isNull();
         verify(courseMapper, never()).existsPublicPostByCourseId(5L);
+    }
+
+    @Test
+    @DisplayName("코스·장소의 화면용 텍스트를 요청 언어로 번역한다")
+    void localizesCourseAndPlaceFields() {
+        Course course = Course.of(5L, USER_ID, null, "나의 코스", "설명", "MANUAL", "ABCD1234");
+        CoursePlaceResponse place = new CoursePlaceResponse(
+                11L, "템버린즈", null, "1F", 1, "향수 브랜드",
+                VisitStatus.PENDING.name(), null);
+        given(courseMapper.findById(5L)).willReturn(Optional.of(course));
+        given(courseMapper.findPlacesByCourseId(5L)).willReturn(List.of(place));
+        given(contentTranslationService.translate(
+                "course", "5", "name", "나의 코스", ContentLanguage.ENGLISH))
+                .willReturn("My Course");
+        given(contentTranslationService.translate(
+                "course", "5", "description", "설명", ContentLanguage.ENGLISH))
+                .willReturn("Description");
+        given(contentTranslationService.translate(
+                "place", "11", "name", "템버린즈", ContentLanguage.ENGLISH))
+                .willReturn("Tamburins");
+        given(contentTranslationService.translate(
+                "course_place", "5:11", "recommendation_reason", "향수 브랜드", ContentLanguage.ENGLISH))
+                .willReturn("Fragrance brand");
+
+        CourseDetailResponse response = courseService.getDetail(USER_ID, 5L, ContentLanguage.ENGLISH);
+
+        assertThat(response.getName()).isEqualTo("My Course");
+        assertThat(response.getDescription()).isEqualTo("Description");
+        assertThat(response.getPlaces().get(0).getName()).isEqualTo("Tamburins");
+        assertThat(response.getPlaces().get(0).getRecommendationReason())
+                .isEqualTo("Fragrance brand");
     }
 
     @Test

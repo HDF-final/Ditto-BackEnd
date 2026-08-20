@@ -903,6 +903,15 @@ AWS_S3_PREFIX=images
 AWS_S3_PUBLIC_BASE_URL=
 AWS_S3_PRESIGNED_URL_EXPIRATION=30m
 
+# Amazon Translate 동적 콘텐츠 번역
+AWS_TRANSLATE_ENABLED=false
+AWS_TRANSLATE_REGION=ap-northeast-2
+AWS_TRANSLATE_MONTHLY_CHARACTER_LIMIT=2000000
+AWS_TRANSLATE_MAX_REQUEST_BYTES=9000
+AWS_TRANSLATE_PENDING_LEASE=2m
+AWS_TRANSLATE_RETRY_BASE=5m
+AWS_TRANSLATE_RETRY_MAX=24h
+
 # AWS RDS PostgreSQL (RAG 계층)
 PG_HOST=CHANGE_ME.rds.amazonaws.com
 PG_USER=postgres
@@ -976,6 +985,42 @@ String imageUrl = s3Provider.getImageUrl(imageKey); // API 응답 시 URL로 변
 - 최대 크기: 10MB
 - 기본 key 형식: `images/{directory}/{yyyy-MM-dd}/{uuid}.{extension}`
 - `AWS_S3_PUBLIC_BASE_URL`이 비어 있으면 30분짜리 Presigned GET URL을 생성합니다.
+
+### 동적 콘텐츠 다국어 번역
+
+뉴스, 코스, 길찾기 장소 조회 API는 `Accept-Language`를 읽어 `ko`, `zh`, `ja`, `en`을 지원합니다.
+헤더가 없거나 값이 잘못됐거나 지원하지 않는 언어이면 기존 한국어 원문을 반환합니다.
+
+| 응답 영역 | 번역 필드 |
+| --- | --- |
+| 뉴스피드 | 제목, 본문, 요약 |
+| 코스 | 코스명, 코스 설명, 장소명, 추천 이유 |
+| 길찾기 장소 | 장소명, 장소 설명 |
+
+번역을 활성화하기 전에 Oracle에
+[`database/oracle/V20260820_01__create_translation_cache.sql`](./database/oracle/V20260820_01__create_translation_cache.sql)을
+한 번 적용합니다. MyBatis는 자동 DDL을 실행하지 않으므로 배포 파이프라인 또는 DBA 절차에서 명시적으로 실행해야 합니다.
+
+```bash
+AWS_TRANSLATE_ENABLED=true
+AWS_TRANSLATE_REGION=ap-northeast-2
+AWS_TRANSLATE_MONTHLY_CHARACTER_LIMIT=2000000
+```
+
+동작 원칙은 다음과 같습니다.
+
+1. 한국어 원문의 SHA-256 해시와 대상 언어로 Oracle 캐시를 조회합니다.
+2. 같은 원문은 저장된 번역을 반환하고 Amazon Translate를 다시 호출하지 않습니다.
+3. 원문이 바뀌면 해시 불일치로 감지해 새 번역으로 캐시를 갱신합니다.
+4. 실패는 빈 문자열이나 0으로 저장하지 않습니다. 재시도 시각까지 한국어 원문을 반환합니다.
+5. 월 문자 예약량이 설정 상한을 넘으면 외부 호출 없이 한국어 원문을 반환합니다.
+6. 긴 본문은 UTF-8 바이트 경계를 지키는 조각으로 나눠 번역하고 한 캐시 항목으로 저장합니다.
+
+AWS access key와 secret key는 저장소나 `.env`에 넣지 않습니다. 로컬에서는 AWS 기본 profile을,
+배포 EC2에서는 `HDF-Backend-EC2-Role`의 `translate:TranslateText` 권한을 SDK 기본 자격 증명 체인이 사용합니다.
+
+`2,000,000`자는 애플리케이션 비용 보호 상한입니다. [Amazon Translate 공식 요금표](https://aws.amazon.com/translate/pricing/)의
+월 200만 자 무료 구간은 첫 번역 요청 후 12개월 동안만 제공되므로, 무료 기간 종료 뒤에도 이 값을 비용 정책에 맞춰 직접 관리해야 합니다.
 - 로컬은 AWS profile, 운영 EC2는 IAM Role을 사용하며 access key를 저장소에 넣지 않습니다.
 
 ## 기타 기본 설정

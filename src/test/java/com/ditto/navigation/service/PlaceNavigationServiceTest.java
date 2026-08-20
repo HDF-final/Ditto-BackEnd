@@ -15,6 +15,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import com.ditto.global.exception.BusinessException;
 import com.ditto.global.exception.ErrorCode;
 import com.ditto.global.infrastructure.s3.S3Provider;
+import com.ditto.global.infrastructure.translation.ContentTranslationService;
+import com.ditto.global.i18n.ContentLanguage;
 import com.ditto.navigation.dto.response.PlaceNavigationResponse;
 import com.ditto.navigation.repository.PlaceNavigationMapper;
 import com.ditto.navigation.repository.PlaceNavigationMapper.PlaceNavigationRow;
@@ -27,6 +29,9 @@ class PlaceNavigationServiceTest {
 
     @Mock
     private S3Provider s3Provider;
+
+    @Mock
+    private ContentTranslationService contentTranslationService;
 
     @InjectMocks
     private PlaceNavigationService placeNavigationService;
@@ -47,6 +52,25 @@ class PlaceNavigationServiceTest {
         assertThat(result.get(0).getFloorCode()).isEqualTo("B2");
         assertThat(result.get(0).getImageUrl())
                 .isEqualTo("https://cdn.example.com/place-picture/11_MLB.jpg");
+    }
+
+    @Test
+    void localizesPlaceNameAndDescription() {
+        PlaceNavigationRow row = row(11L, "B2_STORE_0032", "매장", "B2", null);
+        row.setDescription("설명");
+        given(placeNavigationMapper.findByPlaceId(11L)).willReturn(row);
+        given(contentTranslationService.translate(
+                "place", "11", "name", "매장", ContentLanguage.JAPANESE))
+                .willReturn("店舗");
+        given(contentTranslationService.translate(
+                "place", "11", "description", "설명", ContentLanguage.JAPANESE))
+                .willReturn("説明");
+
+        PlaceNavigationResponse result = placeNavigationService.getNavigationByPlaceId(
+                11L, ContentLanguage.JAPANESE);
+
+        assertThat(result.getName()).isEqualTo("店舗");
+        assertThat(result.getDescription()).isEqualTo("説明");
     }
 
     @Test
