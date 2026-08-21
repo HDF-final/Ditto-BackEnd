@@ -58,7 +58,7 @@ public class ClovaOcrClient {
                     .retrieve()
                     .body(ClovaOcrResponse.class);
 
-            return extractBrand(response);
+            return extractWords(response);
 
         } catch (RestClientException e) {
             log.error("CLOVA OCR 호출 실패. cause={}", e.getMessage());
@@ -101,10 +101,11 @@ public class ClovaOcrClient {
     }
 
     /**
-     * 응답 필드 중 바운딩 박스 면적이 가장 큰 글자를 브랜드명으로 채택한다.
-     * 간판에서 가장 큰 글자가 상호일 가능성이 높다는 휴리스틱이다.
+     * 인식된 텍스트 조각들을 바운딩 박스 면적(간판에서의 도드라짐) 내림차순으로 추린다.
+     * 가장 큰 글자만 쓰지 않고 상위 여러 조각을 후보로 넘겨, 브랜드명이 최대 크기가
+     * 아니거나 여러 줄로 쪼개진 경우에도 매칭이 가능하게 한다.
      */
-    private ClovaOcrResult extractBrand(ClovaOcrResponse response) {
+    private ClovaOcrResult extractWords(ClovaOcrResponse response) {
         if (response == null || response.getImages() == null || response.getImages().isEmpty()) {
             return ClovaOcrResult.empty();
         }
@@ -113,13 +114,15 @@ public class ClovaOcrClient {
             return ClovaOcrResult.empty();
         }
 
-        return image.getFields().stream()
+        List<RecognizedWord> words = image.getFields().stream()
                 .filter(f -> StringUtils.hasText(f.getInferText()))
-                .max(Comparator.comparingDouble(this::area))
-                .map(f -> new ClovaOcrResult(
+                .map(f -> new RecognizedWord(
                         f.getInferText().trim(),
-                        f.getInferConfidence() == null ? 0.0 : f.getInferConfidence()))
-                .orElse(ClovaOcrResult.empty());
+                        f.getInferConfidence() == null ? 0.0 : f.getInferConfidence(),
+                        area(f)))
+                .sorted(Comparator.comparingDouble(RecognizedWord::getArea).reversed())
+                .toList();
+        return new ClovaOcrResult(words);
     }
 
     /** 바운딩 박스 꼭짓점으로 사각형 면적을 근사한다(폭 × 높이). */

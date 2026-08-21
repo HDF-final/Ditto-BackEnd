@@ -11,17 +11,19 @@
     </select>
 
     <!--
-      브랜드명으로 상호를 부분 일치 검색한다. OCR 텍스트(예: TAMBURINS)가 상호에
-      섞여 있어도 잡히도록 대소문자를 무시하고 LIKE 로 매칭한다.
+      정규화된 인식 텍스트로 상호를 부분 일치 검색한다. 상호도 같은 규칙으로 정규화
+      (영숫자·한글만 남기고 대문자화)해 양쪽을 맞춘 뒤 LIKE 로 매칭한다. 최종 유사도
+      랭킹은 애플리케이션(OcrPlaceMatcher)에서 수행하므로 여기서는 후보만 넉넉히 추린다.
     -->
-    <select id="findCandidatesByBrandName"
+    <select id="findCandidatesByNormalizedName"
             resultType="com.ditto.ocr.repository.OcrPlaceMapper$CandidateRow">
         SELECT p.place_id,
                p.name,
                f.floor_code AS floor
           FROM place p
           JOIN floor f ON f.floor_id = p.floor_id
-         WHERE UPPER(p.name) LIKE '%' || UPPER(#{brandName}) || '%'
+         WHERE UPPER(REGEXP_REPLACE(p.name, '[^0-9A-Za-z가-힣]', ''))
+               LIKE '%' || #{norm} || '%'
          ORDER BY p.name
          FETCH FIRST #{limit} ROWS ONLY
     </select>
