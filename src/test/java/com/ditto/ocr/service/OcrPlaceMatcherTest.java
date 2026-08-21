@@ -107,4 +107,27 @@ class OcrPlaceMatcherTest {
     void oneCharTypoStaysSimilar() {
         assertThat(TextSimilarity.similarity("EATALX", "EATALY")).isGreaterThan(0.8);
     }
+
+    @Test
+    @DisplayName("영어 간판(EATALY)이 별칭 사전으로 한글 상호(이탈리)에 매칭된다")
+    void englishSignMatchesKoreanPlaceViaAlias() {
+        OcrPlaceMatcher matcher = matcherWith(row(122L, "이탈리"));
+
+        List<OcrCandidateResponse> result = matcher.match(
+                words(new RecognizedWord("EATALY", 0.95, 3000)), 3, 5);
+
+        assertThat(result).extracting(OcrCandidateResponse::getPlaceId).containsExactly(122L);
+    }
+
+    @Test
+    @DisplayName("별칭이 상호 핵심 토큰이면 접미사가 붙은 상호에도 매칭된다")
+    void aliasMatchesPlaceWithSuffix() {
+        // NIKE → 나이키, place 는 "나이키 라이즈"
+        OcrPlaceMatcher matcher = matcherWith(row(3L, "나이키 라이즈"));
+
+        List<OcrCandidateResponse> result = matcher.match(
+                words(new RecognizedWord("NIKE", 0.9, 4000)), 3, 5);
+
+        assertThat(result).extracting(OcrCandidateResponse::getPlaceId).containsExactly(3L);
+    }
 }
