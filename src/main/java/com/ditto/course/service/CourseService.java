@@ -9,6 +9,7 @@ import java.util.Set;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.util.StringUtils;
 
 import com.ditto.course.domain.Course;
@@ -33,6 +34,8 @@ import com.ditto.global.common.response.PageResponse;
 import com.ditto.global.exception.BusinessException;
 import com.ditto.global.exception.ErrorCode;
 import com.ditto.global.infrastructure.s3.S3Provider;
+import com.ditto.global.i18n.ContentLanguage;
+import com.ditto.global.infrastructure.translation.ContentTranslationService;
 
 import lombok.RequiredArgsConstructor;
 
@@ -51,6 +54,7 @@ public class CourseService {
     private final CourseMapper courseMapper;
     private final PlaceMapper placeMapper;
     private final S3Provider s3Provider;
+    private final ContentTranslationService contentTranslationService;
     private final SecureRandom secureRandom = new SecureRandom();
 
     /**
@@ -72,6 +76,23 @@ public class CourseService {
         List<MyCourseSummaryResponse> content = courseMapper.findSummariesByUserId(userId, offset, safeSize);
         long totalElements = courseMapper.countByUserId(userId);
         return new PageResponse<>(content, safePage, totalElements);
+    }
+
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public PageResponse<MyCourseSummaryResponse> getMyCourses(
+            Long userId,
+            int page,
+            int size,
+            ContentLanguage language) {
+        PageResponse<MyCourseSummaryResponse> response = getMyCourses(userId, page, size);
+        if (language == null || !language.requiresTranslation()) {
+            return response;
+        }
+        for (MyCourseSummaryResponse course : response.getContent()) {
+            course.setName(contentTranslationService.translate(
+                    "course", String.valueOf(course.getCourseId()), "name", course.getName(), language));
+        }
+        return response;
     }
 
     /**
@@ -99,6 +120,38 @@ public class CourseService {
             place.setImageUrl(s3Provider.resolveImageUrl(place.getImageUrl()));
         }
         return CourseDetailResponse.from(course, places);
+    }
+
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public CourseDetailResponse getDetail(Long userId, Long courseId, ContentLanguage language) {
+        CourseDetailResponse response = getDetail(userId, courseId);
+        if (language == null || !language.requiresTranslation()) {
+            return response;
+        }
+
+        String courseKey = String.valueOf(response.getCourseId());
+        for (CoursePlaceResponse place : response.getPlaces()) {
+            String placeKey = String.valueOf(place.getPlaceId());
+            place.setName(contentTranslationService.translate(
+                    "place", placeKey, "name", place.getName(), language));
+            place.setRecommendationReason(contentTranslationService.translate(
+                    "course_place",
+                    courseKey + ":" + placeKey,
+                    "recommendation_reason",
+                    place.getRecommendationReason(),
+                    language));
+        }
+        return new CourseDetailResponse(
+                response.getCourseId(),
+                contentTranslationService.translate(
+                        "course", courseKey, "name", response.getName(), language),
+                contentTranslationService.translate(
+                        "course", courseKey, "description", response.getDescription(), language),
+                response.getCreationType(),
+                response.getSourceCourseId(),
+                response.getShareCode(),
+                response.getCreatedAt(),
+                response.getPlaces());
     }
 
     /**

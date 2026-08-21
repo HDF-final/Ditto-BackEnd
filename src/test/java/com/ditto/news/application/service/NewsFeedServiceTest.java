@@ -19,6 +19,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.ditto.global.exception.BusinessException;
 import com.ditto.global.exception.ErrorCode;
+import com.ditto.global.infrastructure.translation.ContentTranslationService;
+import com.ditto.global.i18n.ContentLanguage;
 import com.ditto.news.application.port.out.NewsFeedRepository;
 import com.ditto.news.domain.NewsFeed;
 
@@ -28,11 +30,14 @@ class NewsFeedServiceTest {
     @Mock
     private NewsFeedRepository newsFeedRepository;
 
+    @Mock
+    private ContentTranslationService contentTranslationService;
+
     private NewsFeedService newsFeedService;
 
     @BeforeEach
     void setUp() {
-        newsFeedService = new NewsFeedService(newsFeedRepository);
+        newsFeedService = new NewsFeedService(newsFeedRepository, contentTranslationService);
     }
 
     @Test
@@ -54,6 +59,33 @@ class NewsFeedServiceTest {
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getTitle()).isEqualTo("Title 1");
         assertThat(result.get(0).getSlug()).isEqualTo("slug-1");
+    }
+
+    @Test
+    @DisplayName("요청 언어에 맞춰 뉴스 제목·본문·요약을 번역한다")
+    void localizesNewsFeedFields() {
+        NewsFeed feed = NewsFeed.builder()
+                .newsFeedId(1L)
+                .title("제목")
+                .body("본문")
+                .summaries(List.of("요약"))
+                .build();
+        given(newsFeedRepository.findById(1L)).willReturn(Optional.of(feed));
+        given(contentTranslationService.translate(
+                "news_feed", "1", "title", "제목", ContentLanguage.ENGLISH))
+                .willReturn("Title");
+        given(contentTranslationService.translate(
+                "news_feed", "1", "body", "본문", ContentLanguage.ENGLISH))
+                .willReturn("Body");
+        given(contentTranslationService.translate(
+                "news_feed", "1", "summary_0", "요약", ContentLanguage.ENGLISH))
+                .willReturn("Summary");
+
+        NewsFeed result = newsFeedService.getNewsFeedById(1L, ContentLanguage.ENGLISH);
+
+        assertThat(result.getTitle()).isEqualTo("Title");
+        assertThat(result.getBody()).isEqualTo("Body");
+        assertThat(result.getSummaries()).containsExactly("Summary");
     }
 
     @Test

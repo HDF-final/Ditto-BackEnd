@@ -11,6 +11,7 @@ import com.ditto.aicourse.client.AiEngineImage;
 import com.ditto.aicourse.client.AiEnginePlace;
 import com.ditto.aicourse.dto.request.CourseChatRequest;
 import com.ditto.aicourse.dto.response.CourseChatResponse;
+import com.ditto.aicourse.dto.response.CourseMetricsResponse;
 import com.ditto.aicourse.dto.response.PlaceImageResponse;
 import com.ditto.aicourse.dto.response.RecommendedPlaceResponse;
 
@@ -36,14 +37,30 @@ public class AiCourseRecommendationService {
                 aiEngineClient.chat(request.getSessionId(), request.getMessage());
 
         // 대화 내용은 남기지 않는다. 추적에 필요한 것은 누가 몇 번째 턴을 돌았는지다.
-        log.debug("AI 코스 추천 완료. userId={}, turn={}, places={}",
-                userId, engineResponse.getTurn(), sizeOf(engineResponse.getPlaces()));
+        // resumed 가 false 로 이어지면 세션이 안 붙는 것이다 — 매 턴 조사를 다시 돌아
+        // 응답이 느려지고 토큰이 세 배로 뛴다. 그래서 같이 남긴다.
+        log.debug("AI 코스 추천 완료. userId={}, turn={}, places={}, resumed={}, "
+                        + "llmCalls={}, engineSeconds={}, inTokens={}, outTokens={}",
+                userId, engineResponse.getTurn(), sizeOf(engineResponse.getPlaces()),
+                engineResponse.getResumed(), engineResponse.getLlmCalls(),
+                engineResponse.getSeconds(), engineResponse.getInputTokens(),
+                engineResponse.getOutputTokens());
 
         return CourseChatResponse.builder()
                 .sessionId(engineResponse.getSession())
                 .reply(engineResponse.getReply())
                 .turn(engineResponse.getTurn())
                 .places(toPlaceResponses(engineResponse.getPlaces()))
+                .metrics(toMetrics(engineResponse))
+                .build();
+    }
+
+    private CourseMetricsResponse toMetrics(AiEngineChatResponse engineResponse) {
+        return CourseMetricsResponse.builder()
+                .seconds(engineResponse.getSeconds())
+                .llmCalls(engineResponse.getLlmCalls())
+                .inputTokens(engineResponse.getInputTokens())
+                .outputTokens(engineResponse.getOutputTokens())
                 .build();
     }
 
@@ -55,6 +72,7 @@ public class AiCourseRecommendationService {
                 .map(place -> RecommendedPlaceResponse.builder()
                         .navigationKey(place.getNavigationKey())
                         .placeName(place.getPlaceName())
+                        .category(place.getCategory())
                         .reason(place.getReason())
                         .imageUrl(place.resolveImageUrl())
                         .image(toImageResponse(place.getImage()))
@@ -75,6 +93,9 @@ public class AiCourseRecommendationService {
                 .url(image.getUrl())
                 .source(image.getSource())
                 .caption(image.getCaption())
+                .article(image.getArticle())
+                .width(image.getWidth())
+                .height(image.getHeight())
                 .build();
     }
 

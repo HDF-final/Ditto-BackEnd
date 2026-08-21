@@ -3,11 +3,14 @@ package com.ditto.navigation.controller;
 import java.util.List;
 
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.http.HttpHeaders;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestHeader;
 
 import com.ditto.global.common.response.ApiResponse;
+import com.ditto.global.i18n.AcceptLanguageResolver;
 import com.ditto.navigation.dto.response.PlaceNavigationResponse;
 import com.ditto.navigation.service.PlaceNavigationService;
 
@@ -28,15 +31,19 @@ public class PlaceNavigationController {
             summary = "길찾기 가능 장소 목록 조회",
             description = "navigation_key 가 등록된 장소의 placeId·navigationKey·이름·층을 조회합니다.")
     @GetMapping("/navigation")
-    public ApiResponse<List<PlaceNavigationResponse>> getNavigablePlaces() {
-        return ApiResponse.success("성공", placeNavigationService.getNavigablePlaces());
+    public ApiResponse<List<PlaceNavigationResponse>> getNavigablePlaces(
+            @RequestHeader(name = HttpHeaders.ACCEPT_LANGUAGE, required = false) String acceptLanguage) {
+        return ApiResponse.success("성공", placeNavigationService.getNavigablePlaces(
+                AcceptLanguageResolver.resolve(acceptLanguage)));
     }
 
     @Operation(summary = "장소 길찾기 식별자 조회")
     @GetMapping("/{placeId}/navigation")
     public ApiResponse<PlaceNavigationResponse> getNavigationByPlaceId(
             @Parameter(description = "장소 ID", example = "1")
-            @PathVariable Long placeId) {
-        return ApiResponse.success("성공", placeNavigationService.getNavigationByPlaceId(placeId));
+            @PathVariable Long placeId,
+            @RequestHeader(name = HttpHeaders.ACCEPT_LANGUAGE, required = false) String acceptLanguage) {
+        return ApiResponse.success("성공", placeNavigationService.getNavigationByPlaceId(
+                placeId, AcceptLanguageResolver.resolve(acceptLanguage)));
     }
 }

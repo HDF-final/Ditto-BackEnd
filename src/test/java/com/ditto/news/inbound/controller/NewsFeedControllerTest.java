@@ -1,6 +1,7 @@
 package com.ditto.news.inbound.controller;
 
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -22,6 +23,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import com.ditto.news.application.service.NewsFeedService;
 import com.ditto.news.domain.NewsFeed;
 import com.ditto.news.inbound.rest.api.NewsFeedController;
+import com.ditto.global.i18n.ContentLanguage;
 import com.ditto.security.SecurityConfig;
 
 @WebMvcTest(
@@ -52,7 +54,8 @@ class NewsFeedControllerTest {
                 .createdAt(LocalDateTime.now())
                 .build();
 
-        given(newsFeedService.getNewsFeeds(anyInt(), anyInt())).willReturn(List.of(feed));
+        given(newsFeedService.getNewsFeeds(anyInt(), anyInt(), any(ContentLanguage.class)))
+                .willReturn(List.of(feed));
 
         mockMvc.perform(get("/api/v1/news")
                         .param("page", "0")
@@ -61,6 +64,20 @@ class NewsFeedControllerTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data[0].title").value("K-POP 컴백 대전"))
                 .andExpect(jsonPath("$.data[0].slug").value("k-pop-comeback"));
+    }
+
+    @Test
+    @DisplayName("Accept-Language 지역 태그를 지원 언어로 정규화한다")
+    void passesResolvedAcceptLanguageToService() throws Exception {
+        given(newsFeedService.getNewsFeeds(0, 10, ContentLanguage.JAPANESE))
+                .willReturn(List.of());
+
+        mockMvc.perform(get("/api/v1/news")
+                        .header("Accept-Language", "ja-JP,en;q=0.8"))
+                .andExpect(status().isOk());
+
+        org.mockito.Mockito.verify(newsFeedService)
+                .getNewsFeeds(0, 10, ContentLanguage.JAPANESE);
     }
 
     @Test
@@ -91,7 +108,7 @@ class NewsFeedControllerTest {
                 .summaries(List.of("요약 1"))
                 .build();
 
-        given(newsFeedService.getNewsFeedById(1L)).willReturn(feed);
+        given(newsFeedService.getNewsFeedById(1L, ContentLanguage.KOREAN)).willReturn(feed);
 
         mockMvc.perform(get("/api/v1/news/1"))
                 .andExpect(status().isOk())
@@ -109,7 +126,7 @@ class NewsFeedControllerTest {
                 .slug("k-pop-slug")
                 .build();
 
-        given(newsFeedService.getNewsFeedBySlug("k-pop-slug")).willReturn(feed);
+        given(newsFeedService.getNewsFeedBySlug("k-pop-slug", ContentLanguage.KOREAN)).willReturn(feed);
 
         mockMvc.perform(get("/api/v1/news/slug/k-pop-slug"))
                 .andExpect(status().isOk())

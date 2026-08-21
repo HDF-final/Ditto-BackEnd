@@ -17,6 +17,7 @@ public class PlaceNavigationResponse {
     private Long placeId;
     private String navigationKey;
     private String name;
+    private String description;
     private String floorCode;
     private String imageUrl;
 }

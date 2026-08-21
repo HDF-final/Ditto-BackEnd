@@ -1,12 +1,16 @@
 package com.ditto.news.application.service;
 
 import java.util.List;
+import java.util.stream.IntStream;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 
 import com.ditto.global.exception.BusinessException;
 import com.ditto.global.exception.ErrorCode;
+import com.ditto.global.i18n.ContentLanguage;
+import com.ditto.global.infrastructure.translation.ContentTranslationService;
 import com.ditto.news.application.port.out.NewsFeedRepository;
 import com.ditto.news.domain.NewsFeed;
 
@@ -24,6 +28,7 @@ import lombok.extern.slf4j.Slf4j;
 public class NewsFeedService {
 
     private final NewsFeedRepository newsFeedRepository;
+    private final ContentTranslationService contentTranslationService;
 
     /**
      * 뉴스피드 목록을 최신순으로 페이징 조회합니다.
@@ -34,6 +39,13 @@ public class NewsFeedService {
      */
     public List<NewsFeed> getNewsFeeds(int page, int size) {
         return newsFeedRepository.findAll(page, size);
+    }
+
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public List<NewsFeed> getNewsFeeds(int page, int size, ContentLanguage language) {
+        return getNewsFeeds(page, size).stream()
+                .map(feed -> localize(feed, language))
+                .toList();
     }
 
     /**
@@ -51,12 +63,54 @@ public class NewsFeedService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.NEWS_FEED_NOT_FOUND));
     }
 
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public NewsFeed getNewsFeedById(Long newsFeedId, ContentLanguage language) {
+        return localize(getNewsFeedById(newsFeedId), language);
+    }
+
     /**
      * URL Slug로 뉴스피드 도메인 엔티티를 조회합니다.
      */
     public NewsFeed getNewsFeedBySlug(String slug) {
         return newsFeedRepository.findBySlug(slug)
                 .orElseThrow(() -> new BusinessException(ErrorCode.NEWS_FEED_NOT_FOUND));
+    }
+
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public NewsFeed getNewsFeedBySlug(String slug, ContentLanguage language) {
+        return localize(getNewsFeedBySlug(slug), language);
+    }
+
+    private NewsFeed localize(NewsFeed feed, ContentLanguage language) {
+        if (feed == null || language == null || !language.requiresTranslation()) {
+            return feed;
+        }
+
+        String sourceKey = String.valueOf(feed.getNewsFeedId());
+        List<String> summaries = feed.getSummaries() == null
+                ? null
+                : IntStream.range(0, feed.getSummaries().size())
+                        .mapToObj(index -> contentTranslationService.translate(
+                                "news_feed",
+                                sourceKey,
+                                "summary_" + index,
+                                feed.getSummaries().get(index),
+                                language))
+                        .toList();
+
+        return NewsFeed.builder()
+                .newsFeedId(feed.getNewsFeedId())
+                .title(contentTranslationService.translate(
+                        "news_feed", sourceKey, "title", feed.getTitle(), language))
+                .slug(feed.getSlug())
+                .representativeImageUrl(feed.getRepresentativeImageUrl())
+                .body(contentTranslationService.translate(
+                        "news_feed", sourceKey, "body", feed.getBody(), language))
+                .summaries(summaries)
+                .keywords(feed.getKeywords())
+                .createdAt(feed.getCreatedAt())
+                .deletedAt(feed.getDeletedAt())
+                .build();
     }
 
     /**
