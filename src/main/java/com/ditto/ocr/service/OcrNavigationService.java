@@ -17,7 +17,6 @@ import com.ditto.ocr.dto.response.OcrCandidateResponse;
 import com.ditto.ocr.dto.response.OcrRecognitionResponse;
 import com.ditto.ocr.dto.response.OcrSessionStartResponse;
 import com.ditto.ocr.repository.OcrPlaceMapper;
-import com.ditto.ocr.repository.OcrPlaceMapper.CandidateRow;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -36,6 +35,7 @@ public class OcrNavigationService {
     private final OcrSessionStore sessionStore;
     private final OcrPlaceMapper ocrPlaceMapper;
     private final ClovaOcrClient clovaOcrClient;
+    private final OcrPlaceMatcher placeMatcher;
     private final com.ditto.ocr.config.OcrProperties properties;
 
     /** 세션을 시작하고 시작 장소의 길찾기 식별자를 함께 돌려준다. */
@@ -87,26 +87,14 @@ public class OcrNavigationService {
                     .build();
         }
 
-        List<OcrCandidateResponse> candidates = toCandidates(result);
+        List<OcrCandidateResponse> candidates =
+                placeMatcher.match(result, properties.getBrandTopN(), properties.getMaxCandidates());
 
         return OcrRecognitionResponse.builder()
                 .recognitionId(recognitionId)
-                .recognizedBrandName(result.getBrandName())
+                .recognizedBrandName(result.primaryText())
                 .candidates(candidates)
                 .build();
-    }
-
-    private List<OcrCandidateResponse> toCandidates(ClovaOcrResult result) {
-        List<CandidateRow> rows = ocrPlaceMapper.findCandidatesByBrandName(
-                result.getBrandName(), properties.getMaxCandidates());
-        return rows.stream()
-                .map(row -> OcrCandidateResponse.builder()
-                        .placeId(row.getPlaceId())
-                        .name(row.getName())
-                        .floor(row.getFloor())
-                        .confidence(result.getConfidence())
-                        .build())
-                .toList();
     }
 
     private void validateImage(MultipartFile image) {

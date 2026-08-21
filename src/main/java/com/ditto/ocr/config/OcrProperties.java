@@ -24,6 +24,9 @@ public class OcrProperties {
     /** 브랜드명 하나로 돌려줄 최대 후보 장소 수. */
     private int maxCandidates = 5;
 
+    /** 매칭에 쓸 상위 인식 텍스트 조각 수(도드라짐 순). 브랜드가 최대 글자가 아닐 때를 대비한다. */
+    private int brandTopN = 3;
+
     private final Clova clova = new Clova();
 
     /** 네이버 CLOVA OCR(General) 접속 설정. */
