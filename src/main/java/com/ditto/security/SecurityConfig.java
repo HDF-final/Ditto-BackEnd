@@ -43,7 +43,6 @@ public class SecurityConfig {
             "/api/v1/auth/login",
             "/api/v1/courses/public/**",
             "/api/v1/news/**",
-            "/api/v1/mobile/access-codes/verify",
             "/api/v1/ocr/locations/recognize",
             // /swagger-ui.html 은 /swagger-ui/** 와 다른 경로다. 둘 다 열어둬야 리다이렉트가 된다.
             "/swagger-ui.html",
@@ -75,6 +74,7 @@ public class SecurityConfig {
                                 writeError(response, ErrorCode.ACCESS_DENIED)))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/v1/mobile/access-codes").hasRole("CUSTOMER")
                         .requestMatchers(HttpMethod.GET, "/api/v1/community/courses", "/api/v1/community/courses/**").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/community/courses/*/comments").hasRole("CUSTOMER")
                         .requestMatchers(HttpMethod.PATCH, "/api/v1/community/courses/*/comments/*").hasRole("CUSTOMER")

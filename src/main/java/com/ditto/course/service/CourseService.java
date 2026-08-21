@@ -81,8 +81,19 @@ public class CourseService {
     public CourseDetailResponse getDetail(Long userId, Long courseId) {
         Course course = requireCourse(courseId);
         validateReadableCourse(course, userId);
+        return loadDetail(course);
+    }
 
-        List<CoursePlaceResponse> places = courseMapper.findPlacesByCourseId(courseId);
+    /**
+     * 모바일 접속 코드로 인가된 사용자를 위한 코스 상세 조회.
+     * 접속 코드 검증이 인가를 대신하므로 소유권·공개 여부 검사는 하지 않는다.
+     */
+    public CourseDetailResponse getMobileDetail(Long courseId) {
+        return loadDetail(requireCourse(courseId));
+    }
+
+    private CourseDetailResponse loadDetail(Course course) {
+        List<CoursePlaceResponse> places = courseMapper.findPlacesByCourseId(course.getCourseId());
         // DB에는 S3 object key가 저장되어 있으므로 클라이언트에는 조회용(presigned) URL로 변환해 내려준다.
         for (CoursePlaceResponse place : places) {
             place.setImageUrl(s3Provider.resolveImageUrl(place.getImageUrl()));
