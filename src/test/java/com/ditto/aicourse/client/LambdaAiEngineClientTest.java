@@ -16,6 +16,7 @@ import org.mockito.ArgumentCaptor;
 import com.ditto.aicourse.config.AiEngineProperties;
 import com.ditto.global.exception.BusinessException;
 import com.ditto.global.exception.ErrorCode;
+import com.ditto.global.i18n.ContentLanguage;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import software.amazon.awssdk.core.SdkBytes;
@@ -46,7 +47,8 @@ class LambdaAiEngineClientTest {
                  "places":[{"navigation_key":"4F_STORE_0058","place_name":"굿러너컴퍼니","reason":"러닝"}]}
                 """);
 
-        AiEngineChatResponse response = client.chat(null, "러닝화 보고 싶어");
+        AiEngineChatResponse response = client.chat(
+                null, "러닝화 보고 싶어", ContentLanguage.KOREAN);
 
         assertThat(response.getSession()).isEqualTo("abc");
         assertThat(response.getTurn()).isEqualTo(1);
@@ -59,7 +61,7 @@ class LambdaAiEngineClientTest {
     void sendsHandlerContract() {
         stubPayload("{\"session\":\"abc\",\"reply\":\"ok\",\"turn\":2,\"places\":[]}");
 
-        client.chat("abc", "세 군데만 알려줘");
+        client.chat("abc", "세 군데만 알려줘", ContentLanguage.ENGLISH);
 
         ArgumentCaptor<InvokeRequest> captor = ArgumentCaptor.forClass(InvokeRequest.class);
         org.mockito.Mockito.verify(lambdaClient).invoke(captor.capture());
@@ -71,6 +73,7 @@ class LambdaAiEngineClientTest {
         assertThat(sent.payload().asUtf8String())
                 .contains("\"session\":\"abc\"")
                 .contains("\"message\":\"세 군데만 알려줘\"")
+                .contains("\"language\":\"en\"")
                 .doesNotContain("requestContext")
                 .doesNotContain("body");
     }
@@ -88,7 +91,7 @@ class LambdaAiEngineClientTest {
                                 "{\"errorType\":\"RuntimeError\",\"errorMessage\":\"message 가 비어 있습니다\"}"))
                         .build());
 
-        assertThatThrownBy(() -> client.chat(null, "안녕"))
+        assertThatThrownBy(() -> client.chat(null, "안녕", ContentLanguage.KOREAN))
                 .isInstanceOf(BusinessException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.AI_SERVICE_ERROR);
     }
@@ -99,7 +102,7 @@ class LambdaAiEngineClientTest {
         when(lambdaClient.invoke(any(InvokeRequest.class)))
                 .thenThrow(SdkClientException.create("Unable to load credentials from IMDS"));
 
-        assertThatThrownBy(() -> client.chat(null, "안녕"))
+        assertThatThrownBy(() -> client.chat(null, "안녕", ContentLanguage.KOREAN))
                 .isInstanceOf(BusinessException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.AI_SERVICE_ERROR);
     }
@@ -112,7 +115,7 @@ class LambdaAiEngineClientTest {
         // success:true 로 손님에게 나간다.
         stubPayload("{\"error\":\"message 가 비어 있습니다\"}");
 
-        assertThatThrownBy(() -> client.chat(null, "안녕"))
+        assertThatThrownBy(() -> client.chat(null, "안녕", ContentLanguage.KOREAN))
                 .isInstanceOf(BusinessException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.AI_SERVICE_ERROR);
     }
@@ -122,7 +125,7 @@ class LambdaAiEngineClientTest {
     void omitsEngineWhenUnset() {
         stubPayload("{\"session\":\"s\",\"reply\":\"r\",\"turn\":1,\"places\":[]}");
 
-        client.chat(null, "코스 짜줘");
+        client.chat(null, "코스 짜줘", ContentLanguage.KOREAN);
 
         assertThat(sentPayload()).doesNotContain("engine");
     }
@@ -136,7 +139,7 @@ class LambdaAiEngineClientTest {
         client = new LambdaAiEngineClient(lambdaClient, properties, new ObjectMapper());
         stubPayload("{\"session\":\"s\",\"reply\":\"r\",\"turn\":1,\"places\":[]}");
 
-        client.chat(null, "코스 짜줘");
+        client.chat(null, "코스 짜줘", ContentLanguage.KOREAN);
 
         assertThat(sentPayload()).contains("\"engine\":\"builtin\"");
     }

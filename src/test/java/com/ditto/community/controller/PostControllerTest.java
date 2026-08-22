@@ -33,6 +33,7 @@ import com.ditto.community.service.PostService;
 import com.ditto.global.common.response.PageResponse;
 import com.ditto.global.exception.BusinessException;
 import com.ditto.global.exception.ErrorCode;
+import com.ditto.global.i18n.ContentLanguage;
 import com.ditto.security.AuthUser;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -69,7 +70,7 @@ class PostControllerTest {
                 .bookmarkCount(4L)
                 .build();
         PageResponse<PublicCourseResponse> pageResponse = new PageResponse<>(List.of(item), 0, 1L);
-        given(postService.getPublicCourses(0, 10)).willReturn(pageResponse);
+        given(postService.getPublicCourses(0, 10, ContentLanguage.KOREAN)).willReturn(pageResponse);
 
         mockMvc.perform(get("/api/v1/community/courses")
                         .param("page", "0")
@@ -86,14 +87,32 @@ class PostControllerTest {
                 .andExpect(jsonPath("$.data.content[0].likeCount").value(12L))
                 .andExpect(jsonPath("$.data.content[0].bookmarkCount").value(4L));
 
-        verify(postService).getPublicCourses(0, 10);
+        verify(postService).getPublicCourses(0, 10, ContentLanguage.KOREAN);
+    }
+
+    @Test
+    @DisplayName("Accept-Language 영어 요청을 서비스 언어로 전달한다")
+    void forwardsRequestedLanguage() throws Exception {
+        PublicCourseResponse item = PublicCourseResponse.builder()
+                .postId(1L)
+                .title("aespa brand tour")
+                .build();
+        given(postService.getPublicCourses(0, 10, ContentLanguage.ENGLISH))
+                .willReturn(new PageResponse<>(List.of(item), 0, 1L));
+
+        mockMvc.perform(get("/api/v1/community/courses")
+                        .header("Accept-Language", "en-US,en;q=0.9"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content[0].title").value("aespa brand tour"));
+
+        verify(postService).getPublicCourses(0, 10, ContentLanguage.ENGLISH);
     }
 
     @Test
     @DisplayName("파라미터가 없으면 기본값 page=0, size=10을 적용한다")
     void getPublicCoursesDefaultParameters() throws Exception {
         PageResponse<PublicCourseResponse> emptyPage = new PageResponse<>(List.of(), 0, 0L);
-        given(postService.getPublicCourses(0, 10)).willReturn(emptyPage);
+        given(postService.getPublicCourses(0, 10, ContentLanguage.KOREAN)).willReturn(emptyPage);
 
         mockMvc.perform(get("/api/v1/community/courses"))
                 .andExpect(status().isOk())
@@ -103,13 +122,13 @@ class PostControllerTest {
                 .andExpect(jsonPath("$.data.content").isArray())
                 .andExpect(jsonPath("$.data.content").isEmpty());
 
-        verify(postService).getPublicCourses(0, 10);
+        verify(postService).getPublicCourses(0, 10, ContentLanguage.KOREAN);
     }
 
     @Test
     @DisplayName("잘못된 페이징 파라미터 요청 시 400 에러와 C001 코드를 반환한다")
     void getPublicCoursesInvalidParameter() throws Exception {
-        given(postService.getPublicCourses(-1, 10))
+        given(postService.getPublicCourses(-1, 10, ContentLanguage.KOREAN))
                 .willThrow(new BusinessException(ErrorCode.INVALID_INPUT_VALUE));
 
         mockMvc.perform(get("/api/v1/community/courses")
@@ -147,7 +166,7 @@ class PostControllerTest {
                                 .createdAt(LocalDateTime.now())
                                 .build()))
                 .build();
-        given(postService.getPublicCourse(1L)).willReturn(detail);
+        given(postService.getPublicCourse(1L, ContentLanguage.KOREAN)).willReturn(detail);
 
         mockMvc.perform(get("/api/v1/community/courses/1"))
                 .andExpect(status().isOk())
@@ -163,13 +182,13 @@ class PostControllerTest {
                 .andExpect(jsonPath("$.data.comments[0].commentId").value(101L))
                 .andExpect(jsonPath("$.data.comments[0].nickname").value("Chen_Li"));
 
-        verify(postService).getPublicCourse(1L);
+        verify(postService).getPublicCourse(1L, ContentLanguage.KOREAN);
     }
 
     @Test
     @DisplayName("존재하지 않는 게시글 상세 조회 시 404 에러와 CM001 코드를 반환한다")
     void getPublicCourseNotFound() throws Exception {
-        given(postService.getPublicCourse(999L))
+        given(postService.getPublicCourse(999L, ContentLanguage.KOREAN))
                 .willThrow(new BusinessException(ErrorCode.POST_NOT_FOUND));
 
         mockMvc.perform(get("/api/v1/community/courses/999"))

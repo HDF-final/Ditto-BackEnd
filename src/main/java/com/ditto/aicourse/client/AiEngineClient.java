@@ -1,5 +1,7 @@
 package com.ditto.aicourse.client;
 
+import com.ditto.global.i18n.ContentLanguage;
+
 /**
  * AI 추천 엔진 호출 창구.
  *
@@ -14,5 +16,5 @@ public interface AiEngineClient {
      *
      * @param session 이어갈 대화 id. {@code null} 이면 엔진이 새 대화를 만든다.
      */
-    AiEngineChatResponse chat(String session, String message);
+    AiEngineChatResponse chat(String session, String message, ContentLanguage language);
 }

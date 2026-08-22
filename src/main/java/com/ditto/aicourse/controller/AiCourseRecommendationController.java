@@ -1,9 +1,11 @@
 package com.ditto.aicourse.controller;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpHeaders;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -11,6 +13,7 @@ import com.ditto.aicourse.dto.request.CourseChatRequest;
 import com.ditto.aicourse.dto.response.CourseChatResponse;
 import com.ditto.aicourse.service.AiCourseRecommendationService;
 import com.ditto.global.common.response.ApiResponse;
+import com.ditto.global.i18n.AcceptLanguageResolver;
 import com.ditto.security.SecurityUtils;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -54,8 +57,13 @@ public class AiCourseRecommendationController {
                     """)
     @PostMapping("/chat")
     @ResponseStatus(HttpStatus.OK)
-    public ApiResponse<CourseChatResponse> chat(@Valid @RequestBody CourseChatRequest request) {
+    public ApiResponse<CourseChatResponse> chat(
+            @Valid @RequestBody CourseChatRequest request,
+            @RequestHeader(name = HttpHeaders.ACCEPT_LANGUAGE, required = false) String acceptLanguage) {
         return ApiResponse.success("성공",
-                aiCourseRecommendationService.chat(SecurityUtils.requireUserId(), request));
+                aiCourseRecommendationService.chat(
+                        SecurityUtils.requireUserId(),
+                        request,
+                        AcceptLanguageResolver.resolve(acceptLanguage)));
     }
 }

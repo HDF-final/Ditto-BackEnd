@@ -3,6 +3,7 @@ package com.ditto.aicourse.client;
 import com.ditto.aicourse.config.AiEngineProperties;
 import com.ditto.global.exception.BusinessException;
 import com.ditto.global.exception.ErrorCode;
+import com.ditto.global.i18n.ContentLanguage;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -41,10 +42,11 @@ public class LambdaAiEngineClient implements AiEngineClient, AutoCloseable {
     }
 
     @Override
-    public AiEngineChatResponse chat(String session, String message) {
+    public AiEngineChatResponse chat(String session, String message, ContentLanguage language) {
         AiEngineChatRequest request = AiEngineChatRequest.builder()
                 .session(session)
                 .message(message)
+                .language(language == null ? ContentLanguage.KOREAN.getCode() : language.getCode())
                 .engine(properties.getEngine())
                 .build();
 

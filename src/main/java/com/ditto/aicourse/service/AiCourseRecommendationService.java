@@ -2,6 +2,7 @@ package com.ditto.aicourse.service;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.IntStream;
 
 import org.springframework.stereotype.Service;
 
@@ -14,6 +15,8 @@ import com.ditto.aicourse.dto.response.CourseChatResponse;
 import com.ditto.aicourse.dto.response.CourseMetricsResponse;
 import com.ditto.aicourse.dto.response.PlaceImageResponse;
 import com.ditto.aicourse.dto.response.RecommendedPlaceResponse;
+import com.ditto.global.i18n.ContentLanguage;
+import com.ditto.global.infrastructure.translation.ContentTranslationService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -31,10 +34,20 @@ import lombok.extern.slf4j.Slf4j;
 public class AiCourseRecommendationService {
 
     private final AiEngineClient aiEngineClient;
+    private final ContentTranslationService contentTranslationService;
 
     public CourseChatResponse chat(Long userId, CourseChatRequest request) {
+        return chat(userId, request, ContentLanguage.KOREAN);
+    }
+
+    public CourseChatResponse chat(
+            Long userId,
+            CourseChatRequest request,
+            ContentLanguage language) {
+        ContentLanguage targetLanguage = language == null ? ContentLanguage.KOREAN : language;
         AiEngineChatResponse engineResponse =
-                aiEngineClient.chat(request.getSessionId(), request.getMessage());
+                aiEngineClient.chat(request.getSessionId(), request.getMessage(), targetLanguage);
+        String translationKey = translationKey(engineResponse, userId);
 
         // 대화 내용은 남기지 않는다. 추적에 필요한 것은 누가 몇 번째 턴을 돌았는지다.
         // resumed 가 false 로 이어지면 세션이 안 붙는 것이다 — 매 턴 조사를 다시 돌아
@@ -48,9 +61,11 @@ public class AiCourseRecommendationService {
 
         return CourseChatResponse.builder()
                 .sessionId(engineResponse.getSession())
-                .reply(engineResponse.getReply())
+                .reply(translate(
+                        translationKey, "reply", engineResponse.getReply(), targetLanguage))
                 .turn(engineResponse.getTurn())
-                .places(toPlaceResponses(engineResponse.getPlaces()))
+                .places(toPlaceResponses(
+                        engineResponse.getPlaces(), translationKey, targetLanguage))
                 .metrics(toMetrics(engineResponse))
                 .build();
     }
@@ -64,19 +79,30 @@ public class AiCourseRecommendationService {
                 .build();
     }
 
-    private List<RecommendedPlaceResponse> toPlaceResponses(List<AiEnginePlace> places) {
+    private List<RecommendedPlaceResponse> toPlaceResponses(
+            List<AiEnginePlace> places,
+            String translationKey,
+            ContentLanguage language) {
         if (places == null) {
             return Collections.emptyList();
         }
-        return places.stream()
-                .map(place -> RecommendedPlaceResponse.builder()
+        return IntStream.range(0, places.size())
+                .mapToObj(index -> {
+                    AiEnginePlace place = places.get(index);
+                    return RecommendedPlaceResponse.builder()
                         .navigationKey(place.getNavigationKey())
                         .placeName(place.getPlaceName())
                         .category(place.getCategory())
-                        .reason(place.getReason())
+                        .reason(translate(
+                                translationKey,
+                                "place_" + index + "_reason",
+                                place.getReason(),
+                                language))
                         .imageUrl(place.resolveImageUrl())
-                        .image(toImageResponse(place.getImage()))
-                        .build())
+                        .image(toImageResponse(
+                                place.getImage(), translationKey, index, language))
+                        .build();
+                })
                 .toList();
     }
 
@@ -84,7 +110,11 @@ public class AiCourseRecommendationService {
      * 사진이 없는 장소도 있으므로 통째로 null 을 받아 넘긴다.
      * 사진 하나 때문에 코스 전체가 실패하면 안 된다 — 엔진도 같은 태도로 짜여 있다.
      */
-    private PlaceImageResponse toImageResponse(AiEngineImage image) {
+    private PlaceImageResponse toImageResponse(
+            AiEngineImage image,
+            String translationKey,
+            int placeIndex,
+            ContentLanguage language) {
         if (image == null) {
             return null;
         }
@@ -92,11 +122,39 @@ public class AiCourseRecommendationService {
                 .kind(image.getKind())
                 .url(image.getUrl())
                 .source(image.getSource())
-                .caption(image.getCaption())
+                .caption(translate(
+                        translationKey,
+                        "place_" + placeIndex + "_image_caption",
+                        image.getCaption(),
+                        language))
                 .article(image.getArticle())
                 .width(image.getWidth())
                 .height(image.getHeight())
                 .build();
+    }
+
+    private String translate(
+            String sourceKey,
+            String sourceField,
+            String sourceText,
+            ContentLanguage language) {
+        if (language == null || !language.requiresTranslation()) {
+            return sourceText;
+        }
+        return contentTranslationService.translate(
+                "ai_course_recommendation",
+                sourceKey,
+                sourceField,
+                sourceText,
+                language);
+    }
+
+    private String translationKey(AiEngineChatResponse response, Long userId) {
+        String session = response.getSession();
+        String stableSession = session == null || session.isBlank()
+                ? "user-" + userId
+                : session;
+        return stableSession + ":" + response.getTurn();
     }
 
     private int sizeOf(List<AiEnginePlace> places) {

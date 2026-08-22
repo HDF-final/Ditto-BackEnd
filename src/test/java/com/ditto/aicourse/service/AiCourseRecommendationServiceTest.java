@@ -2,7 +2,9 @@ package com.ditto.aicourse.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.IOException;
@@ -16,6 +18,8 @@ import com.ditto.aicourse.client.AiEngineClient;
 import com.ditto.aicourse.dto.request.CourseChatRequest;
 import com.ditto.aicourse.dto.response.CourseChatResponse;
 import com.ditto.aicourse.dto.response.RecommendedPlaceResponse;
+import com.ditto.global.infrastructure.translation.ContentTranslationService;
+import com.ditto.global.i18n.ContentLanguage;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 class AiCourseRecommendationServiceTest {
@@ -23,12 +27,14 @@ class AiCourseRecommendationServiceTest {
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private AiEngineClient aiEngineClient;
+    private ContentTranslationService contentTranslationService;
     private AiCourseRecommendationService service;
 
     @BeforeEach
     void setUp() {
         aiEngineClient = mock(AiEngineClient.class);
-        service = new AiCourseRecommendationService(aiEngineClient);
+        contentTranslationService = mock(ContentTranslationService.class);
+        service = new AiCourseRecommendationService(aiEngineClient, contentTranslationService);
     }
 
     @Test
@@ -173,6 +179,43 @@ class AiCourseRecommendationServiceTest {
     }
 
     @Test
+    @DisplayName("선택 언어를 엔진에 전달하고 설명성 응답만 번역한다")
+    void localizesAiCourseDescriptions() throws IOException {
+        stub("""
+                {"session":"s","reply":"코스를 준비했어요","turn":1,"places":[
+                  {"place_name":"프라다","navigation_key":"1F_STORE_0035","category":"매장",
+                   "reason":"카리나가 즐겨 찾는 브랜드예요",
+                   "image":{"kind":"evidence","url":"https://example.com/a.jpg",
+                            "caption":"카리나가 프라다를 착용한 모습"}}]}
+                """);
+        when(contentTranslationService.translate(
+                eq("ai_course_recommendation"), eq("s:1"), eq("reply"),
+                eq("코스를 준비했어요"), eq(ContentLanguage.ENGLISH)))
+                .thenReturn("Your course is ready.");
+        when(contentTranslationService.translate(
+                eq("ai_course_recommendation"), eq("s:1"), eq("place_0_reason"),
+                eq("카리나가 즐겨 찾는 브랜드예요"), eq(ContentLanguage.ENGLISH)))
+                .thenReturn("A brand often worn by Karina.");
+        when(contentTranslationService.translate(
+                eq("ai_course_recommendation"), eq("s:1"), eq("place_0_image_caption"),
+                eq("카리나가 프라다를 착용한 모습"), eq(ContentLanguage.ENGLISH)))
+                .thenReturn("Karina wearing Prada.");
+
+        CourseChatResponse response = service.chat(
+                1L,
+                CourseChatRequest.builder().message("Make me a course").build(),
+                ContentLanguage.ENGLISH);
+
+        assertThat(response.getReply()).isEqualTo("Your course is ready.");
+        assertThat(response.getPlaces().get(0).getPlaceName()).isEqualTo("프라다");
+        assertThat(response.getPlaces().get(0).getCategory()).isEqualTo("매장");
+        assertThat(response.getPlaces().get(0).getReason()).isEqualTo("A brand often worn by Karina.");
+        assertThat(response.getPlaces().get(0).getImage().getCaption())
+                .isEqualTo("Karina wearing Prada.");
+        verify(aiEngineClient).chat(null, "Make me a course", ContentLanguage.ENGLISH);
+    }
+
+    @Test
     @DisplayName("엔진이 category 를 안 주던 시절 응답도 그대로 흘려보낸다")
     void toleratesMissingCategory() throws IOException {
         stub("{\"session\":\"s\",\"reply\":\"r\",\"turn\":1,"
@@ -189,7 +232,7 @@ class AiCourseRecommendationServiceTest {
     }
 
     private void stub(String engineJson) throws IOException {
-        when(aiEngineClient.chat(any(), any()))
+        when(aiEngineClient.chat(any(), any(), any()))
                 .thenReturn(MAPPER.readValue(engineJson, AiEngineChatResponse.class));
     }
 }
