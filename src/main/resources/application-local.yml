@@ -6,8 +6,11 @@ server:
       cookie:
         name: JSESSIONID
         http-only: true       # JS에서 쿠키 접근 차단
-        secure: false         # 운영(HTTPS)에서는 true
-        same-site: lax        # 크로스 사이트 요청 시 쿠키 정책
+        # 프론트가 백엔드와 다른 오리진(예: trycloudflare 주소)이면
+        # SESSION_COOKIE_SAME_SITE=none / SESSION_COOKIE_SECURE=true 로 띄워야
+        # 브라우저가 JSESSIONID 를 실어 보낸다. none 은 secure=true 가 필수다.
+        secure: ${SESSION_COOKIE_SECURE:false}
+        same-site: ${SESSION_COOKIE_SAME_SITE:lax}
 
 spring:
   # DB 계정/비밀번호는 .env (ORACLE_*, POSTGRES_*) 에서 읽고 application.yml 이 ${} 로 연결한다.
