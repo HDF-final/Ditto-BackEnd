@@ -18,6 +18,7 @@
     <select id="findCandidatesByNormalizedName"
             resultType="com.ditto.ocr.repository.OcrPlaceMapper$CandidateRow">
         SELECT p.place_id,
+               p.navigation_key AS navigationKey,
                p.name,
                f.floor_code AS floor
           FROM place p

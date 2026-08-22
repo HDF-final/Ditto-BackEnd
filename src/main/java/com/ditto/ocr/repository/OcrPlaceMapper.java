@@ -25,6 +25,7 @@ public interface OcrPlaceMapper {
     @Setter
     class CandidateRow {
         private Long placeId;
+        private String navigationKey;
         private String name;
         private String floor;
     }
