@@ -109,6 +109,34 @@ class OcrPlaceMatcherTest {
     }
 
     @Test
+    @DisplayName("POP MART와 POPMART는 같은 별칭으로 팝마트에 매칭된다")
+    void popMartSpacingVariantsMatchSamePlace() {
+        OcrPlaceMatcher matcher = matcherWith(row(16L, "팝마트"));
+
+        List<OcrCandidateResponse> spaced = matcher.match(
+                words(new RecognizedWord("POP MART", 0.95, 3000)), 3, 5);
+        List<OcrCandidateResponse> packed = matcher.match(
+                words(new RecognizedWord("POPMART", 0.95, 3000)), 3, 5);
+
+        assertThat(spaced).extracting(OcrCandidateResponse::getPlaceId).containsExactly(16L);
+        assertThat(packed).extracting(OcrCandidateResponse::getPlaceId).containsExactly(16L);
+    }
+
+    @Test
+    @DisplayName("POP과 MART가 따로 인식돼도 팝마트에 매칭된다")
+    void splitPopMartWordsMatchKoreanPlace() {
+        OcrPlaceMatcher matcher = matcherWith(row(16L, "팝마트"));
+
+        List<OcrCandidateResponse> result = matcher.match(
+                words(
+                        new RecognizedWord("POP", 0.94, 2000),
+                        new RecognizedWord("MART", 0.93, 1800)),
+                3, 5);
+
+        assertThat(result).extracting(OcrCandidateResponse::getPlaceId).containsExactly(16L);
+    }
+
+    @Test
     @DisplayName("영어 간판(EATALY)이 별칭 사전으로 한글 상호(이탈리)에 매칭된다")
     void englishSignMatchesKoreanPlaceViaAlias() {
         OcrPlaceMatcher matcher = matcherWith(row(122L, "이탈리"));
@@ -129,5 +157,49 @@ class OcrPlaceMatcherTest {
                 words(new RecognizedWord("NIKE", 0.9, 4000)), 3, 5);
 
         assertThat(result).extracting(OcrCandidateResponse::getPlaceId).containsExactly(3L);
+    }
+
+    @Test
+    @DisplayName("SIE 간판은 한글 상호 시에에 매칭된다")
+    void sieMatchesKoreanPlace() {
+        OcrPlaceMatcher matcher = matcherWith(row(40L, "시에"));
+
+        List<OcrCandidateResponse> result = matcher.match(
+                words(new RecognizedWord("SIE", 0.93, 2500)), 3, 5);
+
+        assertThat(result).extracting(OcrCandidateResponse::getPlaceId).containsExactly(40L);
+    }
+
+    @Test
+    @DisplayName("TILL I DIE 간판은 틸아이다이에 매칭된다")
+    void tillIDieMatchesKoreanPlace() {
+        OcrPlaceMatcher matcher = matcherWith(row(41L, "틸아이다이"));
+
+        List<OcrCandidateResponse> result = matcher.match(
+                words(new RecognizedWord("TILL I DIE", 0.91, 2800)), 3, 5);
+
+        assertThat(result).extracting(OcrCandidateResponse::getPlaceId).containsExactly(41L);
+    }
+
+    @Test
+    @DisplayName("LE LABO 간판은 르 라보에 매칭된다")
+    void leLaboMatchesKoreanPlace() {
+        OcrPlaceMatcher matcher = matcherWith(row(42L, "르 라보"));
+
+        List<OcrCandidateResponse> result = matcher.match(
+                words(new RecognizedWord("LE LABO", 0.96, 2200)), 3, 5);
+
+        assertThat(result).extracting(OcrCandidateResponse::getPlaceId).containsExactly(42L);
+    }
+
+    @Test
+    @DisplayName("NOICE 간판은 노이스에 매칭된다")
+    void noiceMatchesKoreanPlace() {
+        OcrPlaceMatcher matcher = matcherWith(row(43L, "노이스"));
+
+        List<OcrCandidateResponse> result = matcher.match(
+                words(new RecognizedWord("NOICE", 0.94, 2100)), 3, 5);
+
+        assertThat(result).extracting(OcrCandidateResponse::getPlaceId).containsExactly(43L);
     }
 }

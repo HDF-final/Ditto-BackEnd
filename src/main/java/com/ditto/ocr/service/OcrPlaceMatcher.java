@@ -41,27 +41,24 @@ public class OcrPlaceMatcher {
                 .limit(Math.max(topNWords, 1))
                 .toList();
 
+        List<String> tokens = words.stream()
+                .map(word -> OcrTextNormalizer.normalize(word.getText()))
+                .toList();
+        double combinedConfidence = words.stream()
+                .mapToDouble(RecognizedWord::getConfidence)
+                .max()
+                .orElse(0.0);
+        // POP + MART 처럼 단어가 쪼개져도 POP MART 별칭으로 한글 상호를 찾는다.
+        addMatches(bestByPlace, BrandAliasDictionary.canonicalTerms(tokens), combinedConfidence, maxCandidates);
+
         for (RecognizedWord word : words) {
             String normalizedWord = OcrTextNormalizer.normalize(word.getText());
 
-            // 상호 직접 검색어 + 영문 간판 별칭을 한글 상호로 바꾼 검색어를 함께 시도한다.
+            // 상호 직접 검색어 + 한 조각 안의 영문 별칭(POP MART / POPMART).
             List<String> searchTerms = new ArrayList<>();
             searchTerms.add(normalizedWord);
             searchTerms.addAll(BrandAliasDictionary.canonicalTerms(normalizedWord));
-
-            for (String term : searchTerms) {
-                if (term.isEmpty()) {
-                    continue;
-                }
-                List<CandidateRow> rows = ocrPlaceMapper.findCandidatesByNormalizedName(term, maxCandidates);
-                for (CandidateRow row : rows) {
-                    double score = score(term, row.getName(), word.getConfidence());
-                    Scored current = bestByPlace.get(row.getPlaceId());
-                    if (current == null || score > current.score) {
-                        bestByPlace.put(row.getPlaceId(), new Scored(row, word.getConfidence(), score));
-                    }
-                }
-            }
+            addMatches(bestByPlace, searchTerms, word.getConfidence(), maxCandidates);
         }
 
         return bestByPlace.values().stream()
@@ -69,11 +66,29 @@ public class OcrPlaceMatcher {
                 .limit(maxCandidates)
                 .map(s -> OcrCandidateResponse.builder()
                         .placeId(s.row.getPlaceId())
+                        .navigationKey(s.row.getNavigationKey())
                         .name(s.row.getName())
                         .floor(s.row.getFloor())
                         .confidence(s.wordConfidence)
                         .build())
                 .toList();
+    }
+
+    private void addMatches(Map<Long, Scored> bestByPlace, List<String> searchTerms,
+                            double confidence, int maxCandidates) {
+        for (String term : searchTerms) {
+            if (term == null || term.isEmpty()) {
+                continue;
+            }
+            List<CandidateRow> rows = ocrPlaceMapper.findCandidatesByNormalizedName(term, maxCandidates);
+            for (CandidateRow row : rows) {
+                double matchScore = score(term, row.getName(), confidence);
+                Scored current = bestByPlace.get(row.getPlaceId());
+                if (current == null || matchScore > current.score) {
+                    bestByPlace.put(row.getPlaceId(), new Scored(row, confidence, matchScore));
+                }
+            }
+        }
     }
 
     /** 유사도(포함/편집거리)에 OCR 신뢰도를 가중한 점수. 유사도가 지배하고 신뢰도는 보정한다. */

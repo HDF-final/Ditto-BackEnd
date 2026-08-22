@@ -19,10 +19,13 @@ public class OcrCandidateResponse {
     @Schema(description = "장소 ID", example = "11")
     private Long placeId;
 
-    @Schema(description = "장소명", example = "TAMBURINS")
+    @Schema(description = "길찾기 식별자", example = "3F_STORE_0035")
+    private String navigationKey;
+
+    @Schema(description = "장소명", example = "시스템")
     private String name;
 
-    @Schema(description = "층", example = "1F")
+    @Schema(description = "층", example = "3F")
     private String floor;
 
     @Schema(description = "인식 신뢰도(0~1)", example = "0.94")
