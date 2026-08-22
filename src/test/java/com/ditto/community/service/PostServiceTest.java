@@ -40,6 +40,8 @@ import com.ditto.community.dto.response.PublicCourseResponse;
 import com.ditto.course.dto.response.CoursePlaceResponse;
 import com.ditto.course.repository.PostMapper.PublicCourseDetailPostRow;
 import com.ditto.global.common.response.PageResponse;
+import com.ditto.global.i18n.ContentLanguage;
+import com.ditto.global.infrastructure.translation.ContentTranslationService;
 
 @ExtendWith(MockitoExtension.class)
 class PostServiceTest {
@@ -54,6 +56,9 @@ class PostServiceTest {
 
     @Mock
     private com.ditto.community.repository.PostCommentMapper postCommentMapper;
+
+    @Mock
+    private ContentTranslationService contentTranslationService;
 
     @InjectMocks
     private PostService postService;
@@ -385,6 +390,25 @@ class PostServiceTest {
     }
 
     @Test
+    @DisplayName("영어 요청이면 공개 코스 제목을 번역한다")
+    void translatesPublicCourseTitle() {
+        PublicCourseResponse item = PublicCourseResponse.builder()
+                .postId(1L)
+                .title("에스파 브랜드 투어")
+                .build();
+        given(postMapper.findPublicCourses(0L, 10)).willReturn(List.of(item));
+        given(postMapper.countPublicCourses()).willReturn(1L);
+        given(contentTranslationService.translate(
+                "community_post", "1", "title", "에스파 브랜드 투어", ContentLanguage.ENGLISH))
+                .willReturn("aespa brand tour");
+
+        PageResponse<PublicCourseResponse> response = postService.getPublicCourses(
+                0, 10, ContentLanguage.ENGLISH);
+
+        assertThat(response.getContent().get(0).getTitle()).isEqualTo("aespa brand tour");
+    }
+
+    @Test
     @DisplayName("목록이 없을 때 빈 리스트와 totalElements 0을 반환한다")
     void getPublicCoursesEmpty() {
         given(postMapper.findPublicCourses(0L, 10)).willReturn(List.of());
@@ -490,6 +514,28 @@ class PostServiceTest {
         verify(postMapper).findPublicCourseDetailById(1L);
         verify(courseMapper).findPlacesByCourseId(3L);
         verify(postCommentMapper).findCommentsByPostId(1L);
+    }
+
+    @Test
+    @DisplayName("영어 요청이면 게시글 제목과 본문만 번역한다")
+    void translatesPublicCourseDetail() {
+        PublicCourseDetailPostRow postRow = new PublicCourseDetailPostRow(
+                1L, 3L, "에스파 브랜드 투어", "추천 동선입니다.");
+        given(postMapper.findPublicCourseDetailById(1L)).willReturn(Optional.of(postRow));
+        given(courseMapper.findPlacesByCourseId(3L)).willReturn(List.of());
+        given(postCommentMapper.findCommentsByPostId(1L)).willReturn(List.of());
+        given(contentTranslationService.translate(
+                "community_post", "1", "title", "에스파 브랜드 투어", ContentLanguage.ENGLISH))
+                .willReturn("aespa brand tour");
+        given(contentTranslationService.translate(
+                "community_post", "1", "content", "추천 동선입니다.", ContentLanguage.ENGLISH))
+                .willReturn("This is the recommended route.");
+
+        PublicCourseDetailResponse response = postService.getPublicCourse(
+                1L, ContentLanguage.ENGLISH);
+
+        assertThat(response.getTitle()).isEqualTo("aespa brand tour");
+        assertThat(response.getContent()).isEqualTo("This is the recommended route.");
     }
 
     @Test

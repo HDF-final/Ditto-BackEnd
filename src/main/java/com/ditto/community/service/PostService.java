@@ -3,6 +3,7 @@ package com.ditto.community.service;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.ditto.community.dto.request.CreateCoursePostRequest;
@@ -22,6 +23,8 @@ import com.ditto.course.repository.PostMapper.PublicCourseDetailPostRow;
 import com.ditto.global.common.response.PageResponse;
 import com.ditto.global.exception.BusinessException;
 import com.ditto.global.exception.ErrorCode;
+import com.ditto.global.i18n.ContentLanguage;
+import com.ditto.global.infrastructure.translation.ContentTranslationService;
 
 import lombok.RequiredArgsConstructor;
 
@@ -35,6 +38,7 @@ public class PostService {
     private final CourseMapper courseMapper;
     private final PostMapper postMapper;
     private final com.ditto.community.repository.PostCommentMapper postCommentMapper;
+    private final ContentTranslationService contentTranslationService;
 
     /**
      * 커뮤니티에 공개된 코스 게시글 목록을 최신순으로 페이징 조회한다.
@@ -49,6 +53,27 @@ public class PostService {
         long totalElements = postMapper.countPublicCourses();
 
         return new PageResponse<>(content != null ? content : List.of(), page, totalElements);
+    }
+
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public PageResponse<PublicCourseResponse> getPublicCourses(
+            int page,
+            int size,
+            ContentLanguage language) {
+        PageResponse<PublicCourseResponse> response = getPublicCourses(page, size);
+        if (language == null || !language.requiresTranslation()) {
+            return response;
+        }
+
+        for (PublicCourseResponse post : response.getContent()) {
+            post.setTitle(contentTranslationService.translate(
+                    "community_post",
+                    String.valueOf(post.getPostId()),
+                    "title",
+                    post.getTitle(),
+                    language));
+        }
+        return response;
     }
 
     /**
@@ -86,6 +111,21 @@ public class PostService {
                 .course(courseInfo)
                 .comments(comments != null ? comments : List.of())
                 .build();
+    }
+
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public PublicCourseDetailResponse getPublicCourse(Long postId, ContentLanguage language) {
+        PublicCourseDetailResponse response = getPublicCourse(postId);
+        if (language == null || !language.requiresTranslation()) {
+            return response;
+        }
+
+        String sourceKey = String.valueOf(response.getPostId());
+        response.setTitle(contentTranslationService.translate(
+                "community_post", sourceKey, "title", response.getTitle(), language));
+        response.setContent(contentTranslationService.translate(
+                "community_post", sourceKey, "content", response.getContent(), language));
+        return response;
     }
 
     @Transactional

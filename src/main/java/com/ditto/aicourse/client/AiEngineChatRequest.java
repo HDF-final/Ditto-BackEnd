@@ -13,7 +13,7 @@ import lombok.Setter;
  * AI 엔진으로 보내는 요청 본문.
  *
  * <pre>
- * {"session": "abc"|null, "message": "...", "engine": "tavily"|"builtin"|null}
+ * {"session": "abc"|null, "message": "...", "language": "ko", "engine": "tavily"|"builtin"|null}
  * </pre>
  *
  * <p>비어 있는 필드는 싣지 않는다 — 안 실어야 엔진이 자기 기본값을 쓴다.
@@ -41,6 +41,9 @@ public class AiEngineChatRequest {
 
     @JsonProperty("message")
     private String message;
+
+    @JsonProperty("language")
+    private String language;
 
     /**
      * 셀럽 조사 방식. {@code tavily}(웹 검색) 또는 {@code builtin}(모델 지식).

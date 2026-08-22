@@ -3,6 +3,7 @@ package com.ditto.community.controller;
 import java.util.List;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpHeaders;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -10,6 +11,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
@@ -31,6 +33,7 @@ import com.ditto.community.service.PostLikeService;
 import com.ditto.community.service.PostService;
 import com.ditto.global.common.response.ApiResponse;
 import com.ditto.global.common.response.PageResponse;
+import com.ditto.global.i18n.AcceptLanguageResolver;
 import com.ditto.security.SecurityUtils;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -59,8 +62,10 @@ public class PostController {
             @Parameter(description = "페이지 번호(0부터 시작, 기본 0)", example = "0")
             @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "페이지 크기(1~100, 기본 10)", example = "10")
-            @RequestParam(defaultValue = "10") int size) {
-        return ApiResponse.success("성공", postService.getPublicCourses(page, size));
+            @RequestParam(defaultValue = "10") int size,
+            @RequestHeader(name = HttpHeaders.ACCEPT_LANGUAGE, required = false) String acceptLanguage) {
+        return ApiResponse.success("성공", postService.getPublicCourses(
+                page, size, AcceptLanguageResolver.resolve(acceptLanguage)));
     }
 
     @Operation(
@@ -70,8 +75,10 @@ public class PostController {
     @ResponseStatus(HttpStatus.OK)
     public ApiResponse<PublicCourseDetailResponse> getPublicCourse(
             @Parameter(description = "조회할 게시글 ID", example = "1")
-            @PathVariable Long postId) {
-        return ApiResponse.success("성공", postService.getPublicCourse(postId));
+            @PathVariable Long postId,
+            @RequestHeader(name = HttpHeaders.ACCEPT_LANGUAGE, required = false) String acceptLanguage) {
+        return ApiResponse.success("성공", postService.getPublicCourse(
+                postId, AcceptLanguageResolver.resolve(acceptLanguage)));
     }
 
     @Operation(summary = "코스 게시글 작성", description = "로그인한 사용자가 본인 소유 코스를 커뮤니티 게시글로 공개합니다.")
