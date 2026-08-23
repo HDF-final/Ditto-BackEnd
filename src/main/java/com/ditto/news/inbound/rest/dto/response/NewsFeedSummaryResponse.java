@@ -39,6 +39,9 @@ public class NewsFeedSummaryResponse {
     @Schema(description = "키워드/해시태그 목록")
     private List<String> keywords;
 
+    @Schema(description = "원문 기사 출처 URL", example = "https://www.yna.co.kr/view/AKR20260818001")
+    private String sourceUrl;
+
     @Schema(description = "생성 일시")
     private LocalDateTime createdAt;
 
@@ -53,6 +56,7 @@ public class NewsFeedSummaryResponse {
                 .representativeImageUrl(feed.getRepresentativeImageUrl())
                 .summaries(feed.getSummaries())
                 .keywords(feed.getKeywords())
+                .sourceUrl(feed.getSourceUrl())
                 .createdAt(feed.getCreatedAt())
                 .build();
     }

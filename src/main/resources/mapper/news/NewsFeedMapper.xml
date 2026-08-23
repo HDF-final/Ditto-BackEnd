@@ -11,6 +11,7 @@
             body,
             summary,
             keywords,
+            source_url,
             created_at,
             deleted_at
         ) VALUES (
@@ -20,6 +21,7 @@
             #{body,jdbcType=CLOB},
             #{summary,jdbcType=VARCHAR},
             #{keywords,jdbcType=VARCHAR},
+            #{sourceUrl,jdbcType=VARCHAR},
             SYSTIMESTAMP,
             NULL
         )
@@ -33,6 +35,7 @@
                body,
                summary,
                keywords,
+               source_url AS sourceUrl,
                created_at AS createdAt,
                deleted_at AS deletedAt
           FROM news_feed
@@ -48,6 +51,7 @@
                body,
                summary,
                keywords,
+               source_url AS sourceUrl,
                created_at AS createdAt,
                deleted_at AS deletedAt
           FROM news_feed
@@ -63,6 +67,7 @@
                body,
                summary,
                keywords,
+               source_url AS sourceUrl,
                created_at AS createdAt,
                deleted_at AS deletedAt
           FROM news_feed
@@ -91,7 +96,8 @@
                body = #{body,jdbcType=CLOB},
                representative_image_url = #{representativeImageUrl,jdbcType=VARCHAR},
                summary = #{summary,jdbcType=VARCHAR},
-               keywords = #{keywords,jdbcType=VARCHAR}
+               keywords = #{keywords,jdbcType=VARCHAR},
+               source_url = #{sourceUrl,jdbcType=VARCHAR}
          WHERE news_feed_id = #{newsFeedId}
            AND deleted_at IS NULL
     </update>

@@ -17,16 +17,49 @@ public final class EnvFileLoader {
 
     public static void load() {
         Path envFile = resolveEnvFile();
-        if (envFile == null) {
+        if (envFile != null) {
+            try {
+                List<String> lines = Files.readAllLines(envFile, StandardCharsets.UTF_8);
+                for (String raw : lines) {
+                    applyLine(raw);
+                }
+            } catch (IOException ignored) {
+                // .env 가 없으면 OS 환경 변수만 사용한다.
+            }
+        }
+        loadAwsCliCredentialsIfPresent();
+    }
+
+    private static void loadAwsCliCredentialsIfPresent() {
+        if (System.getenv("AWS_ACCESS_KEY_ID") != null || System.getProperty("aws.accessKeyId") != null) {
             return;
         }
         try {
-            List<String> lines = Files.readAllLines(envFile, StandardCharsets.UTF_8);
-            for (String raw : lines) {
-                applyLine(raw);
+            Process process = new ProcessBuilder("aws", "configure", "export-credentials", "--format", "env")
+                    .redirectErrorStream(true)
+                    .start();
+            try (java.io.BufferedReader reader = new java.io.BufferedReader(
+                    new java.io.InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    line = line.trim();
+                    if (line.startsWith("export ")) {
+                        line = line.substring(7).trim();
+                        int eq = line.indexOf('=');
+                        if (eq > 0) {
+                            String k = line.substring(0, eq).trim();
+                            String v = line.substring(eq + 1).trim();
+                            System.setProperty(k, v);
+                            if ("AWS_ACCESS_KEY_ID".equals(k)) System.setProperty("aws.accessKeyId", v);
+                            if ("AWS_SECRET_ACCESS_KEY".equals(k)) System.setProperty("aws.secretAccessKey", v);
+                            if ("AWS_SESSION_TOKEN".equals(k)) System.setProperty("aws.sessionToken", v);
+                        }
+                    }
+                }
             }
-        } catch (IOException ignored) {
-            // .env 가 없으면 OS 환경 변수만 사용한다.
+            process.waitFor();
+        } catch (Exception ignored) {
+            // 로컬 AWS CLI가 없거나 실패 시 기본 SDK 체인에 위임
         }
     }
 
@@ -59,6 +92,9 @@ public final class EnvFileLoader {
             return;
         }
         System.setProperty(key, value);
+        if ("AWS_PROFILE".equalsIgnoreCase(key) && System.getProperty("aws.profile") == null) {
+            System.setProperty("aws.profile", value);
+        }
     }
 
     private static String unquote(String value) {

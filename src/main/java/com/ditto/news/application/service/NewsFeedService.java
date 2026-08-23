@@ -137,6 +137,7 @@ public class NewsFeedService {
                 .body(body)
                 .summaries(summaries != null ? summaries : existing.getSummaries())
                 .keywords(keywords != null ? keywords : existing.getKeywords())
+                .sourceUrl(existing.getSourceUrl())
                 .createdAt(existing.getCreatedAt())
                 .build();
 

@@ -38,6 +38,9 @@ public class NewsFeed {
     /** 키워드/태그 목록 */
     private List<String> keywords;
 
+    /** 원문 기사 출처 URL */
+    private String sourceUrl;
+
     /** 피드 생성 일시 */
     private LocalDateTime createdAt;
 
