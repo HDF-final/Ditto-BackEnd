@@ -76,8 +76,6 @@ dependencies {
     // AWS S3 (이미지 객체 저장)
     // 버전은 Spring AI BOM이 관리하는 AWS SDK v2와 맞춘다.
     implementation 'software.amazon.awssdk:s3'
-    implementation 'software.amazon.awssdk:sso'
-    implementation 'software.amazon.awssdk:ssooidc'
 
     // AWS Lambda — AI 엔진을 함수 이름으로 직접 호출한다.
     // SigV4 서명은 SDK 가 처리하므로 서명 코드를 들고 있지 않는다.

@@ -47,9 +47,6 @@ class NewsFeedPipelineServiceTest {
     @Mock
     private NewsFeedRepository newsFeedRepository;
 
-    @Mock
-    private com.ditto.global.infrastructure.s3.S3Provider s3Provider;
-
     private NewsFeedGenerationProperties properties;
     private NewsFeedPipelineService pipelineService;
 
@@ -58,7 +55,7 @@ class NewsFeedPipelineServiceTest {
         properties = new NewsFeedGenerationProperties();
         properties.setTopics(List.of("K-POP", "K-Drama"));
         properties.setMaxFeedsPerTopic(3);
-        pipelineService = new NewsFeedPipelineService(collector, crawler, selector, aiNewsFeedGenerator, newsFeedRepository, properties, s3Provider);
+        pipelineService = new NewsFeedPipelineService(collector, crawler, selector, aiNewsFeedGenerator, newsFeedRepository, properties);
     }
 
     @Test

@@ -33,7 +33,4 @@ public class GeneratedNewsFeed {
 
     /** 연관 키워드/태그 목록 */
     private List<String> keywords;
-
-    /** 원문 기사 출처 URL */
-    private String sourceUrl;
 }

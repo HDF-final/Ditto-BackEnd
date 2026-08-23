@@ -68,8 +68,7 @@ class NewsFeedRepositoryImplTest {
                 eq("https://img.yna.co.kr/photo.jpg"),
                 eq("본문 내용..."),
                 anyString(),
-                anyString(),
-                any()
+                anyString()
         );
     }
 
@@ -83,7 +82,6 @@ class NewsFeedRepositoryImplTest {
                 .body("Body")
                 .summary("[\"요약1\",\"요약2\"]")
                 .keywords("[\"#KPOP\"]")
-                .sourceUrl("https://example.com/news")
                 .createdAt(LocalDateTime.now())
                 .build();
 
@@ -95,7 +93,6 @@ class NewsFeedRepositoryImplTest {
         assertThat(result.get().getNewsFeedId()).isEqualTo(10L);
         assertThat(result.get().getSummaries()).containsExactly("요약1", "요약2");
         assertThat(result.get().getKeywords()).containsExactly("#KPOP");
-        assertThat(result.get().getSourceUrl()).isEqualTo("https://example.com/news");
     }
 
     @Test
@@ -140,11 +137,10 @@ class NewsFeedRepositoryImplTest {
                 .body("Updated Body")
                 .summaries(List.of("요약"))
                 .keywords(List.of("#TAG"))
-                .sourceUrl("https://example.com/news")
                 .build();
 
         repository.update(feed);
-        verify(newsFeedMapper).update(eq(1L), eq("Updated Title"), eq("Updated Body"), any(), anyString(), anyString(), any());
+        verify(newsFeedMapper).update(eq(1L), eq("Updated Title"), eq("Updated Body"), any(), anyString(), anyString());
 
         repository.deleteById(1L);
         verify(newsFeedMapper).deleteById(1L);

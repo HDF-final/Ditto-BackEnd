@@ -44,8 +44,7 @@ public class NewsFeedRepositoryImpl implements NewsFeedRepository {
                 generatedFeed.getRepresentativeImageUrl(),
                 generatedFeed.getBody(),
                 summaryJson,
-                keywordsJson,
-                generatedFeed.getSourceUrl()
+                keywordsJson
         );
 
         log.info("뉴스피드 DB 저장 완료: title='{}', slug='{}'", generatedFeed.getTitle(), generatedFeed.getSlug());
@@ -57,7 +56,6 @@ public class NewsFeedRepositoryImpl implements NewsFeedRepository {
                 .body(generatedFeed.getBody())
                 .summaries(generatedFeed.getSummaries())
                 .keywords(generatedFeed.getKeywords())
-                .sourceUrl(generatedFeed.getSourceUrl())
                 .createdAt(LocalDateTime.now())
                 .build();
     }
@@ -119,8 +117,7 @@ public class NewsFeedRepositoryImpl implements NewsFeedRepository {
                 newsFeed.getBody(),
                 newsFeed.getRepresentativeImageUrl(),
                 summaryJson,
-                keywordsJson,
-                newsFeed.getSourceUrl()
+                keywordsJson
         );
         log.info("뉴스피드 DB 수정 완료: newsFeedId={}", newsFeed.getNewsFeedId());
     }
@@ -143,7 +140,6 @@ public class NewsFeedRepositoryImpl implements NewsFeedRepository {
                 .body(row.getBody())
                 .summaries(deserializeList(row.getSummary()))
                 .keywords(deserializeList(row.getKeywords()))
-                .sourceUrl(row.getSourceUrl())
                 .createdAt(row.getCreatedAt())
                 .deletedAt(row.getDeletedAt())
                 .build();

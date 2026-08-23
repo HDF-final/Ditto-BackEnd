@@ -23,8 +23,7 @@ public interface NewsFeedMapper {
             @Param("representativeImageUrl") String representativeImageUrl,
             @Param("body") String body,
             @Param("summary") String summary,
-            @Param("keywords") String keywords,
-            @Param("sourceUrl") String sourceUrl
+            @Param("keywords") String keywords
     );
 
     /**
@@ -64,8 +63,7 @@ public interface NewsFeedMapper {
             @Param("body") String body,
             @Param("representativeImageUrl") String representativeImageUrl,
             @Param("summary") String summary,
-            @Param("keywords") String keywords,
-            @Param("sourceUrl") String sourceUrl
+            @Param("keywords") String keywords
     );
 
     /**

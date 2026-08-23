@@ -37,7 +37,6 @@ public class NewsFeedPipelineService {
     private final AiNewsFeedGenerator aiNewsFeedGenerator;
     private final NewsFeedRepository newsFeedRepository;
     private final NewsFeedGenerationProperties properties;
-    private final com.ditto.global.infrastructure.s3.S3Provider s3Provider;
 
     /**
      * 특정 토픽에 대해 파이프라인을 실행하고 최종 생성 및 저장된 첫 번째 뉴스피드를 반환합니다.
@@ -115,13 +114,10 @@ public class NewsFeedPipelineService {
                 // 단일 기사의 팩트를 바탕으로 독립된 매거진 포맷 뉴스피드 2차 생성
                 GeneratedNewsFeed feed = aiNewsFeedGenerator.generate(List.of(article), topic);
                 if (feed != null) {
-                    // [S3 이미지 영구 보존]: 선별된 최종 기사의 대표 이미지를 우리 AWS S3 news/ 폴더에 업로드
-                    GeneratedNewsFeed finalFeed = uploadImageToS3IfPresent(feed);
-
-                    generatedFeeds.add(finalFeed);
+                    generatedFeeds.add(feed);
 
                     // 5단계: DB 영속화 (INSERT)
-                    NewsFeed saved = newsFeedRepository.save(finalFeed);
+                    NewsFeed saved = newsFeedRepository.save(feed);
                     if (saved != null && saved.getNewsFeedId() != null) {
                         savedNewsFeedIds.add(saved.getNewsFeedId());
                     }
@@ -187,40 +183,5 @@ public class NewsFeedPipelineService {
                 .savedNewsFeedId(null)
                 .savedNewsFeedIds(Collections.emptyList())
                 .build();
-    }
-
-    /**
-     * 최종 선별된 뉴스피드의 대표 이미지를 S3 버킷(news/)에 업로드하고, S3 접근 URL로 교체합니다.
-     * S3 업로드 실패 시 원본 이미지를 유지하는 안전한 Fallback 구조를 취합니다.
-     */
-    private GeneratedNewsFeed uploadImageToS3IfPresent(GeneratedNewsFeed feed) {
-        if (s3Provider == null || feed == null || feed.getRepresentativeImageUrl() == null || feed.getRepresentativeImageUrl().isBlank()) {
-            return feed;
-        }
-
-        String originalUrl = feed.getRepresentativeImageUrl().trim();
-        // 이미 우리 S3 / CloudFront 도메인인 경우 중복 업로드 방지
-        if (originalUrl.contains("amazonaws.com") || originalUrl.contains("cloudfront.net")) {
-            return feed;
-        }
-
-        try {
-            com.ditto.global.infrastructure.s3.S3UploadResult result = s3Provider.uploadImageFromUrl(originalUrl, "news");
-            if (result != null && result.getUrl() != null && !result.getUrl().isBlank()) {
-                log.info("뉴스피드 대표 이미지 S3 업로드 성공: originalUrl={}, s3Url={}", originalUrl, result.getUrl());
-                return GeneratedNewsFeed.builder()
-                        .title(feed.getTitle())
-                        .summaries(feed.getSummaries())
-                        .body(feed.getBody())
-                        .slug(feed.getSlug())
-                        .representativeImageUrl(result.getUrl())
-                        .keywords(feed.getKeywords())
-                        .sourceUrl(feed.getSourceUrl())
-                        .build();
-            }
-        } catch (Exception e) {
-            log.warn("뉴스 이미지 S3 업로드 실패 (원본 URL 유지): url={}, cause={}", originalUrl, e.getMessage());
-        }
-        return feed;
     }
 }

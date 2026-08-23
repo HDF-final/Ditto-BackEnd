@@ -44,28 +44,6 @@ public class DefaultNewsArticleSelector implements NewsArticleSelector {
     /** 본문 연관 보조 표현 일치 기본 점수 */
     public static final int BODY_RELATED_TERM_SCORE = 20;
 
-    /** 음악/앨범/컴백/투어 등 핵심 K-POP 활동 가산 키워드 */
-    private static final List<String> CORE_MUSIC_KEYWORDS = List.of(
-            "[가요소식]", "[가요]", "음반", "음원", "빌보드", "billboard", "컴백", "comeback",
-            "밀리언셀러", "스트리밍", "streaming", "앨범", "album", "차트", "chart", "쇼케이스",
-            "콘서트", "concert", "월드투어", "world tour", "투어", "팬미팅", "fan meeting",
-            "뮤직비디오", "뮤비", "mv", "수록곡", "신곡", "스포티파이", "spotify", "오리콘", "oricon",
-            "싱글", "single", "신보", "발매", "트랙", "track", "1위", "톱10", "top10"
-    );
-
-    /** K-POP과 무관한 기술/스포츠/정치/사회 노이즈 감점 키워드 */
-    private static final List<String> NON_KPOP_NOISE_KEYWORDS = List.of(
-            "로봇", "robot", "피지컬 ai", "엔터테크", "로봇파크", "기념메달", "주화", "화폐",
-            "손흥민", "조수미", "페이커", "축구", "야구", "골프", "올림픽", "정치", "국회",
-            "대통령", "총선", "주식", "증시", "코인", "재판", "법원", "검찰", "구속", "사기", "음주운전"
-    );
-
-    /** 음악 활동 핵심 키워드 일치 가산점 */
-    public static final int MUSIC_ACTIVITY_BONUS = 60;
-
-    /** 비관련 노이즈 키워드 감점 */
-    public static final int NOISE_PENALTY = 150;
-
     /** 최신성 보너스 점수 (24시간 이내 발행) */
     public static final int RECENCY_24H_SCORE = 15;
 
@@ -114,8 +92,6 @@ public class DefaultNewsArticleSelector implements NewsArticleSelector {
             Map.entry("nct 127", "nct"),
             Map.entry("엔하이픈", "enhypen"),
             Map.entry("enhypen", "enhypen"),
-            Map.entry("캣츠아이", "katseye"),
-            Map.entry("katseye", "katseye"),
             Map.entry("빅뱅", "bigbang"),
             Map.entry("bigbang", "bigbang"),
             Map.entry("투모로우바이투게더", "txt"),
@@ -143,9 +119,9 @@ public class DefaultNewsArticleSelector implements NewsArticleSelector {
             "보이그룹", "걸그룹",
             "bts", "blackpink", "black pink", "newjeans", "new jeans", "aespa", "seventeen", "ive",
             "stray kids", "straykids", "twice", "le sserafim", "lesserafim", "txt", "riize", "nct",
-            "enhypen", "bigbang", "zerobaseone", "boynextdoor", "katseye",
+            "enhypen", "bigbang", "zerobaseone", "boynextdoor",
             "방탄소년단", "뉴진스", "에스파", "세븐틴", "아이브", "스트레이 키즈", "스트레이키즈", "스키즈",
-            "트와이스", "르세라핌", "라이즈", "엔시티", "투모로우바이투게더", "엔하이픈", "빅뱅", "캣츠아이"
+            "트와이스", "르세라핌", "라이즈", "엔시티", "투모로우바이투게더", "엔하이픈", "빅뱅"
     );
 
     /** K-POP 토픽 보조 표현 맵 */
@@ -184,14 +160,13 @@ public class DefaultNewsArticleSelector implements NewsArticleSelector {
         LocalDateTime now = LocalDateTime.now(clock);
         LocalDateTime cutoffDate = now.minusDays(MAX_ARTICLE_AGE_DAYS);
 
-        // 1. 유효성 검사 및 오래된 기사 제외 (로봇/기념메달 등 비관련 노이즈 기사 제외)
+        // 1. 유효성 검사 및 오래된 기사 제외
         List<CrawledNewsArticle> validArticles = articles.stream()
                 .filter(a -> a != null
                         && a.getUrl() != null && !a.getUrl().isBlank()
                         && a.getTitle() != null && !a.getTitle().isBlank()
                         && a.getBody() != null && !a.getBody().isBlank())
                 .filter(a -> a.getPublishedAt() == null || !a.getPublishedAt().isBefore(cutoffDate))
-                .filter(a -> !isNonKpopNoiseArticle(a.getTitle()))
                 .toList();
 
         if (validArticles.isEmpty()) {
@@ -219,14 +194,6 @@ public class DefaultNewsArticleSelector implements NewsArticleSelector {
                 .limit(MAX_SELECTED_ARTICLES)
                 .map(ScoredArticle::getArticle)
                 .toList();
-    }
-
-    private boolean isNonKpopNoiseArticle(String title) {
-        if (title == null) return false;
-        String lower = title.toLowerCase(Locale.ROOT);
-        return lower.contains("로봇") || lower.contains("피지컬 ai") || lower.contains("로봇파크")
-                || lower.contains("기념메달") || lower.contains("기념 메달") || lower.contains("손흥민")
-                || lower.contains("페이커") || lower.contains("조수미");
     }
 
     public List<CrawledNewsArticle> selectRelevantArticlesForKeyword(List<CrawledNewsArticle> articles, String targetKeyword) {

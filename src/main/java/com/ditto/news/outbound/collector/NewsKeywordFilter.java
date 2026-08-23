@@ -27,9 +27,9 @@ public class NewsKeywordFilter {
             "보이그룹", "걸그룹",
             "bts", "blackpink", "black pink", "newjeans", "new jeans", "aespa", "seventeen", "ive",
             "stray kids", "straykids", "twice", "le sserafim", "lesserafim", "txt", "riize", "nct",
-            "enhypen", "bigbang", "zerobaseone", "boynextdoor", "katseye",
+            "enhypen", "bigbang", "zerobaseone", "boynextdoor",
             "방탄소년단", "뉴진스", "에스파", "세븐틴", "아이브", "스트레이 키즈", "스트레이키즈", "스키즈",
-            "트와이스", "르세라핌", "라이즈", "엔시티", "투모로우바이투게더", "엔하이픈", "빅뱅", "캣츠아이"
+            "트와이스", "르세라핌", "라이즈", "엔시티", "투모로우바이투게더", "엔하이픈", "빅뱅"
     );
 
     private static final Map<String, List<String>> TOPIC_KEYWORDS_MAP = Map.of(

@@ -25,7 +25,6 @@ public class NewsFeedRow {
     private String body;
     private String summary;
     private String keywords;
-    private String sourceUrl;
     private LocalDateTime createdAt;
     private LocalDateTime deletedAt;
 }
