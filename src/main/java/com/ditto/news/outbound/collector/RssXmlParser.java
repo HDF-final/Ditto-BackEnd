@@ -121,10 +121,7 @@ public class RssXmlParser {
 
         String source = cleanText(getDirectChildElementText(element, "source"));
         if (source == null || source.isBlank()) {
-            source = cleanText(getDirectChildElementText(element, "creator"));
-        }
-        if (source == null || source.isBlank()) {
-            source = fallbackSource;
+            source = normalizeMediaSource(normalizedUrl, fallbackSource);
         }
 
         String pubDateStr = getDirectChildElementText(element, "pubDate");
@@ -145,6 +142,27 @@ public class RssXmlParser {
                 .publishedAt(publishedAt)
                 .description(description)
                 .build();
+    }
+
+    public static String normalizeMediaSource(String url, String fallbackSource) {
+        String lowerUrl = (url != null) ? url.toLowerCase() : "";
+        if (lowerUrl.contains("yna.co.kr")) {
+            return "연합뉴스";
+        }
+        if (lowerUrl.contains("koreaherald.com")) {
+            return "코리아헤럴드";
+        }
+        if (lowerUrl.contains("koreatimes.co.kr")) {
+            return "코리아타임스";
+        }
+        if (fallbackSource != null && !fallbackSource.isBlank()) {
+            String lowerFallback = fallbackSource.toLowerCase();
+            if (lowerFallback.contains("yonhap") || lowerFallback.contains("yna")) return "연합뉴스";
+            if (lowerFallback.contains("herald")) return "코리아헤럴드";
+            if (lowerFallback.contains("times")) return "코리아타임스";
+            return fallbackSource.trim();
+        }
+        return "연합뉴스";
     }
 
     private List<NewsArticleCandidate> parseAtomEntries(NodeList entryNodes, String fallbackSource) {

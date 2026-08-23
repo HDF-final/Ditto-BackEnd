@@ -11,6 +11,7 @@ import java.util.regex.Pattern;
 
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
+import org.springframework.web.client.RestClient;
 import org.springframework.web.multipart.MultipartFile;
 
 import lombok.RequiredArgsConstructor;
@@ -89,6 +90,91 @@ public class S3Provider {
             log.error("S3 image upload failed. bucket={}, key={}",
                     properties.getBucket(), objectKey, exception);
             throw new BusinessException(ErrorCode.S3_UPLOAD_FAILED);
+        }
+    }
+
+    /**
+     * 바이트 배열 이미지를 S3에 업로드한다.
+     *
+     * @param bytes 이미지 바이트 배열
+     * @param contentType MIME 타입 (예: image/jpeg, image/png)
+     * @param directory 도메인별 저장 경로. 예: news, stores
+     * @return DB 저장용 key와 클라이언트 응답용 URL
+     */
+    public S3UploadResult uploadImageBytes(byte[] bytes, String contentType, String directory) {
+        if (bytes == null || bytes.length == 0) {
+            throw new BusinessException(ErrorCode.INVALID_IMAGE_FILE);
+        }
+        if (bytes.length > MAX_IMAGE_SIZE_BYTES) {
+            throw new BusinessException(ErrorCode.IMAGE_SIZE_EXCEEDED);
+        }
+
+        String normalizedContentType = (contentType != null && !contentType.isBlank())
+                ? contentType.toLowerCase(Locale.ROOT)
+                : "image/jpeg";
+        String extension = EXTENSION_BY_CONTENT_TYPE.getOrDefault(normalizedContentType, "jpg");
+
+        String normalizedDirectory = normalizeDirectory(directory);
+        String objectKey = createObjectKey(normalizedDirectory, extension);
+
+        PutObjectRequest request = PutObjectRequest.builder()
+                .bucket(properties.getBucket())
+                .key(objectKey)
+                .contentType(normalizedContentType)
+                .contentLength((long) bytes.length)
+                .build();
+
+        try {
+            s3Client.putObject(request, RequestBody.fromBytes(bytes));
+            log.info("S3 image uploaded from bytes. bucket={}, key={}", properties.getBucket(), objectKey);
+
+            return S3UploadResult.builder()
+                    .key(objectKey)
+                    .url(getImageUrl(objectKey))
+                    .build();
+        } catch (SdkException exception) {
+            log.error("S3 image upload failed. bucket={}, key={}",
+                    properties.getBucket(), objectKey, exception);
+            throw new BusinessException(ErrorCode.S3_UPLOAD_FAILED);
+        }
+    }
+
+    /**
+     * 외부 이미지 URL로부터 이미지를 다운로드하여 S3에 업로드한다.
+     * 다운로드 실패나 S3 오류 시 null을 반환하여 원본 URL fallback이 가능하도록 한다.
+     *
+     * @param imageUrl 외부 이미지 원본 URL
+     * @param directory S3 저장 디렉토리 (예: news)
+     * @return 업로드된 S3 정보, 실패 시 null
+     */
+    public S3UploadResult uploadImageFromUrl(String imageUrl, String directory) {
+        if (!StringUtils.hasText(imageUrl)) {
+            return null;
+        }
+        try {
+            RestClient restClient = RestClient.builder()
+                    .defaultHeader(org.springframework.http.HttpHeaders.USER_AGENT,
+                            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                    .build();
+
+            org.springframework.http.ResponseEntity<byte[]> response = restClient.get()
+                    .uri(imageUrl.trim())
+                    .retrieve()
+                    .toEntity(byte[].class);
+
+            byte[] bytes = response.getBody();
+            if (bytes == null || bytes.length == 0) {
+                log.warn("외부 이미지 다운로드 실패 (데이터 없음): url={}", imageUrl);
+                return null;
+            }
+
+            org.springframework.http.MediaType mediaType = response.getHeaders().getContentType();
+            String contentType = (mediaType != null) ? mediaType.toString() : "image/jpeg";
+
+            return uploadImageBytes(bytes, contentType, directory);
+        } catch (Exception e) {
+            log.warn("외부 이미지 S3 업로드 실패 (원본 URL 유지): url={}, cause={}", imageUrl, e.getMessage());
+            return null;
         }
     }
 
