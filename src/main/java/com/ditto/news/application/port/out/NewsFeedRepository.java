@@ -3,7 +3,6 @@ package com.ditto.news.application.port.out;
 import java.util.List;
 import java.util.Optional;
 
-import com.ditto.news.domain.GeneratedNewsFeed;
 import com.ditto.news.domain.NewsFeed;
 
 /**
@@ -12,9 +11,9 @@ import com.ditto.news.domain.NewsFeed;
 public interface NewsFeedRepository {
 
     /**
-     * AI가 생성한 뉴스피드를 DB에 INSERT 저장하고 영속화된 도메인 객체를 반환합니다.
+     * 뉴스피드를 DB에 INSERT 저장하고 도메인 객체를 반환합니다.
      */
-    NewsFeed save(GeneratedNewsFeed generatedFeed);
+    NewsFeed save(NewsFeed newsFeed);
 
     /**
      * PK ID로 뉴스피드를 단건 조회합니다.

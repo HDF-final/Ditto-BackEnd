@@ -20,7 +20,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import com.ditto.news.domain.GeneratedNewsFeed;
 import com.ditto.news.domain.NewsFeed;
 import com.ditto.news.outbound.repository.entity.NewsFeedRow;
 import com.ditto.news.outbound.repository.mapper.NewsFeedMapper;
@@ -42,9 +41,9 @@ class NewsFeedRepositoryImplTest {
     }
 
     @Test
-    @DisplayName("GeneratedNewsFeed를 전달받아 NewsFeedMapper.insert를 호출하고 NewsFeed 도메인 객체를 반환한다")
-    void savesGeneratedNewsFeedSuccessfully() {
-        GeneratedNewsFeed generated = GeneratedNewsFeed.builder()
+    @DisplayName("NewsFeed를 전달받아 NewsFeedMapper.insert를 호출하고 NewsFeed 도메인 객체를 반환한다")
+    void savesNewsFeedSuccessfully() {
+        NewsFeed feed = NewsFeed.builder()
                 .title("K-POP 서머 차트 돌풍")
                 .slug("k-pop-1234")
                 .representativeImageUrl("https://img.yna.co.kr/photo.jpg")
@@ -53,7 +52,7 @@ class NewsFeedRepositoryImplTest {
                 .keywords(List.of("#KPOP", "#BTS"))
                 .build();
 
-        NewsFeed saved = repository.save(generated);
+        NewsFeed saved = repository.save(feed);
 
         assertThat(saved).isNotNull();
         assertThat(saved.getTitle()).isEqualTo("K-POP 서머 차트 돌풍");
