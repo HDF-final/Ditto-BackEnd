@@ -674,7 +674,7 @@ securityContextRepository.saveContext(context, request, response);
 
 세션 쿠키를 크로스 오리진으로 주고받으므로 프론트·백엔드 양쪽 설정이 맞아야 합니다.
 
-- 백엔드: `setAllowCredentials(true)`, 허용 오리진에 프론트 주소 명시(`*` 불가).
+- 백엔드: `setAllowCredentials(true)`, 허용 오리진은 `https://ditto-global.com`만 명시(`*` 불가).
 - 프론트엔드: 요청 시 자격 증명 포함(Axios `withCredentials: true`).
 - 쿠키: `HttpOnly`, `SameSite=Lax`(운영 HTTPS에서는 `Secure=true`).
 
@@ -1025,10 +1025,10 @@ AWS 청구 기준에 따라 비용을 지불합니다. 비용 관찰과 알림�
 
 ### CORS
 
-프론트엔드 개발 서버(`http://localhost:3000`)를 허용합니다. 운영 도메인은 배포 시 추가합니다. 설정은 [config/CorsConfig.java](./src/main/java/com/ditto/config/CorsConfig.java)에서 관리하며 `SecurityConfig`가 이를 사용합니다.
+임시 배포 프론트엔드의 정확한 Origin인 `https://ditto-global.com`만 허용합니다. localhost, 127.0.0.1, Cloudflare wildcard 등 다른 Origin은 허용하지 않습니다. 설정은 [application.yml](./src/main/resources/application.yml)과 [config/CorsConfig.java](./src/main/java/com/ditto/config/CorsConfig.java)에서 관리하며 `SecurityConfig`가 이를 사용합니다.
 
 ```java
-config.setAllowedOrigins(List.of("http://localhost:3000"));
+config.setAllowedOrigins(List.of("https://ditto-global.com"));
 config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
 config.setAllowCredentials(true);
 ```
