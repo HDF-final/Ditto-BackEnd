@@ -13,20 +13,19 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 public class CorsConfig {
 
     /**
-     * 허용 오리진. app.cors.allowed-origins (CORS_ALLOWED_ORIGINS) 로 덮어쓴다.
-     * allowCredentials(true) 와 와일드카드를 같이 쓰려면 setAllowedOrigins 가 아니라
-     * setAllowedOriginPatterns 를 써야 한다. (Spring 이 실제 Origin 값을 그대로 되돌려준다)
+     * 허용 오리진. 자격 증명을 포함하므로 와일드카드 없이 배포 프론트엔드의
+     * 정확한 Origin만 {@code app.cors.allowed-origins}에 둔다.
      */
-    private final List<String> allowedOriginPatterns;
+    private final List<String> allowedOrigins;
 
-    public CorsConfig(@Value("${app.cors.allowed-origins}") List<String> allowedOriginPatterns) {
-        this.allowedOriginPatterns = allowedOriginPatterns;
+    public CorsConfig(@Value("${app.cors.allowed-origins}") List<String> allowedOrigins) {
+        this.allowedOrigins = allowedOrigins;
     }
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOriginPatterns(allowedOriginPatterns);
+        config.setAllowedOrigins(allowedOrigins);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setExposedHeaders(List.of("Authorization"));
