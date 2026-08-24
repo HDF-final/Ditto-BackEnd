@@ -22,7 +22,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.ditto.auth.dto.request.LoginRequest;
 import com.ditto.news.application.port.out.NewsFeedRepository;
-import com.ditto.news.domain.GeneratedNewsFeed;
 import com.ditto.news.domain.NewsFeed;
 import com.ditto.news.inbound.rest.dto.request.NewsFeedUpdateRequest;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -46,7 +45,7 @@ class AdminSessionCookieAuthLiveTest {
     @DisplayName("[세션 인증 실시간 검증] admin@naver.com 로그인 -> 세션 획득 -> 관리자 뉴스 수정 성공")
     void testAdminLoginAndSessionAuth() throws Exception {
         // 0. 테스트용 임시 뉴스피드 생성
-        GeneratedNewsFeed tempFeed = GeneratedNewsFeed.builder()
+        NewsFeed tempFeed = NewsFeed.builder()
                 .title("임시 테스트 뉴스피드")
                 .slug("temp-auth-test-" + System.currentTimeMillis())
                 .representativeImageUrl("https://img.test.com/temp.jpg")

@@ -8,7 +8,6 @@ import java.util.Optional;
 import org.springframework.stereotype.Repository;
 
 import com.ditto.news.application.port.out.NewsFeedRepository;
-import com.ditto.news.domain.GeneratedNewsFeed;
 import com.ditto.news.domain.NewsFeed;
 import com.ditto.news.outbound.repository.entity.NewsFeedRow;
 import com.ditto.news.outbound.repository.mapper.NewsFeedMapper;
@@ -30,34 +29,25 @@ public class NewsFeedRepositoryImpl implements NewsFeedRepository {
     private final ObjectMapper objectMapper;
 
     @Override
-    public NewsFeed save(GeneratedNewsFeed generatedFeed) {
-        if (generatedFeed == null) {
+    public NewsFeed save(NewsFeed newsFeed) {
+        if (newsFeed == null) {
             return null;
         }
 
-        String summaryJson = serializeList(generatedFeed.getSummaries());
-        String keywordsJson = serializeList(generatedFeed.getKeywords());
+        String summaryJson = serializeList(newsFeed.getSummaries());
+        String keywordsJson = serializeList(newsFeed.getKeywords());
 
         newsFeedMapper.insert(
-                generatedFeed.getTitle(),
-                generatedFeed.getSlug(),
-                generatedFeed.getRepresentativeImageUrl(),
-                generatedFeed.getBody(),
+                newsFeed.getTitle(),
+                newsFeed.getSlug(),
+                newsFeed.getRepresentativeImageUrl(),
+                newsFeed.getBody(),
                 summaryJson,
                 keywordsJson
         );
 
-        log.info("뉴스피드 DB 저장 완료: title='{}', slug='{}'", generatedFeed.getTitle(), generatedFeed.getSlug());
-
-        return NewsFeed.builder()
-                .title(generatedFeed.getTitle())
-                .slug(generatedFeed.getSlug())
-                .representativeImageUrl(generatedFeed.getRepresentativeImageUrl())
-                .body(generatedFeed.getBody())
-                .summaries(generatedFeed.getSummaries())
-                .keywords(generatedFeed.getKeywords())
-                .createdAt(LocalDateTime.now())
-                .build();
+        log.info("뉴스피드 DB 저장 완료: title='{}', slug='{}'", newsFeed.getTitle(), newsFeed.getSlug());
+        return newsFeed;
     }
 
     @Override

@@ -16,7 +16,6 @@ import com.ditto.global.exception.BusinessException;
 import com.ditto.global.exception.ErrorCode;
 import com.ditto.news.application.port.out.NewsFeedRepository;
 import com.ditto.news.application.service.NewsFeedService;
-import com.ditto.news.domain.GeneratedNewsFeed;
 import com.ditto.news.domain.NewsFeed;
 
 @SpringBootTest
@@ -39,7 +38,7 @@ class NewsFeedCrudComprehensiveLiveTest {
 
         // 1. 사전 데이터 생성 (C)
         String uniqueSlug = "test-slug-" + System.currentTimeMillis();
-        GeneratedNewsFeed newFeed = GeneratedNewsFeed.builder()
+        NewsFeed newFeed = NewsFeed.builder()
                 .title("테스트 뉴스 제목 🌟")
                 .slug(uniqueSlug)
                 .representativeImageUrl("https://img.test.com/photo.jpg")
