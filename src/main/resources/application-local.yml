@@ -74,6 +74,16 @@ ditto:
     # 조회 창구는 Redis 를 한 번 읽고 끝난다. 짧아야 람다가 죽었을 때 화면이 안 매달린다.
     read-timeout: 10s
 
+  # ===== 실내 지도 원장 자산 =====
+  # 층 그래프·장소 원장·방 폴리곤은 한 번 만들어지면 바뀌지 않는 정적 파일이라 S3 에 두고
+  # CloudFront(course-resource/*)로 내보낸다. 백엔드는 그 파일을 대신 실어 나르지 않는다 —
+  # 588KB 를 EC2 로 통과시키면 CDN 을 둔 이유가 사라진다. 어디에 있는지만 알려 준다.
+  #
+  # 비워 두면 프론트가 자기 public/ 안의 사본으로 떨어진다.
+  map-assets:
+    base-url: ${MAP_ASSET_BASE_URL:https://d1bxld598du04o.cloudfront.net/course-resource/navigation/v2}
+    max-age-seconds: ${MAP_ASSET_MAX_AGE:1814400}
+
   # ===== OCR 간판 인식 길찾기 =====
   # 세션은 인메모리로 관리한다. 인식은 네이버 CLOVA OCR(외부) 에 맡긴다.
   # invoke-url·secret 은 CLOVA 콘솔에서 발급하며 소스에 두지 않고 .env 로 공급한다.
