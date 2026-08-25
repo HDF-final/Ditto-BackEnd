@@ -73,6 +73,26 @@ class CelebDraftClientTest {
     }
 
     @Test
+    @DisplayName("장소 카탈로그 창구를 그대로 부른다")
+    void callsPlacesWindow() {
+        stubPayload("{\"count\":147,\"places\":[]}");
+
+        client.findPlaces(false);
+
+        assertThat(sentPayload()).isEqualTo("{\"places\":true,\"fresh\":false}");
+    }
+
+    @Test
+    @DisplayName("fresh 를 주면 람다가 들고 있는 목록을 무시하게 한다")
+    void callsPlacesWindowFresh() {
+        stubPayload("{\"count\":147,\"places\":[]}");
+
+        client.findPlaces(true);
+
+        assertThat(sentPayload()).contains("\"fresh\":true");
+    }
+
+    @Test
     @DisplayName("어느 창구도 초안을 만들지 않는다 — 명단 칸을 보내는 경로가 없다")
     void neverSendsRoster() {
         stubPayload("{\"count\":0,\"drafts\":[]}");

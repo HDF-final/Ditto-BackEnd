@@ -22,6 +22,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import com.ditto.admin.dto.response.AdminCourseDetailResponse;
 import com.ditto.admin.dto.response.AdminCourseListResponse;
+import com.ditto.admin.dto.response.AdminCoursePlaceCatalogResponse;
 import com.ditto.admin.dto.response.AdminCourseRunResponse;
 import com.ditto.admin.service.AdminCourseService;
 import com.ditto.global.exception.BusinessException;
@@ -91,14 +92,38 @@ class AdminCourseControllerTest {
     }
 
     @Test
-    @DisplayName("/run 은 인물 이름으로 새지 않는다 — 고정 경로가 변수보다 구체적이다")
-    void runPathBeatsCelebrityPath() throws Exception {
-        given(adminCourseService.getRunStatus()).willReturn(run());
+    @DisplayName("장소 카탈로그를 돌려준다")
+    void returnsPlaceCatalog() throws Exception {
+        given(adminCourseService.getPlaces(false)).willReturn(catalog());
 
-        mockMvc.perform(get("/api/v1/admin/admin-courses/run"))
+        mockMvc.perform(get("/api/v1/admin/admin-courses/places"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.count").value(2))
+                .andExpect(jsonPath("$.data.payload.places[0].place_name").value("구찌"));
+    }
+
+    @Test
+    @DisplayName("fresh=true 를 그대로 넘긴다")
+    void passesFreshFlag() throws Exception {
+        given(adminCourseService.getPlaces(true)).willReturn(catalog());
+
+        mockMvc.perform(get("/api/v1/admin/admin-courses/places").param("fresh", "true"))
                 .andExpect(status().isOk());
 
+        then(adminCourseService).should().getPlaces(true);
+    }
+
+    @Test
+    @DisplayName("/run 과 /places 는 인물 이름으로 새지 않는다 — 고정 경로가 변수보다 구체적이다")
+    void fixedPathsBeatCelebrityPath() throws Exception {
+        given(adminCourseService.getRunStatus()).willReturn(run());
+        given(adminCourseService.getPlaces(false)).willReturn(catalog());
+
+        mockMvc.perform(get("/api/v1/admin/admin-courses/run")).andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/admin/admin-courses/places")).andExpect(status().isOk());
+
         then(adminCourseService).should().getRunStatus();
+        then(adminCourseService).should().getPlaces(false);
         then(adminCourseService).should(org.mockito.Mockito.never()).getDraft(anyString());
     }
 
@@ -162,6 +187,21 @@ class AdminCourseControllerTest {
                            "evidence":{"brand":"프라다","article":"https://issuepicker.com/news/26308"},
                            "image":{"kind":"evidence","url":"https://issuepicker.com/x.jpg",
                                     "caption":"카리나 × 프라다"}}]}
+                        """))
+                .build();
+    }
+
+    private AdminCoursePlaceCatalogResponse catalog() throws Exception {
+        return AdminCoursePlaceCatalogResponse.builder()
+                .functionName("ditto-celeb-warm-2")
+                .fetchedAt(Instant.parse("2026-08-25T05:20:00Z"))
+                .count(2)
+                .payload(objectMapper.readTree("""
+                        {"count":2,"places":[
+                          {"navigation_key":"1F_STORE_0031","place_name":"구찌","floor":"1F",
+                           "category":"럭셔리","image_url":"https://s3/gucci.jpg"},
+                          {"navigation_key":"1F_STORE_0065","place_name":"르 라보","floor":"1F",
+                           "category":"뷰티","image_url":"https://s3/lelabo.png"}]}
                         """))
                 .build();
     }

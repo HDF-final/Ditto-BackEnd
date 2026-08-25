@@ -630,6 +630,7 @@ HTTP로 호출하고 응답을 `ApiResponse`로 감싸 돌려줄 뿐입니다. �
 | 검색 유입 콘텐츠 조회 | `GET` | `/api/v1/admin/seo/contents` | ADMIN |
 | 승인 대기 코스 초안 목록 조회 | `GET` | `/api/v1/admin/admin-courses` | ADMIN |
 | 오늘 초안 생성 실행 상황 조회 | `GET` | `/api/v1/admin/admin-courses/run` | ADMIN |
+| 더현대 장소 카탈로그 조회 | `GET` | `/api/v1/admin/admin-courses/places` | ADMIN |
 | 인물 한 명의 코스 초안 조회 | `GET` | `/api/v1/admin/admin-courses/{celebrity}` | ADMIN |
 
 트렌드 조회 API는 Lambda가 기존 이미지 버킷에 갱신하는 `latest-*.json` 세 파일만 읽습니다.
@@ -646,6 +647,9 @@ HTTP로 호출하고 응답을 `ApiResponse`로 감싸 돌려줄 뿐입니다. �
 | 목록 | `{"drafts":true}` | 인물·상태·코스 모양·경고 수·남은 TTL (머리말만) |
 | 상세 | `{"draft":"카리나"}` | 코스 전문 — 장소마다 근거 문장·출처 기사·사진, 그리고 승인 람다가 쓸 조사 원문(`research`)과 다음 턴을 잇는 세션 상태(`state`) |
 | 실행 상황 | `{"run":true}` | 오늘 배치가 어디까지 갔나 (`queued` / `done`) |
+| 장소 카탈로그 | `{"places":true}` | 더현대 장소 전부(147곳). 관리자가 초안의 자리를 갈아 끼울 때 고를 재료 |
+
+장소 카탈로그는 관리자 화면이 DB 에 직접 붙지 않게 하려고 람다에서 받아 옵니다 — 초안을 만드는 람다가 이미 장소 DB 와 사진 DB 둘 다에 붙어 있어 거기서 내주는 편이 쌉니다. 람다가 5분간 들고 있으므로 매장이 새로 들어온 날은 `?fresh=true` 로 갱신합니다. 조회에 실패해도 오류가 아니라 **빈 목록**이 옵니다.
 
 - 초안을 **만들거나 지우거나 서빙 캐시(`celeb:course:*`)로 올리지 않습니다.** 그 셋은 배치와
   승인 람다의 일이고, 여기서 열어 두면 관리자 화면의 실수 한 번이 손님에게 그대로 나갑니다.
