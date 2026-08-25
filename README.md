@@ -429,6 +429,7 @@ Ditto-BackEnd/
 | 기능 | Method | Endpoint | 인증 | 상태 |
 | --- | --- | --- | --- | --- |
 | AI 코스 추천 대화 · 맞춤 생성 · 재추천 | `POST` | `/api/v1/ai/course-recommendations/chat` | O | 구현됨 |
+| AI 추천 장소 브랜드 상품 이미지 조회 | `GET` | `/api/v1/ai/course-recommendations/places/{navigationKey}/products` | O | 구현됨 |
 
 **엔드포인트는 하나입니다.** 맞춤 생성·대화로 다듬기·재추천이 전부 같은 호출입니다.
 차이는 `sessionId`를 싣느냐뿐입니다.
@@ -461,6 +462,22 @@ HTTP로 호출하고 응답을 `ApiResponse`로 감싸 돌려줄 뿐입니다. �
 > 엔진 쪽 `http.server`가 본문을 0바이트로 읽어 **에러 없이 빈 메시지**를 처리합니다.
 > `AiEngineClient`가 본문을 `byte[]`로 직렬화하는 이유입니다. AWS API Gateway도
 > 청크 전송을 받지 않으므로 Lambda 이전 후에도 동일합니다.
+
+장소 상세 모달의 `브랜드 사진` 영역은 추천 장소의 `navigationKey`로 상품 이미지를 조회한다.
+기본 6개, 최대 20개를 반환한다.
+
+```
+요청  GET /api/v1/ai/course-recommendations/places/B2_STORE_0030/products?limit=3
+응답  data: [{"productId": 10,
+              "productName": "뉴발란스 574",
+              "brandId": 3,
+              "brandName": "뉴발란스",
+              "imageUrl": "https://image.example.com/nb-574.jpg",
+              "productUrl": "https://www.nbkorea.com/product/574"}]
+```
+
+프론트는 `imageUrl`을 썸네일로 노출하고, 이미지 클릭 시 `productUrl`로 이동시키면 된다.
+해당 매장 브랜드에 연결된 상품 이미지가 없으면 빈 배열을 반환한다.
 
 ### 내 코스 (My Course) — `/api/v1/courses`
 

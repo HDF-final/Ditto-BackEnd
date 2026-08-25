@@ -1,8 +1,13 @@
 package com.ditto.aicourse.controller;
 
+import java.util.List;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpHeaders;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -11,12 +16,15 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.ditto.aicourse.dto.request.CourseChatRequest;
 import com.ditto.aicourse.dto.response.CourseChatResponse;
+import com.ditto.aicourse.dto.response.PlaceProductImageResponse;
 import com.ditto.aicourse.service.AiCourseRecommendationService;
+import com.ditto.aicourse.service.PlaceProductImageService;
 import com.ditto.global.common.response.ApiResponse;
 import com.ditto.global.i18n.AcceptLanguageResolver;
 import com.ditto.security.SecurityUtils;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +37,7 @@ import lombok.RequiredArgsConstructor;
 public class AiCourseRecommendationController {
 
     private final AiCourseRecommendationService aiCourseRecommendationService;
+    private final PlaceProductImageService placeProductImageService;
 
     @Operation(
             summary = "AI 코스 추천 대화 (맞춤 생성·재추천 포함)",
@@ -65,5 +74,24 @@ public class AiCourseRecommendationController {
                         SecurityUtils.requireUserId(),
                         request,
                         AcceptLanguageResolver.resolve(acceptLanguage)));
+    }
+
+    @Operation(
+            summary = "AI 추천 장소의 브랜드 상품 이미지 조회",
+            description = """
+                    추천 코스 장소의 navigationKey 로 연결된 매장을 찾고, 그 매장의 브랜드에 \
+                    연결된 product 이미지와 클릭 이동 URL 을 반환합니다.
+
+                    프론트는 장소 상세 모달의 '브랜드 사진' 영역에 `imageUrl` 을 노출하고, \
+                    사용자가 이미지를 클릭하면 `productUrl` 로 이동시키면 됩니다. 기본 6개, 최대 20개입니다.
+                    """)
+    @GetMapping("/places/{navigationKey}/products")
+    public ApiResponse<List<PlaceProductImageResponse>> getPlaceProductImages(
+            @Parameter(description = "AI 추천 장소의 navigationKey", example = "B2_STORE_0012")
+            @PathVariable String navigationKey,
+            @Parameter(description = "조회 개수. 기본 6, 최대 20", example = "3")
+            @RequestParam(required = false) Integer limit) {
+        return ApiResponse.success("성공",
+                placeProductImageService.getProductImages(navigationKey, limit));
     }
 }
