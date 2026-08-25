@@ -4,7 +4,9 @@ import java.time.Instant;
 
 import org.springframework.stereotype.Service;
 
+import com.ditto.admin.client.CelebApproveClient;
 import com.ditto.admin.client.CelebDraftClient;
+import com.ditto.admin.dto.response.AdminCourseApproveResponse;
 import com.ditto.admin.dto.response.AdminCourseDetailResponse;
 import com.ditto.admin.dto.response.AdminCourseListResponse;
 import com.ditto.admin.dto.response.AdminCoursePlaceCatalogResponse;
@@ -17,11 +19,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- * {@code ditto-celeb-warm-2} 가 만든 승인 대기 코스 초안을 읽는다. <b>읽기만 한다.</b>
+ * {@code ditto-celeb-warm-2} 가 만든 승인 대기 코스 초안을 읽고, 관리자가 확정한 것을
+ * {@code ditto-celeb-approve} 로 넘긴다.
  *
- * <p>초안을 만들지도, 지우지도, 서빙 캐시({@code celeb:course:*})로 올리지도 않는다.
- * 그 셋은 각각 배치와 승인 람다의 일이고, 여기서 열어 두면 관리자 화면의 실수 한 번이
- * 손님에게 그대로 나간다.
+ * <p><b>이 백엔드가 직접 Redis 나 Oracle 을 건드리지는 않는다.</b> 캐시 키의 규칙과
+ * 쓰는 순서는 람다가 안다 — 여기서 흉내 내면 두 곳이 같은 규칙을 따로 들게 된다.
  */
 @Slf4j
 @Service
@@ -29,6 +31,7 @@ import lombok.extern.slf4j.Slf4j;
 public class AdminCourseService {
 
     private final CelebDraftClient celebDraftClient;
+    private final CelebApproveClient celebApproveClient;
 
     public AdminCourseListResponse getDrafts() {
         JsonNode payload = celebDraftClient.listDrafts();
@@ -99,6 +102,49 @@ public class AdminCourseService {
                 .functionName(celebDraftClient.getFunctionName())
                 .fetchedAt(Instant.now())
                 .count(payload.path("places").size())
+                .payload(payload)
+                .build();
+    }
+
+    /**
+     * 관리자가 고친 초안을 승인해 손님 캐시로 올린다.
+     *
+     * <p><b>경로의 인물과 본문의 인물이 다르면 막는다.</b> 화면이 다른 초안을 열어 둔
+     * 채로 요청이 나가면 남의 인물 캐시를 덮어쓰게 된다 — 그건 하루 종일 손님에게
+     * 나가는 값이라 되돌릴 창구가 없다.
+     */
+    public AdminCourseApproveResponse approve(String celebrity, JsonNode draft) {
+        String name = celebrity == null ? "" : celebrity.trim();
+        if (name.isEmpty()) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "인물 이름이 비어 있습니다.");
+        }
+        if (draft == null || !draft.isObject()) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "초안 본문이 비어 있습니다.");
+        }
+        String inBody = draft.path("celebrity").asText("").trim();
+        if (!name.equals(inBody)) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE,
+                    "경로의 인물(" + name + ")과 본문의 인물(" + inBody + ")이 다릅니다.");
+        }
+
+        JsonNode payload = celebApproveClient.approve(draft);
+
+        // 람다는 검증 실패를 예외가 아니라 {"ok":false,"errors":[…]} 로 돌려준다.
+        // 이걸 놓치면 아무것도 안 올라갔는데 화면이 "승인했습니다" 라고 한다.
+        if (!payload.path("ok").asBoolean(false)) {
+            String why = payload.path("errors").toString();
+            log.warn("승인이 거절됐다. celebrity={}, errors={}", name, why);
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE,
+                    "승인할 수 없습니다: " + why);
+        }
+
+        return AdminCourseApproveResponse.builder()
+                .functionName(celebApproveClient.getFunctionName())
+                .approvedAt(Instant.now())
+                .celebrity(payload.path("celebrity").asText(name))
+                .placeCount(payload.path("places").asInt())
+                .expiresAt(textOrNull(payload, "expires_at"))
+                .warnings(payload.get("warnings"))
                 .payload(payload)
                 .build();
     }

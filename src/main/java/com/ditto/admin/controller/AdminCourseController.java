@@ -2,16 +2,20 @@ package com.ditto.admin.controller;
 
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.ditto.admin.dto.response.AdminCourseApproveResponse;
 import com.ditto.admin.dto.response.AdminCourseDetailResponse;
 import com.ditto.admin.dto.response.AdminCourseListResponse;
 import com.ditto.admin.dto.response.AdminCoursePlaceCatalogResponse;
 import com.ditto.admin.dto.response.AdminCourseRunResponse;
 import com.ditto.admin.service.AdminCourseService;
 import com.ditto.global.common.response.ApiResponse;
+import com.fasterxml.jackson.databind.JsonNode;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -65,5 +69,17 @@ public class AdminCourseController {
             @Parameter(description = "인물 이름", example = "카리나")
             @PathVariable String celebrity) {
         return ApiResponse.success(adminCourseService.getDraft(celebrity));
+    }
+
+    @Operation(summary = "코스 초안 승인",
+            description = "관리자가 고친 초안을 손님이 받는 캐시로 올리고 초안을 지운다. "
+                    + "캐시는 다음 00시(KST)에 만료된다. 되돌리는 창구는 없다 — "
+                    + "잘못 올렸으면 고쳐서 다시 승인한다(덮어쓴다).")
+    @PostMapping("/{celebrity}/approve")
+    public ApiResponse<AdminCourseApproveResponse> approve(
+            @Parameter(description = "인물 이름", example = "카리나")
+            @PathVariable String celebrity,
+            @RequestBody JsonNode draft) {
+        return ApiResponse.success(adminCourseService.approve(celebrity, draft));
     }
 }
