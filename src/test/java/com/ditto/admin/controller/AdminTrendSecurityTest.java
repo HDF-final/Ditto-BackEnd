@@ -38,20 +38,20 @@ class AdminTrendSecurityTest {
     @Test
     @DisplayName("ROLE_ADMIN 사용자는 트렌드 산출물을 조회할 수 있다")
     void adminCanReadTrendArtifact() throws Exception {
-        given(adminTrendService.getTop4()).willReturn(artifact());
+        given(adminTrendService.getTop10()).willReturn(artifact());
 
-        mockMvc.perform(get("/api/v1/admin/trends/top4")
+        mockMvc.perform(get("/api/v1/admin/trends/top10")
                         .header("X-User-Id", "1")
                         .header("X-User-Role", "ROLE_ADMIN"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.artifact").value("top4"));
+                .andExpect(jsonPath("$.data.artifact").value("top10"));
     }
 
     @Test
     @DisplayName("ROLE_CUSTOMER 사용자는 트렌드 산출물 조회가 거부된다")
     void customerCannotReadTrendArtifact() throws Exception {
-        mockMvc.perform(get("/api/v1/admin/trends/top4")
+        mockMvc.perform(get("/api/v1/admin/trends/top10")
                         .header("X-User-Id", "2")
                         .header("X-User-Role", "ROLE_CUSTOMER"))
                 .andExpect(status().isForbidden())
@@ -62,7 +62,7 @@ class AdminTrendSecurityTest {
     @Test
     @DisplayName("인증되지 않은 사용자는 트렌드 산출물 조회가 거부된다")
     void anonymousCannotReadTrendArtifact() throws Exception {
-        mockMvc.perform(get("/api/v1/admin/trends/top4"))
+        mockMvc.perform(get("/api/v1/admin/trends/top10"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.code").value("A001"));
@@ -70,8 +70,8 @@ class AdminTrendSecurityTest {
 
     private TrendArtifactResponse artifact() throws Exception {
         return TrendArtifactResponse.builder()
-                .artifact("top4")
-                .displayName("국가별 TOP 4")
+                .artifact("top10")
+                .displayName("국가별 TOP 10")
                 .status("complete")
                 .builtAt("2026-08-24T06:48:30Z")
                 .warningCount(0)

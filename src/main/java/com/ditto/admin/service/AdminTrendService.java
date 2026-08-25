@@ -14,6 +14,10 @@ public class AdminTrendService {
 
     private final TrendArtifactRepository trendArtifactRepository;
 
+    public TrendArtifactResponse getTop10() {
+        return trendArtifactRepository.findLatest(TrendArtifactType.TOP10);
+    }
+
     public TrendArtifactResponse getTop4() {
         return trendArtifactRepository.findLatest(TrendArtifactType.TOP4);
     }

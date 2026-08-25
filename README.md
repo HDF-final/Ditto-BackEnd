@@ -602,8 +602,9 @@ HTTP로 호출하고 응답을 `ApiResponse`로 감싸 돌려줄 뿐입니다. �
 | 기본 추천 코스 수정 | `PUT` | `/api/v1/admin/recommend-courses/{courseId}` | ADMIN |
 | 기본 추천 코스 삭제 | `DELETE` | `/api/v1/admin/recommend-courses/{courseId}` | ADMIN |
 | 트렌드 순위 관리 | `PUT` | `/api/v1/admin/trends/rankings` | ADMIN |
-| 국가별 트렌드 TOP 4 산출물 조회 | `GET` | `/api/v1/admin/trends/top4` | ADMIN |
-| 국가별 후보 TOP 20 산출물 조회 | `GET` | `/api/v1/admin/trends/candidates` | ADMIN |
+| 국가별 트렌드 TOP 10 산출물 조회 | `GET` | `/api/v1/admin/trends/top10` | ADMIN |
+| 국가별 트렌드 TOP 4 호환본 조회 | `GET` | `/api/v1/admin/trends/top4` | ADMIN |
+| 국가별 후보군 산출물 조회 | `GET` | `/api/v1/admin/trends/candidates` | ADMIN |
 | YouTube 급상승 TOP 10 산출물 조회 | `GET` | `/api/v1/admin/trends/youtube` | ADMIN |
 | AI 코스·챗봇 로그 조회 | `GET` | `/api/v1/admin/logs/ai` | ADMIN |
 | 사이트맵 조회 | `GET` | `/api/v1/admin/sitemap` | ADMIN |

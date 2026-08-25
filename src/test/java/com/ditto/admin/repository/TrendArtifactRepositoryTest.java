@@ -60,15 +60,15 @@ class TrendArtifactRepositoryTest {
                 .willAnswer(invocation -> {
                     GetObjectRequest request = invocation.getArgument(0);
                     assertThat(request.bucket()).isEqualTo("hdf-ditto-images");
-                    assertThat(request.key()).isEqualTo("trends/country-ranking/latest-top4.json");
+                    assertThat(request.key()).isEqualTo("trends/country-ranking/latest-top10.json");
                     return ResponseBytes.fromByteArray(
                             objectResponse,
                             json.getBytes(StandardCharsets.UTF_8));
                 });
 
-        TrendArtifactResponse response = repository.findLatest(TrendArtifactType.TOP4);
+        TrendArtifactResponse response = repository.findLatest(TrendArtifactType.TOP10);
 
-        assertThat(response.getArtifact()).isEqualTo("top4");
+        assertThat(response.getArtifact()).isEqualTo("top10");
         assertThat(response.getStatus()).isEqualTo("partial");
         assertThat(response.getBuiltAt()).isEqualTo("2026-08-24T06:48:30Z");
         assertThat(response.getWarningCount()).isEqualTo(2);
