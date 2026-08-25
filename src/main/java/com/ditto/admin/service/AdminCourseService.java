@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import com.ditto.admin.client.CelebDraftClient;
 import com.ditto.admin.dto.response.AdminCourseDetailResponse;
 import com.ditto.admin.dto.response.AdminCourseListResponse;
+import com.ditto.admin.dto.response.AdminCoursePlaceCatalogResponse;
 import com.ditto.admin.dto.response.AdminCourseRunResponse;
 import com.ditto.global.exception.BusinessException;
 import com.ditto.global.exception.ErrorCode;
@@ -79,6 +80,25 @@ public class AdminCourseService {
                 .date(textOrNull(payload, "date"))
                 .queued(payload.path("queued").asInt())
                 .doneCount(payload.path("done").size())
+                .payload(payload)
+                .build();
+    }
+
+    /**
+     * 더현대 장소 전부. 관리자가 초안의 자리를 갈아 끼울 때 고를 재료다.
+     *
+     * <p>람다는 조회에 실패해도 오류가 아니라 <b>빈 목록</b>을 준다 — 목록을 못 얻었다고
+     * 초안 만들기까지 같이 죽으면 안 된다는 판단이다. 그래서 여기서도 빈 목록이 정상 응답이고,
+     * 화면이 "고를 것이 없다"로 표시한다.
+     */
+    public AdminCoursePlaceCatalogResponse getPlaces(boolean fresh) {
+        JsonNode payload = celebDraftClient.findPlaces(fresh);
+        rejectError(payload, ErrorCode.CELEB_DRAFT_READ_FAILED);
+
+        return AdminCoursePlaceCatalogResponse.builder()
+                .functionName(celebDraftClient.getFunctionName())
+                .fetchedAt(Instant.now())
+                .count(payload.path("places").size())
                 .payload(payload)
                 .build();
     }

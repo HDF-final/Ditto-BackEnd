@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import com.ditto.admin.client.CelebDraftClient;
 import com.ditto.admin.dto.response.AdminCourseDetailResponse;
 import com.ditto.admin.dto.response.AdminCourseListResponse;
+import com.ditto.admin.dto.response.AdminCoursePlaceCatalogResponse;
 import com.ditto.admin.dto.response.AdminCourseRunResponse;
 import com.ditto.global.exception.BusinessException;
 import com.ditto.global.exception.ErrorCode;
@@ -138,6 +139,32 @@ class AdminCourseServiceTest {
         assertThatThrownBy(() -> service.getDrafts())
                 .isInstanceOf(BusinessException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.CELEB_DRAFT_READ_FAILED);
+    }
+
+    @Test
+    @DisplayName("장소 카탈로그는 곳 수를 세어 머리말에 올린다")
+    void countsPlaces() {
+        given(celebDraftClient.findPlaces(false)).willReturn(json("""
+                {"count":2,"places":[
+                  {"navigation_key":"1F_STORE_0031","place_name":"구찌","floor":"1F",
+                   "category":"럭셔리","image_url":"https://s3/gucci.jpg"},
+                  {"navigation_key":"1F_STORE_0065","place_name":"르 라보","floor":"1F",
+                   "category":"뷰티","image_url":"https://s3/lelabo.png"}]}
+                """));
+
+        AdminCoursePlaceCatalogResponse response = service.getPlaces(false);
+
+        assertThat(response.getCount()).isEqualTo(2);
+        assertThat(response.getPayload().path("places").get(0).path("place_name").asText())
+                .isEqualTo("구찌");
+    }
+
+    @Test
+    @DisplayName("장소 카탈로그가 비어도 오류가 아니다 — 화면이 '고를 것이 없다'로 표시한다")
+    void emptyCatalogIsNotAnError() {
+        given(celebDraftClient.findPlaces(false)).willReturn(json("{\"count\":0,\"places\":[]}"));
+
+        assertThat(service.getPlaces(false).getCount()).isZero();
     }
 
     @Test

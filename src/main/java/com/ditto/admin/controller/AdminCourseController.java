@@ -3,10 +3,12 @@ package com.ditto.admin.controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.ditto.admin.dto.response.AdminCourseDetailResponse;
 import com.ditto.admin.dto.response.AdminCourseListResponse;
+import com.ditto.admin.dto.response.AdminCoursePlaceCatalogResponse;
 import com.ditto.admin.dto.response.AdminCourseRunResponse;
 import com.ditto.admin.service.AdminCourseService;
 import com.ditto.global.common.response.ApiResponse;
@@ -36,15 +38,24 @@ public class AdminCourseController {
     }
 
     /**
-     * 인물 이름이 {@code run} 이어도 이 매핑이 이긴다 — Spring 6 의 경로 매칭은 선언 순서가
-     * 아니라 더 구체적인 패턴을 고르고, 고정 문자열이 변수보다 구체적이다. 읽는 사람을 위해
-     * 순서도 맞춰 둔다.
+     * 인물 이름이 {@code run} 이나 {@code places} 여도 이 매핑들이 이긴다 — Spring 6 의 경로
+     * 매칭은 선언 순서가 아니라 더 구체적인 패턴을 고르고, 고정 문자열이 변수보다 구체적이다.
+     * 읽는 사람을 위해 순서도 맞춰 둔다.
      */
     @Operation(summary = "오늘 초안 생성 실행 상황 조회",
             description = "배치가 아직 도는 중인지, 실패로 끝났는지를 본다. 초안 목록만으로는 둘을 구별할 수 없다.")
     @GetMapping("/run")
     public ApiResponse<AdminCourseRunResponse> getRunStatus() {
         return ApiResponse.success(adminCourseService.getRunStatus());
+    }
+
+    @Operation(summary = "더현대 장소 카탈로그 조회",
+            description = "관리자가 초안의 자리를 갈아 끼울 때 고를 목록. 초안의 차순위 후보로 모자랄 때 쓴다.")
+    @GetMapping("/places")
+    public ApiResponse<AdminCoursePlaceCatalogResponse> getPlaces(
+            @Parameter(description = "람다가 5분간 들고 있는 목록을 무시하고 다시 조회한다", example = "false")
+            @RequestParam(defaultValue = "false") boolean fresh) {
+        return ApiResponse.success(adminCourseService.getPlaces(fresh));
     }
 
     @Operation(summary = "인물 한 명의 코스 초안 조회",
