@@ -20,13 +20,19 @@ public class AdminTrendController {
 
     private final AdminTrendService adminTrendService;
 
-    @Operation(summary = "국가별 트렌드 TOP 4 조회")
+    @Operation(summary = "국가별 트렌드 TOP 10 조회")
+    @GetMapping("/top10")
+    public ApiResponse<TrendArtifactResponse> getTop10() {
+        return ApiResponse.success(adminTrendService.getTop10());
+    }
+
+    @Operation(summary = "국가별 트렌드 TOP 4 호환본 조회")
     @GetMapping("/top4")
     public ApiResponse<TrendArtifactResponse> getTop4() {
         return ApiResponse.success(adminTrendService.getTop4());
     }
 
-    @Operation(summary = "국가별 트렌드 후보 TOP 20 조회")
+    @Operation(summary = "국가별 트렌드 후보군 조회")
     @GetMapping("/candidates")
     public ApiResponse<TrendArtifactResponse> getCandidates() {
         return ApiResponse.success(adminTrendService.getCandidates());

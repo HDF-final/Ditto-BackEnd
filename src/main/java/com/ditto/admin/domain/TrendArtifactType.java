@@ -8,8 +8,9 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public enum TrendArtifactType {
 
-    TOP4("top4", "국가별 TOP 4", "trends/country-ranking/latest-top4.json"),
-    CANDIDATES("candidates", "국가별 후보 TOP 20", "trends/country-ranking/latest-candidates.json"),
+    TOP10("top10", "국가별 TOP 10", "trends/country-ranking/latest-top10.json"),
+    TOP4("top4", "국가별 TOP 4 호환본", "trends/country-ranking/latest-top4.json"),
+    CANDIDATES("candidates", "국가별 후보군", "trends/country-ranking/latest-candidates.json"),
     YOUTUBE("youtube", "YouTube 급상승 TOP 10", "trends/youtube/latest-top10.json");
 
     private final String code;

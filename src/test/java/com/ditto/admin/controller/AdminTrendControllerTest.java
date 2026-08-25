@@ -39,6 +39,17 @@ class AdminTrendControllerTest {
     private ObjectMapper objectMapper;
 
     @Test
+    void returnsTop10Artifact() throws Exception {
+        given(adminTrendService.getTop10()).willReturn(artifact("top10"));
+
+        mockMvc.perform(get("/api/v1/admin/trends/top10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.artifact").value("top10"))
+                .andExpect(jsonPath("$.data.payload.countries.KR").isArray());
+    }
+
+    @Test
     void returnsTop4Artifact() throws Exception {
         given(adminTrendService.getTop4()).willReturn(artifact("top4"));
 
