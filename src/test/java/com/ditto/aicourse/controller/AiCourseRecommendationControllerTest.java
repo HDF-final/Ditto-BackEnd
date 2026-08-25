@@ -4,6 +4,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -24,7 +25,9 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import com.ditto.aicourse.dto.request.CourseChatRequest;
 import com.ditto.aicourse.dto.response.CourseChatResponse;
+import com.ditto.aicourse.dto.response.PlaceProductImageResponse;
 import com.ditto.aicourse.service.AiCourseRecommendationService;
+import com.ditto.aicourse.service.PlaceProductImageService;
 import com.ditto.global.i18n.ContentLanguage;
 import com.ditto.security.AuthUser;
 
@@ -37,6 +40,9 @@ class AiCourseRecommendationControllerTest {
 
     @MockBean
     private AiCourseRecommendationService aiCourseRecommendationService;
+
+    @MockBean
+    private PlaceProductImageService placeProductImageService;
 
     @Test
     @DisplayName("Accept-Language를 AI 추천 서비스 언어로 전달한다")
@@ -65,5 +71,28 @@ class AiCourseRecommendationControllerTest {
 
         verify(aiCourseRecommendationService).chat(
                 eq(2L), any(CourseChatRequest.class), eq(ContentLanguage.ENGLISH));
+    }
+
+    @Test
+    @DisplayName("navigationKey로 장소 브랜드 상품 이미지를 조회한다")
+    void getsPlaceProductImages() throws Exception {
+        given(placeProductImageService.getProductImages("B2_STORE_0012", 3))
+                .willReturn(List.of(PlaceProductImageResponse.builder()
+                        .productId(10L)
+                        .productName("뉴발란스 574")
+                        .brandId(3L)
+                        .brandName("뉴발란스")
+                        .imageUrl("https://image.example.com/nb-574.jpg")
+                        .productUrl("https://www.nbkorea.com/product/574")
+                        .build()));
+
+        mockMvc.perform(get("/api/v1/ai/course-recommendations/places/B2_STORE_0012/products")
+                        .param("limit", "3"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].productName").value("뉴발란스 574"))
+                .andExpect(jsonPath("$.data[0].imageUrl").value("https://image.example.com/nb-574.jpg"))
+                .andExpect(jsonPath("$.data[0].productUrl").value("https://www.nbkorea.com/product/574"));
+
+        verify(placeProductImageService).getProductImages("B2_STORE_0012", 3);
     }
 }

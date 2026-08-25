@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ditto.aicourse.repository.PlaceProductMapper">
+
+    <select id="findProductImagesByNavigationKey"
+            resultType="com.ditto.aicourse.repository.PlaceProductMapper$PlaceProductImageRow">
+        SELECT *
+          FROM (
+                SELECT pr.product_id,
+                       pr.name AS product_name,
+                       b.brand_id,
+                       b.name AS brand_name,
+                       pr.image_url,
+                       pr.product_url
+                  FROM place pl
+                 JOIN brand b ON b.brand_id = pl.brand_id
+                 JOIN product pr ON pr.brand_id = b.brand_id
+                 WHERE pl.navigation_key = #{navigationKey}
+                   AND pr.image_url IS NOT NULL
+                   AND pr.product_url IS NOT NULL
+                 ORDER BY pr.sort_order, pr.product_id
+               )
+         WHERE ROWNUM &lt;= #{limit}
+    </select>
+
+</mapper>
