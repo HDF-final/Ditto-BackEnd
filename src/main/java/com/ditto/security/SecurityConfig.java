@@ -83,7 +83,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/community/courses/*/likes").hasRole("CUSTOMER")
                         .requestMatchers(HttpMethod.POST, "/api/v1/community/courses/*/bookmarks").hasRole("CUSTOMER")
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/community/courses/*/bookmarks").hasRole("CUSTOMER")
-                        .requestMatchers("/api/v1/users/me/**").hasRole("CUSTOMER")
+                        // 관리자 화면도 동일한 세션 프로필 API로 ROLE_ADMIN 여부를 확인한다.
+                        .requestMatchers("/api/v1/users/me/**").hasAnyRole("CUSTOMER", "ADMIN")
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .logout(logout -> logout.disable());

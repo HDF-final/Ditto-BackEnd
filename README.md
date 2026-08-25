@@ -602,9 +602,15 @@ HTTP로 호출하고 응답을 `ApiResponse`로 감싸 돌려줄 뿐입니다. �
 | 기본 추천 코스 수정 | `PUT` | `/api/v1/admin/recommend-courses/{courseId}` | ADMIN |
 | 기본 추천 코스 삭제 | `DELETE` | `/api/v1/admin/recommend-courses/{courseId}` | ADMIN |
 | 트렌드 순위 관리 | `PUT` | `/api/v1/admin/trends/rankings` | ADMIN |
+| 국가별 트렌드 TOP 4 산출물 조회 | `GET` | `/api/v1/admin/trends/top4` | ADMIN |
+| 국가별 후보 TOP 20 산출물 조회 | `GET` | `/api/v1/admin/trends/candidates` | ADMIN |
+| YouTube 급상승 TOP 10 산출물 조회 | `GET` | `/api/v1/admin/trends/youtube` | ADMIN |
 | AI 코스·챗봇 로그 조회 | `GET` | `/api/v1/admin/logs/ai` | ADMIN |
 | 사이트맵 조회 | `GET` | `/api/v1/admin/sitemap` | ADMIN |
 | 검색 유입 콘텐츠 조회 | `GET` | `/api/v1/admin/seo/contents` | ADMIN |
+
+트렌드 조회 API는 Lambda가 기존 이미지 버킷에 갱신하는 `latest-*.json` 세 파일만 읽습니다.
+별도 버킷이나 새 환경 변수는 필요하지 않으며, 기존 `AWS_S3_BUCKET`과 `AWS_REGION` 설정을 사용합니다.
 
 ## 인증/인가 기본 골격
 

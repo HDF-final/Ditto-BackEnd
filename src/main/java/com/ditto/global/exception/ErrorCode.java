@@ -70,6 +70,10 @@ public enum ErrorCode {
     S3_DELETE_FAILED(HttpStatus.BAD_GATEWAY, "ST006", "이미지 삭제에 실패했습니다."),
     S3_URL_GENERATION_FAILED(HttpStatus.BAD_GATEWAY, "ST007", "이미지 조회 URL 생성에 실패했습니다."),
 
+    // ===== Admin / Trend artifacts =====
+    TREND_ARTIFACT_NOT_FOUND(HttpStatus.NOT_FOUND, "TR001", "트렌드 결과 파일을 찾을 수 없습니다."),
+    TREND_ARTIFACT_READ_FAILED(HttpStatus.BAD_GATEWAY, "TR002", "트렌드 결과 파일을 읽지 못했습니다."),
+
     // ===== External (AI / OCR) =====
     AI_SERVICE_ERROR(HttpStatus.BAD_GATEWAY, "E001", "AI 서비스 처리 중 오류가 발생했습니다."),
     OCR_SERVICE_ERROR(HttpStatus.BAD_GATEWAY, "E002", "OCR 처리 중 오류가 발생했습니다."),
