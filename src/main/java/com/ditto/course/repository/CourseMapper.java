@@ -22,8 +22,6 @@ public interface CourseMapper {
 
     Optional<Course> findById(@Param("courseId") Long courseId);
 
-    int countByShareCode(@Param("shareCode") String shareCode);
-
     int countPlaceInCourse(
             @Param("courseId") Long courseId,
             @Param("placeId") Long placeId);
@@ -92,7 +90,6 @@ public interface CourseMapper {
         private String name;
         private String description;
         private String creationType;
-        private String shareCode;
     }
 
     @Getter

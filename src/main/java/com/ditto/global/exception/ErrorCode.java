@@ -54,9 +54,8 @@ public enum ErrorCode {
     ALREADY_LIKED(HttpStatus.CONFLICT, "CM003", "이미 좋아요한 코스입니다."),
     ALREADY_BOOKMARKED(HttpStatus.CONFLICT, "CM004", "이미 북마크한 코스입니다."),
 
-    // ===== Navigation / Mobile =====
+    // ===== Navigation =====
     MAP_MANIFEST_NOT_FOUND(HttpStatus.NOT_FOUND, "N001", "지도 매니페스트를 찾을 수 없습니다."),
-    INVALID_ACCESS_CODE(HttpStatus.BAD_REQUEST, "N002", "유효하지 않은 접속 코드입니다."),
 
     // ===== Brand =====
     BRAND_NOT_FOUND(HttpStatus.NOT_FOUND, "BR001", "브랜드를 찾을 수 없습니다."),

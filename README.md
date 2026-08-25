@@ -169,9 +169,8 @@ public enum ErrorCode {
     COMMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "CM002", "댓글을 찾을 수 없습니다."),
     ALREADY_LIKED(HttpStatus.CONFLICT, "CM003", "이미 좋아요한 코스입니다."),
 
-    // Navigation / Mobile
+    // Navigation
     MAP_MANIFEST_NOT_FOUND(HttpStatus.NOT_FOUND, "N001", "지도 매니페스트를 찾을 수 없습니다."),
-    INVALID_ACCESS_CODE(HttpStatus.BAD_REQUEST, "N002", "유효하지 않은 접속 코드입니다."),
 
     // External (AI / OCR)
     AI_SERVICE_ERROR(HttpStatus.BAD_GATEWAY, "E001", "AI 서비스 처리 중 오류가 발생했습니다."),
@@ -335,9 +334,6 @@ Ditto-BackEnd/
     │   │   │   ├── controller/  service/  repository/  domain/  dto/
     │   │   │
     │   │   ├── navigation/               # 실내 내비게이션 도메인
-    │   │   │   ├── controller/  service/  repository/  domain/  dto/
-    │   │   │
-    │   │   ├── mobile/                   # 모바일 접속 코드 도메인
     │   │   │   ├── controller/  service/  repository/  domain/  dto/
     │   │   │
     │   │   ├── admin/                    # 관리자 도메인
@@ -588,7 +584,7 @@ HTTP로 호출하고 응답을 `ApiResponse`로 감싸 돌려줄 뿐입니다. �
 | 뉴스피드 수정 | `PUT` | `/api/v1/news/{newsId}` | ADMIN |
 | 뉴스피드 삭제 | `DELETE` | `/api/v1/news/{newsId}` | ADMIN |
 
-### 실내 내비게이션 · 모바일 (Navigation & Mobile) — `/api/v1/navigation`, `/api/v1/mobile`
+### 실내 내비게이션 (Navigation) — `/api/v1/navigation`
 
 | 기능 | Method | Endpoint | 인증 |
 | --- | --- | --- | --- |
@@ -600,8 +596,6 @@ HTTP로 호출하고 응답을 `ApiResponse`로 감싸 돌려줄 뿐입니다. �
 | 현재 위치 확인·경로 시작점 설정 | `POST` | `/api/v1/navigation/location` | O |
 | OCR 현재 위치 인식 | `POST` | `/api/v1/navigation/location/ocr` | O |
 | 장소 방문 완료·코스 진행률 조회 | `POST` | `/api/v1/navigation/courses/{courseId}/progress` | O |
-| 모바일 접속 코드 발급 | `POST` | `/api/v1/mobile/access-codes` | O |
-| 접속 코드 검증·코스 불러오기 | `POST` | `/api/v1/mobile/access-codes/verify` | X |
 
 ### 관리자 (Admin) — `/api/v1/admin`
 

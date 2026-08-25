@@ -20,7 +20,6 @@ public class CourseDetailResponse {
     private final String description;
     private final String creationType;
     private final Long sourceCourseId;
-    private final String shareCode;
     private final LocalDateTime createdAt;
     private final List<CoursePlaceResponse> places;
 
@@ -32,7 +31,6 @@ public class CourseDetailResponse {
                 course.getDescription(),
                 course.getCreationType(),
                 course.getSourceCourseId(),
-                course.getShareCode(),
                 course.getCreatedAt(),
                 safePlaces);
     }
