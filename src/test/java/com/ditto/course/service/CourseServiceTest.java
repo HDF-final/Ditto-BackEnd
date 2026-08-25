@@ -78,8 +78,7 @@ class CourseServiceTest {
                         null,
                         "나의 코스",
                         null,
-                        CourseCreationType.MANUAL.name(),
-                        "ABCDEFGH")));
+                        CourseCreationType.MANUAL.name())));
         when(placeMapper.findExistingIds(List.of(placeId))).thenReturn(List.of(placeId));
         when(courseMapper.countPlaceInCourse(courseId, placeId)).thenReturn(0);
         when(courseMapper.findMaxVisitOrder(courseId)).thenReturn(2);
@@ -123,8 +122,7 @@ class CourseServiceTest {
                         null,
                         "나의 코스",
                         null,
-                        CourseCreationType.MANUAL.name(),
-                        "ABCDEFGH")));
+                        CourseCreationType.MANUAL.name())));
         when(placeMapper.findExistingIds(List.of(placeId))).thenReturn(List.of(placeId));
         when(courseMapper.countPlaceInCourse(courseId, placeId)).thenReturn(1);
 
@@ -177,7 +175,7 @@ class CourseServiceTest {
     @Test
     @DisplayName("본인 소유 코스 상세를 방문 순서와 함께 조회한다")
     void getDetailForOwnCourse() {
-        Course course = Course.of(5L, USER_ID, null, "나의 코스", "설명", "MANUAL", "ABCD1234");
+        Course course = Course.of(5L, USER_ID, null, "나의 코스", "설명", "MANUAL");
         CoursePlaceResponse firstPlace = new CoursePlaceResponse(
                 11L, "템버린즈", "place-picture/74_탬버린즈.jpg", "1F", 1, "향수 브랜드",
                 VisitStatus.PENDING.name(), null);
@@ -197,7 +195,6 @@ class CourseServiceTest {
         assertThat(response.getName()).isEqualTo("나의 코스");
         assertThat(response.getDescription()).isEqualTo("설명");
         assertThat(response.getCreationType()).isEqualTo("MANUAL");
-        assertThat(response.getShareCode()).isEqualTo("ABCD1234");
         assertThat(response.getPlaces()).extracting(CoursePlaceResponse::getVisitOrder)
                 .containsExactly(1, 2);
         assertThat(response.getPlaces().get(0).getPlaceId()).isEqualTo(11L);
@@ -214,7 +211,7 @@ class CourseServiceTest {
     @Test
     @DisplayName("코스·장소의 화면용 텍스트를 요청 언어로 번역한다")
     void localizesCourseAndPlaceFields() {
-        Course course = Course.of(5L, USER_ID, null, "나의 코스", "설명", "MANUAL", "ABCD1234");
+        Course course = Course.of(5L, USER_ID, null, "나의 코스", "설명", "MANUAL");
         CoursePlaceResponse place = new CoursePlaceResponse(
                 11L, "템버린즈", null, "1F", 1, "향수 브랜드",
                 VisitStatus.PENDING.name(), null);
@@ -245,7 +242,7 @@ class CourseServiceTest {
     @Test
     @DisplayName("SYSTEM 기본 코스 상세를 조회한다")
     void getDetailForSystemCourse() {
-        Course course = Course.of(3L, null, null, "K-뷰티 코스", "기본 코스", "SYSTEM", "KBEAUTY01");
+        Course course = Course.of(3L, null, null, "K-뷰티 코스", "기본 코스", "SYSTEM");
         given(courseMapper.findById(3L)).willReturn(Optional.of(course));
         given(courseMapper.findPlacesByCourseId(3L)).willReturn(List.of());
 
@@ -260,7 +257,7 @@ class CourseServiceTest {
     @Test
     @DisplayName("유효한 공개 게시글에 연결된 코스 상세를 조회한다")
     void getDetailForCourseLinkedToPublicPost() {
-        Course course = Course.of(8L, 99L, null, "커뮤니티 코스", "공개", "MANUAL", "POST0001");
+        Course course = Course.of(8L, 99L, null, "커뮤니티 코스", "공개", "MANUAL");
         given(courseMapper.findById(8L)).willReturn(Optional.of(course));
         given(courseMapper.existsPublicPostByCourseId(8L)).willReturn(true);
         given(courseMapper.findPlacesByCourseId(8L)).willReturn(List.of());
@@ -287,7 +284,7 @@ class CourseServiceTest {
     @Test
     @DisplayName("다른 사용자의 비공개 코스 상세 조회는 거부한다")
     void rejectGetDetailWhenPrivateCourseOwnedByOtherUser() {
-        Course course = Course.of(8L, 99L, null, "비공개 코스", null, "MANUAL", "PRIVATE1");
+        Course course = Course.of(8L, 99L, null, "비공개 코스", null, "MANUAL");
         given(courseMapper.findById(8L)).willReturn(Optional.of(course));
         given(courseMapper.existsPublicPostByCourseId(8L)).willReturn(false);
 
@@ -302,7 +299,7 @@ class CourseServiceTest {
     @Test
     @DisplayName("본인 코스를 삭제하면 soft delete 한다")
     void deleteOwnCourse() {
-        Course course = Course.of(5L, USER_ID, null, "코스", null, "MANUAL", "ABCD1234");
+        Course course = Course.of(5L, USER_ID, null, "코스", null, "MANUAL");
         given(courseMapper.findById(5L)).willReturn(Optional.of(course));
 
         courseService.delete(USER_ID, 5L);
@@ -313,7 +310,7 @@ class CourseServiceTest {
     @Test
     @DisplayName("본인 코스가 아니면 NOT_COURSE_OWNER 로 거부하고 삭제하지 않는다")
     void rejectDeleteWhenNotOwner() {
-        Course course = Course.of(5L, 999L, null, "남의 코스", null, "MANUAL", "ABCD1234");
+        Course course = Course.of(5L, 999L, null, "남의 코스", null, "MANUAL");
         given(courseMapper.findById(5L)).willReturn(Optional.of(course));
 
         assertThatThrownBy(() -> courseService.delete(USER_ID, 5L))
@@ -340,7 +337,7 @@ class CourseServiceTest {
     @Test
     @DisplayName("공개 코스를 내 코스로 복사한다")
     void copyPublicCourse() {
-        Course sourceCourse = Course.of(3L, null, null, "K-MZ Course", "원본 설명", "SYSTEM", "KBEAUTY01");
+        Course sourceCourse = Course.of(3L, null, null, "K-MZ Course", "원본 설명", "SYSTEM");
         given(courseMapper.findById(3L)).willReturn(Optional.of(sourceCourse));
         given(courseMapper.insert(any(CourseInsertCommand.class))).willAnswer(invocation -> {
             CourseInsertCommand command = invocation.getArgument(0);
@@ -358,7 +355,6 @@ class CourseServiceTest {
         assertThat(saved.getName()).isEqualTo("K-MZ Course Copy");
         assertThat(saved.getDescription()).isEqualTo("원본 설명");
         assertThat(saved.getCreationType()).isEqualTo(CourseCreationType.COPIED.name());
-        assertThat(saved.getShareCode()).isNotBlank();
 
         verify(courseMapper, never()).existsPublicPostByCourseId(3L);
         verify(courseMapper).copyPlacesFromCourse(3L, 101L, VisitStatus.PENDING.name());
@@ -370,7 +366,7 @@ class CourseServiceTest {
     @Test
     @DisplayName("유효한 공개 게시글에 연결된 사용자 코스도 내 코스로 복사한다")
     void copyCourseLinkedToPublicPost() {
-        Course sourceCourse = Course.of(3L, 99L, null, "커뮤니티 코스", "공개 게시글 연결", "MANUAL", "POST0001");
+        Course sourceCourse = Course.of(3L, 99L, null, "커뮤니티 코스", "공개 게시글 연결", "MANUAL");
         given(courseMapper.findById(3L)).willReturn(Optional.of(sourceCourse));
         given(courseMapper.existsPublicPostByCourseId(3L)).willReturn(true);
         given(courseMapper.insert(any(CourseInsertCommand.class))).willAnswer(invocation -> {
@@ -409,7 +405,7 @@ class CourseServiceTest {
     @Test
     @DisplayName("사용자 소유 코스는 공개 코스가 아니므로 복사를 거절한다")
     void rejectCopyWhenCourseIsNotPublic() {
-        Course sourceCourse = Course.of(3L, 99L, null, "비공개 코스", null, "MANUAL", "PRIVATE1");
+        Course sourceCourse = Course.of(3L, 99L, null, "비공개 코스", null, "MANUAL");
         given(courseMapper.findById(3L)).willReturn(Optional.of(sourceCourse));
         given(courseMapper.existsPublicPostByCourseId(3L)).willReturn(false);
 
@@ -425,7 +421,7 @@ class CourseServiceTest {
     @Test
     @DisplayName("COURSE_PLACE 복사 실패 시 트랜잭션 메서드에서 예외가 전파된다")
     void copyCoursePlaceFailurePropagatesInTransaction() throws NoSuchMethodException {
-        Course sourceCourse = Course.of(3L, null, null, "K-MZ Course", null, "SYSTEM", "KBEAUTY01");
+        Course sourceCourse = Course.of(3L, null, null, "K-MZ Course", null, "SYSTEM");
         given(courseMapper.findById(3L)).willReturn(Optional.of(sourceCourse));
         given(courseMapper.insert(any(CourseInsertCommand.class))).willAnswer(invocation -> {
             CourseInsertCommand command = invocation.getArgument(0);
@@ -448,7 +444,7 @@ class CourseServiceTest {
     @Test
     @DisplayName("내 코스에서 장소를 삭제하고 뒤쪽 방문 순서를 앞으로 당긴다")
     void deletePlaceFromOwnCourse() {
-        Course course = Course.of(5L, USER_ID, null, "코스", null, "MANUAL", "ABCD1234");
+        Course course = Course.of(5L, USER_ID, null, "코스", null, "MANUAL");
         given(courseMapper.findById(5L)).willReturn(Optional.of(course));
         given(courseMapper.findVisitOrderByCourseAndPlace(5L, 22L)).willReturn(Optional.of(2));
 
@@ -462,7 +458,7 @@ class CourseServiceTest {
     @Test
     @DisplayName("코스에 없는 장소를 삭제하려 하면 C001 로 거절한다")
     void rejectDeletePlaceWhenPlaceNotInCourse() {
-        Course course = Course.of(5L, USER_ID, null, "코스", null, "MANUAL", "ABCD1234");
+        Course course = Course.of(5L, USER_ID, null, "코스", null, "MANUAL");
         given(courseMapper.findById(5L)).willReturn(Optional.of(course));
         given(courseMapper.findVisitOrderByCourseAndPlace(5L, 999L)).willReturn(Optional.empty());
 
@@ -479,7 +475,7 @@ class CourseServiceTest {
     @Test
     @DisplayName("본인 코스의 정보와 방문 순서를 수정한다")
     void updateCourse() {
-        Course course = Course.of(5L, USER_ID, null, "옛 이름", null, "MANUAL", "ABCD1234");
+        Course course = Course.of(5L, USER_ID, null, "옛 이름", null, "MANUAL");
         given(courseMapper.findById(5L)).willReturn(Optional.of(course));
         given(courseMapper.findPlaceIdsByCourseId(5L)).willReturn(List.of(11L, 22L, 33L));
 
@@ -497,7 +493,7 @@ class CourseServiceTest {
     @Test
     @DisplayName("name·description 을 생략하면 기존 값을 유지한다(부분 수정)")
     void updateKeepsInfoWhenOmitted() {
-        Course course = Course.of(5L, USER_ID, null, "기존 이름", "기존 설명", "MANUAL", "ABCD1234");
+        Course course = Course.of(5L, USER_ID, null, "기존 이름", "기존 설명", "MANUAL");
         given(courseMapper.findById(5L)).willReturn(Optional.of(course));
         given(courseMapper.findPlaceIdsByCourseId(5L)).willReturn(List.of(11L, 22L));
 
@@ -514,7 +510,7 @@ class CourseServiceTest {
     @Test
     @DisplayName("본인 코스가 아니면 NOT_COURSE_OWNER 로 거부하고 수정하지 않는다")
     void rejectUpdateWhenNotOwner() {
-        Course course = Course.of(5L, 999L, null, "남의 코스", null, "MANUAL", "ABCD1234");
+        Course course = Course.of(5L, 999L, null, "남의 코스", null, "MANUAL");
         given(courseMapper.findById(5L)).willReturn(Optional.of(course));
 
         assertThatThrownBy(() -> courseService.update(USER_ID, 5L,
@@ -530,7 +526,7 @@ class CourseServiceTest {
     @Test
     @DisplayName("코스에 속한 장소 집합과 다르면(누락·추가) 순서 수정을 거절한다")
     void rejectUpdateWhenPlaceSetMismatch() {
-        Course course = Course.of(5L, USER_ID, null, "코스", null, "MANUAL", "ABCD1234");
+        Course course = Course.of(5L, USER_ID, null, "코스", null, "MANUAL");
         given(courseMapper.findById(5L)).willReturn(Optional.of(course));
         given(courseMapper.findPlaceIdsByCourseId(5L)).willReturn(List.of(11L, 22L, 33L));
 

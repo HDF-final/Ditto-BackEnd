@@ -66,7 +66,7 @@ class PostServiceTest {
     @Test
     @DisplayName("본인 소유 코스로 게시글을 작성한다")
     void createCoursePost() {
-        Course course = Course.of(100L, USER_ID, null, "나의 코스", null, CourseCreationType.MANUAL.name(), "ABCD1234");
+        Course course = Course.of(100L, USER_ID, null, "나의 코스", null, CourseCreationType.MANUAL.name());
         given(courseMapper.findById(100L)).willReturn(Optional.of(course));
         given(postMapper.insert(any(PostInsertCommand.class))).willAnswer(invocation -> {
             PostInsertCommand command = invocation.getArgument(0);
@@ -97,7 +97,7 @@ class PostServiceTest {
     @Test
     @DisplayName("복사 후 본인 소유가 된 코스도 게시글을 작성할 수 있다")
     void createCoursePostWithCopiedOwnCourse() {
-        Course course = Course.of(101L, USER_ID, 3L, "복사 코스", null, CourseCreationType.COPIED.name(), "COPY1234");
+        Course course = Course.of(101L, USER_ID, 3L, "복사 코스", null, CourseCreationType.COPIED.name());
         given(courseMapper.findById(101L)).willReturn(Optional.of(course));
         given(postMapper.insert(any(PostInsertCommand.class))).willAnswer(invocation -> {
             PostInsertCommand command = invocation.getArgument(0);
@@ -140,7 +140,7 @@ class PostServiceTest {
     @Test
     @DisplayName("다른 사용자 소유 코스는 게시글 작성이 거부된다")
     void rejectWhenCourseOwnedByOtherUser() {
-        Course course = Course.of(100L, 99L, null, "다른 사람 코스", null, CourseCreationType.MANUAL.name(), "ABCD1234");
+        Course course = Course.of(100L, 99L, null, "다른 사람 코스", null, CourseCreationType.MANUAL.name());
         given(courseMapper.findById(100L)).willReturn(Optional.of(course));
 
         assertThatThrownBy(() -> postService.createCoursePost(
@@ -160,7 +160,7 @@ class PostServiceTest {
     @Test
     @DisplayName("SYSTEM 기본 코스는 직접 게시글 작성이 거부된다")
     void rejectWhenSystemCourse() {
-        Course course = Course.of(3L, null, null, "기본 코스", null, CourseCreationType.SYSTEM.name(), "SYSTEM01");
+        Course course = Course.of(3L, null, null, "기본 코스", null, CourseCreationType.SYSTEM.name());
         given(courseMapper.findById(3L)).willReturn(Optional.of(course));
 
         assertThatThrownBy(() -> postService.createCoursePost(
@@ -180,7 +180,7 @@ class PostServiceTest {
     @Test
     @DisplayName("Mapper INSERT 실패 시 트랜잭션 메서드에서 예외가 전파된다")
     void insertFailurePropagatesInTransaction() throws NoSuchMethodException {
-        Course course = Course.of(100L, USER_ID, null, "나의 코스", null, CourseCreationType.MANUAL.name(), "ABCD1234");
+        Course course = Course.of(100L, USER_ID, null, "나의 코스", null, CourseCreationType.MANUAL.name());
         given(courseMapper.findById(100L)).willReturn(Optional.of(course));
         given(postMapper.insert(any(PostInsertCommand.class))).willThrow(new IllegalStateException("insert failed"));
 

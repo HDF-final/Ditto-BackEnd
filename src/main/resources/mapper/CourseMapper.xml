@@ -10,7 +10,6 @@
                name,
                description,
                creation_type,
-               share_code,
                view_count,
                created_at,
                updated_at,
@@ -18,12 +17,6 @@
           FROM course
          WHERE course_id = #{courseId}
            AND deleted_at IS NULL
-    </select>
-
-    <select id="countByShareCode" resultType="int">
-        SELECT COUNT(*)
-          FROM course
-         WHERE share_code = #{shareCode}
     </select>
 
     <select id="countPlaceInCourse" resultType="int">
@@ -129,7 +122,6 @@
             name,
             description,
             creation_type,
-            share_code,
             view_count,
             created_at
         ) VALUES (
@@ -138,7 +130,6 @@
             #{name,jdbcType=VARCHAR},
             #{description,jdbcType=VARCHAR},
             #{creationType,jdbcType=VARCHAR},
-            #{shareCode,jdbcType=VARCHAR},
             0,
             SYSTIMESTAMP
         )

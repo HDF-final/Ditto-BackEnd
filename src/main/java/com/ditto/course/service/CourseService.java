@@ -1,6 +1,5 @@
 package com.ditto.course.service;
 
-import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -45,9 +44,6 @@ import lombok.RequiredArgsConstructor;
 public class CourseService {
 
     static final String DEFAULT_COURSE_TITLE = "이름 없는 코스";
-    private static final String SHARE_CODE_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-    private static final int SHARE_CODE_LENGTH = 8;
-    private static final int SHARE_CODE_MAX_RETRY = 5;
     private static final int DEFAULT_PAGE_SIZE = 20;
     private static final int MAX_PAGE_SIZE = 100;
 
@@ -55,7 +51,6 @@ public class CourseService {
     private final PlaceMapper placeMapper;
     private final S3Provider s3Provider;
     private final ContentTranslationService contentTranslationService;
-    private final SecureRandom secureRandom = new SecureRandom();
 
     /**
      * 코스 PK 조회. 58·59·60 에서 소유권 확인 전에 이 메서드를 쓴다.
@@ -105,14 +100,6 @@ public class CourseService {
         return loadDetail(course);
     }
 
-    /**
-     * 모바일 접속 코드로 인가된 사용자를 위한 코스 상세 조회.
-     * 접속 코드 검증이 인가를 대신하므로 소유권·공개 여부 검사는 하지 않는다.
-     */
-    public CourseDetailResponse getMobileDetail(Long courseId) {
-        return loadDetail(requireCourse(courseId));
-    }
-
     private CourseDetailResponse loadDetail(Course course) {
         List<CoursePlaceResponse> places = courseMapper.findPlacesByCourseId(course.getCourseId());
         // DB에는 S3 object key가 저장되어 있으므로 클라이언트에는 조회용(presigned) URL로 변환해 내려준다.
@@ -149,7 +136,6 @@ public class CourseService {
                         "course", courseKey, "description", response.getDescription(), language),
                 response.getCreationType(),
                 response.getSourceCourseId(),
-                response.getShareCode(),
                 response.getCreatedAt(),
                 response.getPlaces());
     }
@@ -214,7 +200,6 @@ public class CourseService {
         validatePlacesExist(placeIds);
 
         String name = resolveName(request.getName());
-        String shareCode = generateUniqueShareCode();
 
         CourseInsertCommand command = new CourseInsertCommand();
         command.setUserId(userId);
@@ -222,7 +207,6 @@ public class CourseService {
         command.setName(name);
         command.setDescription(trimToNull(request.getDescription()));
         command.setCreationType(CourseCreationType.MANUAL.name());
-        command.setShareCode(shareCode);
         courseMapper.insert(command);
 
         insertPlaces(command.getCourseId(), placeIds);
@@ -245,7 +229,6 @@ public class CourseService {
         command.setName(copiedName);
         command.setDescription(sourceCourse.getDescription());
         command.setCreationType(CourseCreationType.COPIED.name());
-        command.setShareCode(generateUniqueShareCode());
         courseMapper.insert(command);
 
         courseMapper.copyPlacesFromCourse(sourceCourseId, command.getCourseId(), VisitStatus.PENDING.name());
@@ -419,23 +402,5 @@ public class CourseService {
             return null;
         }
         return value.trim();
-    }
-
-    private String generateUniqueShareCode() {
-        for (int i = 0; i < SHARE_CODE_MAX_RETRY; i++) {
-            String shareCode = randomShareCode();
-            if (courseMapper.countByShareCode(shareCode) == 0) {
-                return shareCode;
-            }
-        }
-        throw new BusinessException(ErrorCode.INTERNAL_SERVER_ERROR, "코스 공유 코드를 생성하지 못했습니다.");
-    }
-
-    private String randomShareCode() {
-        StringBuilder builder = new StringBuilder(SHARE_CODE_LENGTH);
-        for (int i = 0; i < SHARE_CODE_LENGTH; i++) {
-            builder.append(SHARE_CODE_CHARS.charAt(secureRandom.nextInt(SHARE_CODE_CHARS.length())));
-        }
-        return builder.toString();
     }
 }
