@@ -342,6 +342,8 @@ Ditto-BackEnd/
     │   │   │
     │   │   ├── admin/                    # 관리자 도메인
     │   │   │   ├── controller/  service/  repository/  domain/  dto/
+    │   │   │   ├── client/               # 코스 초안 람다 호출 (ditto-celeb-warm-2, 읽기 전용)
+    │   │   │   └── config/               # 그 람다의 접속 설정 (ditto.celeb-draft.*)
     │   │   │
     │   │   ├── country/                  # 국가 정보 도메인
     │   │   │   └── repository/
@@ -626,9 +628,39 @@ HTTP로 호출하고 응답을 `ApiResponse`로 감싸 돌려줄 뿐입니다. �
 | AI 코스·챗봇 로그 조회 | `GET` | `/api/v1/admin/logs/ai` | ADMIN |
 | 사이트맵 조회 | `GET` | `/api/v1/admin/sitemap` | ADMIN |
 | 검색 유입 콘텐츠 조회 | `GET` | `/api/v1/admin/seo/contents` | ADMIN |
+| 승인 대기 코스 초안 목록 조회 | `GET` | `/api/v1/admin/admin-courses` | ADMIN |
+| 오늘 초안 생성 실행 상황 조회 | `GET` | `/api/v1/admin/admin-courses/run` | ADMIN |
+| 인물 한 명의 코스 초안 조회 | `GET` | `/api/v1/admin/admin-courses/{celebrity}` | ADMIN |
 
 트렌드 조회 API는 Lambda가 기존 이미지 버킷에 갱신하는 `latest-*.json` 세 파일만 읽습니다.
 별도 버킷이나 새 환경 변수는 필요하지 않으며, 기존 `AWS_S3_BUCKET`과 `AWS_REGION` 설정을 사용합니다.
+
+### 승인 대기 코스 초안 (`/api/v1/admin/admin-courses`)
+
+`ditto-celeb-warm-2` 배치가 셀럽 한 명을 조사해 **매장 3 + 카페 1 + 여가 1** 짜리 코스 초안을
+만들어 Redis(`celeb:draft:*`)에 하루 동안 둡니다. 관리자가 보고 승인해야 손님에게 나갑니다.
+이 API는 그 초안을 **읽기만** 합니다.
+
+| 부르는 창구 | Lambda payload | 돌려주는 것 |
+| --- | --- | --- |
+| 목록 | `{"drafts":true}` | 인물·상태·코스 모양·경고 수·남은 TTL (머리말만) |
+| 상세 | `{"draft":"카리나"}` | 코스 전문 — 장소마다 근거 문장·출처 기사·사진, 그리고 승인 람다가 쓸 조사 원문(`research`)과 다음 턴을 잇는 세션 상태(`state`) |
+| 실행 상황 | `{"run":true}` | 오늘 배치가 어디까지 갔나 (`queued` / `done`) |
+
+- 초안을 **만들거나 지우거나 서빙 캐시(`celeb:course:*`)로 올리지 않습니다.** 그 셋은 배치와
+  승인 람다의 일이고, 여기서 열어 두면 관리자 화면의 실수 한 번이 손님에게 그대로 나갑니다.
+  `CelebDraftClient` 는 인물 이름을 **값**으로만 싣고 명단 칸(`celebrities`·`artists`·`names`·
+  `list`)을 만들 경로가 아예 없습니다.
+- 목록은 머리말만 옵니다. 초안 하나가 조사 원문까지 들고 있어 수십 KB 라, 열 명이면 응답이
+  메가 단위가 됩니다.
+- 상세가 `404 CD001`이면 그 초안이 없는 것입니다(만료됐거나 아직 안 만들었다). 초안이 통째로
+  안 보이면 `/run` 을 보세요 — 그쪽은 Redis 에 못 붙은 것을 `502 CD002`로 따로 말합니다.
+- `ditto.ai-engine` 과 달리 **HTTP 모드가 없습니다.** 초안 창구는 Lambda 안에서만 열리는
+  Redis 를 보므로 로컬에 같은 것을 띄울 방법이 없습니다. 로컬은 AWS profile, 배포 환경은 EC2
+  인스턴스 역할로 자격증명을 얻으며 `lambda:InvokeFunction` 권한이 있어야 합니다.
+- 읽기 타임아웃은 10초입니다(`ditto.celeb-draft.read-timeout`). AI 엔진의 120초와 달리 짧은
+  것은, 이 백엔드가 부르는 것이 Redis 를 한 번 읽고 끝나는 **조회 창구뿐**이기 때문입니다.
+  초안을 *만드는* 경로는 인물당 2~6분이 걸리지만 여기서 부르지 않습니다.
 
 ## 인증/인가 기본 골격
 
@@ -919,6 +951,10 @@ GEMINI_API_KEY=CHANGE_ME
 
 # AI 엔진 base URL (생략 시 http://127.0.0.1:8000)
 AI_ENGINE_BASE_URL=http://127.0.0.1:8000
+
+# 승인 대기 코스 초안 람다 (관리자 조회 전용, 생략 시 ditto-celeb-warm-2)
+# 액세스 키는 필요 없다 — AWS profile 또는 EC2 인스턴스 역할의 lambda:InvokeFunction 권한을 쓴다.
+CELEB_DRAFT_FUNCTION_NAME=ditto-celeb-warm-2
 
 # S3 이미지 저장소
 AWS_S3_BUCKET=hdf-ditto-images
