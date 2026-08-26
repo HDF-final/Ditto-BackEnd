@@ -1,5 +1,6 @@
 package com.ditto.admin.controller;
 
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -13,6 +14,7 @@ import com.ditto.admin.dto.response.AdminCourseCacheListResponse;
 import com.ditto.admin.dto.response.AdminCourseDetailResponse;
 import com.ditto.admin.dto.response.AdminCourseListResponse;
 import com.ditto.admin.dto.response.AdminCoursePlaceCatalogResponse;
+import com.ditto.admin.dto.response.AdminCourseRevokeResponse;
 import com.ditto.admin.dto.response.AdminCourseRunResponse;
 import com.ditto.admin.service.AdminCourseService;
 import com.ditto.global.common.response.ApiResponse;
@@ -60,6 +62,26 @@ public class AdminCourseController {
     @GetMapping("/cached")
     public ApiResponse<AdminCourseCacheListResponse> getCachedCourses() {
         return ApiResponse.success(adminCourseService.getCachedCourses());
+    }
+
+    @Operation(summary = "서비스 중인 코스 하나 조회",
+            description = "어드민 편집기가 아는 모양으로 되돌려 준다 — 초안 상세와 같은 칸이다. "
+                    + "고쳐서 승인 창구에 다시 넣으면 덮어쓴다.")
+    @GetMapping("/cached/{celebrity}")
+    public ApiResponse<AdminCourseDetailResponse> getCachedCourse(
+            @Parameter(description = "인물 이름", example = "카리나")
+            @PathVariable String celebrity) {
+        return ApiResponse.success(adminCourseService.getCachedCourse(celebrity));
+    }
+
+    @Operation(summary = "서비스 중인 코스 내리기",
+            description = "인물의 캐시를 통째로 뺀다 — 코스(전 축) · 조사 재료 · 사전 매칭 표기. "
+                    + "되돌리는 창구는 없다. 다시 올리려면 배치를 돌려 초안을 새로 만들고 승인한다.")
+    @DeleteMapping("/cached/{celebrity}")
+    public ApiResponse<AdminCourseRevokeResponse> revokeCachedCourse(
+            @Parameter(description = "인물 이름", example = "카리나")
+            @PathVariable String celebrity) {
+        return ApiResponse.success(adminCourseService.revoke(celebrity));
     }
 
     @Operation(summary = "더현대 장소 카탈로그 조회",

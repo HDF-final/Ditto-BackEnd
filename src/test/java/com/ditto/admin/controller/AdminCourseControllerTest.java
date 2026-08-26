@@ -4,6 +4,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.BDDMockito.then;
 import static org.mockito.BDDMockito.willThrow;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -22,6 +23,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import com.ditto.admin.dto.response.AdminCourseCacheListResponse;
 import com.ditto.admin.dto.response.AdminCourseDetailResponse;
+import com.ditto.admin.dto.response.AdminCourseRevokeResponse;
 import com.ditto.admin.dto.response.AdminCourseListResponse;
 import com.ditto.admin.dto.response.AdminCoursePlaceCatalogResponse;
 import com.ditto.admin.dto.response.AdminCourseRunResponse;
@@ -147,6 +149,45 @@ class AdminCourseControllerTest {
     }
 
     @Test
+    @DisplayName("서비스 중인 코스 상세는 편집기가 아는 모양을 그대로 싣는다")
+    void returnsCachedCourseDetail() throws Exception {
+        given(adminCourseService.getCachedCourse("카리나")).willReturn(cachedDetail());
+
+        mockMvc.perform(get("/api/v1/admin/admin-courses/cached/{celebrity}", "카리나"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.celebrity").value("카리나"))
+                .andExpect(jsonPath("$.data.status").value("서비스 중"))
+                .andExpect(jsonPath("$.data.payload.cached").value(true))
+                .andExpect(jsonPath("$.data.payload.places[0].kind").value("매장"))
+                .andExpect(jsonPath("$.data.payload.places[0].evidence.brand").value("프라다"));
+    }
+
+    @Test
+    @DisplayName("내리기는 DELETE 다 — 지운 키와 뺀 표기 수를 돌려준다")
+    void revokesCachedCourse() throws Exception {
+        given(adminCourseService.revoke("카리나")).willReturn(revoked());
+
+        mockMvc.perform(delete("/api/v1/admin/admin-courses/cached/{celebrity}", "카리나"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.celebrity").value("카리나"))
+                .andExpect(jsonPath("$.data.keys").value(2))
+                .andExpect(jsonPath("$.data.aliases").value(3));
+
+        then(adminCourseService).should().revoke("카리나");
+    }
+
+    @Test
+    @DisplayName("만료된 코스를 열면 404 다")
+    void missingCachedCourseIsNotFound() throws Exception {
+        willThrow(new BusinessException(ErrorCode.CELEB_COURSE_CACHE_NOT_FOUND))
+                .given(adminCourseService).getCachedCourse("없는사람");
+
+        mockMvc.perform(get("/api/v1/admin/admin-courses/cached/{celebrity}", "없는사람"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("CD005"));
+    }
+
+    @Test
     @DisplayName("캐시를 못 읽으면 502 로 알려 준다 — 빈 목록을 성공으로 내보내지 않는다")
     void unreadableCacheIsBadGateway() throws Exception {
         willThrow(new BusinessException(ErrorCode.CELEB_COURSE_CACHE_READ_FAILED))
@@ -218,6 +259,40 @@ class AdminCourseControllerTest {
                            "hero":{"url":"https://hdf.s3/b.jpg","kind":"place","caption":"프라다"},
                            "aliases":["KARINA","카리나"],"research":true,"ttl":46853}]}
                         """))
+                .build();
+    }
+
+    private AdminCourseDetailResponse cachedDetail() throws Exception {
+        return AdminCourseDetailResponse.builder()
+                .functionName("ditto-celeb-approve")
+                .fetchedAt(Instant.parse("2026-08-26T05:20:00Z"))
+                .celebrity("카리나")
+                .kind("PERSON")
+                .status("서비스 중")
+                .shape("매장 3 · 카페 1 · 여가 1")
+                .builtAt("2026-08-26T00:12:00")
+                .placeCount(1)
+                .warningCount(0)
+                .payload(objectMapper.readTree("""
+                        {"celebrity":"카리나","aspect":"BRAND","status":"서비스 중","cached":true,
+                         "approved_at":"2026-08-26T09:20:11","ttl":46063,"warnings":[],
+                         "places":[{"kind":"매장","place_name":"프라다","floor":"1F",
+                           "category":"럭셔리","price_tier":"LUXURY","reason_kind":"evidence",
+                           "evidence":{"brand":"프라다","article":"https://issuepicker.com/news/26308"},
+                           "image":{"kind":"evidence","url":"https://issuepicker.com/x.jpg"}}]}
+                        """))
+                .build();
+    }
+
+    private AdminCourseRevokeResponse revoked() throws Exception {
+        return AdminCourseRevokeResponse.builder()
+                .functionName("ditto-celeb-approve")
+                .revokedAt(Instant.parse("2026-08-26T05:20:00Z"))
+                .celebrity("카리나")
+                .keys(2)
+                .aliases(3)
+                .payload(objectMapper.readTree(
+                        "{\"revoke\":[\"카리나\"],\"keys\":2,\"aliases\":3}"))
                 .build();
     }
 

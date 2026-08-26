@@ -11,6 +11,7 @@ import com.ditto.admin.dto.response.AdminCourseCacheListResponse;
 import com.ditto.admin.dto.response.AdminCourseDetailResponse;
 import com.ditto.admin.dto.response.AdminCourseListResponse;
 import com.ditto.admin.dto.response.AdminCoursePlaceCatalogResponse;
+import com.ditto.admin.dto.response.AdminCourseRevokeResponse;
 import com.ditto.admin.dto.response.AdminCourseRunResponse;
 import com.ditto.global.exception.BusinessException;
 import com.ditto.global.exception.ErrorCode;
@@ -94,6 +95,68 @@ public class AdminCourseService {
                 .functionName(celebApproveClient.getFunctionName())
                 .fetchedAt(Instant.now())
                 .count(payload.path("courses").size())
+                .payload(payload)
+                .build();
+    }
+
+    /**
+     * 서비스 중인 코스 하나. <b>초안과 같은 칸으로 온다</b> — 화면이 두 가지 모양을
+     * 알 이유가 없어, 응답 그릇도 초안 상세와 같은 것을 쓴다.
+     *
+     * <p>관리자가 이걸 고쳐 {@link #approve(String, JsonNode)} 에 다시 넣으면 덮어쓴다.
+     * 승인이 멱등이라 따로 "수정" 창구를 두지 않는다.
+     */
+    public AdminCourseDetailResponse getCachedCourse(String celebrity) {
+        String name = celebrity == null ? "" : celebrity.trim();
+        if (name.isEmpty()) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "인물 이름이 비어 있습니다.");
+        }
+
+        JsonNode payload = celebApproveClient.findCourse(name);
+        // 이 창구의 오류는 "그런 코스가 없다"(만료됐거나 아직 승인 전) 아니면 Redis 장애다.
+        // 둘을 여기서 가를 수 없다 — 목록 창구가 그때 502 를 내므로 거기서 갈린다.
+        rejectError(payload, ErrorCode.CELEB_COURSE_CACHE_NOT_FOUND);
+
+        return AdminCourseDetailResponse.builder()
+                .functionName(celebApproveClient.getFunctionName())
+                .fetchedAt(Instant.now())
+                .celebrity(payload.path("celebrity").asText(name))
+                .kind(textOrNull(payload, "kind"))
+                .status(textOrNull(payload, "status"))
+                .shape(textOrNull(payload, "shape"))
+                .builtAt(textOrNull(payload, "built_at"))
+                .placeCount(payload.path("places").size())
+                .warningCount(payload.path("warnings").size())
+                .payload(payload)
+                .build();
+    }
+
+    /**
+     * 인물의 캐시를 통째로 내린다 — 코스(전 축) · 조사 재료 · 표기.
+     *
+     * <p><b>되돌리는 창구는 없다.</b> 다시 올리려면 배치를 돌려 초안을 새로 만들고
+     * 승인한다. 화면이 두 번 눌러야 나가게 해 둔 것이 그 때문이다.
+     *
+     * <p>지운 것이 없어도(이미 만료됐다) 오류가 아니다 — 관리자가 원한 상태가 이미
+     * 그것이고, 화면은 목록에서 카드가 사라지는 것으로 결과를 본다.
+     */
+    public AdminCourseRevokeResponse revoke(String celebrity) {
+        String name = celebrity == null ? "" : celebrity.trim();
+        if (name.isEmpty()) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "인물 이름이 비어 있습니다.");
+        }
+
+        JsonNode payload = celebApproveClient.revoke(name);
+        rejectError(payload, ErrorCode.CELEB_COURSE_REVOKE_FAILED);
+        log.info("코스를 내렸다. celebrity={}, keys={}, aliases={}",
+                name, payload.path("keys").asInt(), payload.path("aliases").asInt());
+
+        return AdminCourseRevokeResponse.builder()
+                .functionName(celebApproveClient.getFunctionName())
+                .revokedAt(Instant.now())
+                .celebrity(name)
+                .keys(payload.path("keys").asInt())
+                .aliases(payload.path("aliases").asInt())
                 .payload(payload)
                 .build();
     }

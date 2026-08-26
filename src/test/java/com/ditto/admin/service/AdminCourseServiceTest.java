@@ -19,6 +19,7 @@ import com.ditto.admin.dto.response.AdminCourseApproveResponse;
 import com.ditto.admin.dto.response.AdminCourseCacheListResponse;
 import com.ditto.admin.dto.response.AdminCourseDetailResponse;
 import com.ditto.admin.dto.response.AdminCourseListResponse;
+import com.ditto.admin.dto.response.AdminCourseRevokeResponse;
 import com.ditto.admin.dto.response.AdminCoursePlaceCatalogResponse;
 import com.ditto.admin.dto.response.AdminCourseRunResponse;
 import com.ditto.global.exception.BusinessException;
@@ -96,6 +97,83 @@ class AdminCourseServiceTest {
         assertThatThrownBy(() -> service.getCachedCourses())
                 .isInstanceOf(BusinessException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.CELEB_COURSE_CACHE_READ_FAILED);
+    }
+
+    @Test
+    @DisplayName("서비스 중인 코스 상세는 초안 상세와 같은 칸으로 온다 — 화면이 한 모양만 알면 된다")
+    void reopensCachedCourse() {
+        given(celebApproveClient.findCourse("카리나")).willReturn(json("""
+                {"celebrity":"카리나","aspect":"BRAND","kind":"PERSON","status":"서비스 중",
+                 "shape":"매장 3 · 카페 1 · 여가 1","built_at":"2026-08-26T00:12:00",
+                 "approved_at":"2026-08-26T09:20:11","cached":true,"ttl":46063,
+                 "warnings":["사진 없음"],
+                 "places":[{"kind":"매장","place_name":"프라다","floor":"1F",
+                            "category":"럭셔리","price_tier":"LUXURY",
+                            "evidence":{"brand":"프라다","article":"https://x"}},
+                           {"kind":"카페","place_name":"블루보틀","floor":"5F"}]}
+                """));
+
+        AdminCourseDetailResponse response = service.getCachedCourse("카리나");
+
+        assertThat(response.getCelebrity()).isEqualTo("카리나");
+        assertThat(response.getStatus()).isEqualTo("서비스 중");
+        assertThat(response.getShape()).isEqualTo("매장 3 · 카페 1 · 여가 1");
+        assertThat(response.getPlaceCount()).isEqualTo(2);
+        assertThat(response.getWarningCount()).isEqualTo(1);
+        assertThat(response.getFunctionName()).isEqualTo("ditto-celeb-approve");
+        // 되짚기는 승인 람다만 안다. 초안 람다는 서빙 캐시를 읽는 코드가 아예 없다.
+        verify(celebDraftClient, never()).findDraft(anyString());
+    }
+
+    @Test
+    @DisplayName("만료됐거나 승인 전이면 404 다")
+    void missingCachedCourseIsNotFound() {
+        given(celebApproveClient.findCourse("없는사람")).willReturn(json("""
+                {"celebrity":"없는사람","error":"서비스 중인 코스가 없습니다"}
+                """));
+
+        assertThatThrownBy(() -> service.getCachedCourse("없는사람"))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.CELEB_COURSE_CACHE_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("내리기는 지운 키와 뺀 표기 수를 돌려준다")
+    void revokesCourse() {
+        given(celebApproveClient.revoke("카리나")).willReturn(json("""
+                {"revoke":["카리나"],"keys":2,"aliases":3}
+                """));
+
+        AdminCourseRevokeResponse response = service.revoke("카리나");
+
+        assertThat(response.getCelebrity()).isEqualTo("카리나");
+        assertThat(response.getKeys()).isEqualTo(2);
+        assertThat(response.getAliases()).isEqualTo(3);
+        assertThat(response.getRevokedAt()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("이미 만료돼 지울 것이 없어도 오류가 아니다 — 관리자가 원한 상태가 이미 그것이다")
+    void revokingNothingIsFine() {
+        given(celebApproveClient.revoke("장원영")).willReturn(json("""
+                {"revoke":["장원영"],"keys":0,"aliases":0}
+                """));
+
+        assertThat(service.revoke("장원영").getKeys()).isZero();
+    }
+
+    @Test
+    @DisplayName("이름이 비면 람다를 부르지도 않는다")
+    void rejectsBlankCelebrity() {
+        assertThatThrownBy(() -> service.revoke("  "))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_INPUT_VALUE);
+        assertThatThrownBy(() -> service.getCachedCourse(null))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_INPUT_VALUE);
+
+        verify(celebApproveClient, never()).revoke(anyString());
+        verify(celebApproveClient, never()).findCourse(anyString());
     }
 
     @Test

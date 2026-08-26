@@ -1,6 +1,7 @@
 package com.ditto.admin.controller;
 
 import static org.mockito.BDDMockito.given;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -88,6 +89,16 @@ class AdminCourseSecurityTest {
         mockMvc.perform(get("/api/v1/admin/admin-courses/cached"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("A001"));
+    }
+
+    @Test
+    @DisplayName("ROLE_CUSTOMER 는 코스를 내릴 수 없다 — 손님 경로를 끊는 동작이다")
+    void customerCannotRevoke() throws Exception {
+        mockMvc.perform(delete("/api/v1/admin/admin-courses/cached/{celebrity}", "카리나")
+                        .header("X-User-Id", "2")
+                        .header("X-User-Role", "ROLE_CUSTOMER"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("A004"));
     }
 
     private AdminCourseListResponse list() throws Exception {

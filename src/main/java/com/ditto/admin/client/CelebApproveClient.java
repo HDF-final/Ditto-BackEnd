@@ -74,6 +74,33 @@ public class CelebApproveClient implements AutoCloseable {
                 ErrorCode.CELEB_COURSE_CACHE_READ_FAILED);
     }
 
+    /**
+     * 서비스 중인 코스 하나를 <b>어드민 편집기가 아는 모양</b>으로 되돌린다.
+     *
+     * <p>승인이 초안을 지우므로, 올린 뒤에 고치려면 캐시에서 되짚는 수밖에 없다. 나온
+     * 것을 그대로 고쳐 {@link #approve(JsonNode)} 에 다시 넣으면 덮어쓴다.
+     *
+     * @return 초안과 같은 칸을 가진 문서, 또는 {@code {"celebrity":…,"error":"…"}}
+     */
+    public JsonNode findCourse(String celebrity) {
+        return call(objectMapper.createObjectNode().put("course", celebrity),
+                ErrorCode.CELEB_COURSE_CACHE_NOT_FOUND);
+    }
+
+    /**
+     * 인물의 캐시를 통째로 내린다 — 코스(전 축) · 조사 재료 · 표기.
+     *
+     * <p><b>되돌리는 창구는 없다.</b> 다시 올리려면 배치를 돌려 초안을 새로 만들고
+     * 승인한다.
+     *
+     * @return {@code {"revoke":["카리나"],"keys":2,"aliases":3}}
+     */
+    public JsonNode revoke(String celebrity) {
+        ObjectNode payload = objectMapper.createObjectNode();
+        payload.putArray("revoke").add(celebrity);
+        return call(payload, ErrorCode.CELEB_COURSE_REVOKE_FAILED);
+    }
+
     @Override
     public void close() {
         lambdaClient.close();
