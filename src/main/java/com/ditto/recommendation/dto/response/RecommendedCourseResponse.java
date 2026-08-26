@@ -21,8 +21,14 @@ public class RecommendedCourseResponse {
     private String name;
     private String description;
 
-    /** {@code COUNTRY.CODE} 와 같은 글자 (KR·JP·CN·US). 아직 안 정해진 코스는 null. */
-    private String countryCode;
+    /**
+     * 이 코스가 걸린 나라들. {@code COUNTRY.CODE} 와 같은 글자 (KR·JP·CN·US).
+     *
+     * <p>한 코스가 여러 나라에 걸린다. DB 에는 {@code 'KR,JP'} 처럼 한 칸에 쉼표로
+     * 들어 있는데, 받는 쪽이 그 모양을 알 이유가 없어 갈라서 준다. 아직 안 정해진
+     * 코스는 빈 목록이다.
+     */
+    private List<String> countryCodes;
 
     private int placeCount;
 

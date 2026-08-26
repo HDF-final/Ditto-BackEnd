@@ -36,17 +36,26 @@ public interface RecommendedCourseMapper {
     /** 자리 이름만. 목록 카드의 칩에 쓴다. */
     List<String> findPlaceNames(@Param("courseId") Long courseId);
 
-    /** 첫 자리의 매장 사진 키. 없으면 null. */
-    String findLeadImageKey(@Param("courseId") Long courseId);
-
     /**
-     * 이름·설명·나라를 한 번에. {@code CourseMapper.updateInfo} 를 안 쓰는 것은 그쪽이
-     * 나라 칸을 모르고, 여기서 SYSTEM 이 아닌 코스를 못 건드리게 막아야 하기 때문이다.
+     * 이름·설명을 한 번에. {@code CourseMapper.updateInfo} 를 안 쓰는 것은 여기서
+     * SYSTEM 이 아닌 코스를 못 건드리게 막아야 하기 때문이다.
+     *
+     * <p>나라는 여기서 안 고친다 — {@code COURSE_COUNTRY} 를 아래 둘이 간다.
      */
     int updateInfo(@Param("courseId") Long courseId,
                    @Param("name") String name,
-                   @Param("description") String description,
-                   @Param("countryCode") String countryCode);
+                   @Param("description") String description);
+
+    /** 이 코스에 걸린 나라를 전부 뗀다. 갈아 끼우기의 앞 절반이다. */
+    int deleteCountries(@Param("courseId") Long courseId);
+
+    /** 나라 하나를 건다. {@code COUNTRY.CODE} 에 FK 가 걸려 있어 없는 코드는 안 들어간다. */
+    int insertCountry(@Param("courseId") Long courseId,
+                      @Param("countryCode") String countryCode);
+
+    /** 대표 사진 키. <b>null 이 "기본값으로 되돌린다"</b> 는 뜻이다. */
+    int updateMainImage(@Param("courseId") Long courseId,
+                        @Param("mainImage") String mainImage);
 
     /** 자리 하나의 추천 이유. 자리 구성은 안 건드린다. */
     int updatePlaceReason(@Param("courseId") Long courseId,
@@ -68,9 +77,12 @@ public interface RecommendedCourseMapper {
         private Long courseId;
         private String name;
         private String description;
-        private String countryCode;
+        /** `KR,JP` — LISTAGG 로 모아 온 것. 받는 쪽이 쉼표로 가른다. */
+        private String countryCodes;
         private int placeCount;
         private LocalDateTime createdAt;
+        /** 대표 사진 키. 관리자가 지정한 것 → 셀럽 사진 → 첫 자리 매장 사진 차례. */
+        private String heroImageKey;
     }
 
     @Getter
@@ -79,7 +91,8 @@ public interface RecommendedCourseMapper {
         private Long courseId;
         private String name;
         private String description;
-        private String countryCode;
+        /** `KR,JP` — LISTAGG 로 모아 온 것. 받는 쪽이 쉼표로 가른다. */
+        private String countryCodes;
         private String shareCode;
         private int placeCount;
         private Long postId;
@@ -88,8 +101,15 @@ public interface RecommendedCourseMapper {
         private LocalDateTime createdAt;
         private LocalDateTime updatedAt;
 
-        /** 목록 카드의 대표 사진 키(첫 자리의 매장 사진). 자리가 없으면 null. */
+        /** 대표 사진 키. 관리자가 지정한 것 → 셀럽 사진 → 첫 자리 매장 사진 차례. */
         private String heroImageKey;
+
+        /**
+         * 관리자가 <b>직접 지정한</b> 대표 사진 키. 안 지정했으면 null 이고, 그때
+         * {@code heroImageKey} 는 기본값으로 채워져 온다. 편집기가 "기본값을 쓰는 중" 인지
+         * 알아야 '기본값으로 되돌리기' 를 그릴 수 있어 둘 다 준다.
+         */
+        private String mainImage;
     }
 
     @Getter
