@@ -1,6 +1,6 @@
 package com.ditto.admin.dto.response;
 
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.List;
 
 import lombok.Builder;
@@ -33,8 +33,17 @@ public class AdminSystemCourseResponse {
      */
     private String heroImageUrl;
 
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
+    /**
+     * 올린 때 · 마지막 수정. <b>시간대를 달고 나간다.</b>
+     *
+     * <p>DB 가 {@code SYSTIMESTAMP} 로 적는데 그 서버 시계가 <b>UTC</b> 다. {@code LocalDateTime}
+     * 으로 내보내면 칸 없는 문자열({@code "2026-08-26T07:00:02"})이 되고, 브라우저는 그걸
+     * 제 시간대로 읽는다 — 한국에서 보면 아홉 시간 이른 시각이 뜬다. 실제로 그렇게 떴다.
+     *
+     * <p>여기서 UTC 라고 못 박아 보내면 받는 쪽이 어느 시간대로 그리든 같은 순간을 가리킨다.
+     */
+    private OffsetDateTime createdAt;
+    private OffsetDateTime updatedAt;
 
     /**
      * 어느 인물의 코스인가. 이 경로로 올린 것만 채워진다 — 그 전에 만든 코스(1번·122번)는

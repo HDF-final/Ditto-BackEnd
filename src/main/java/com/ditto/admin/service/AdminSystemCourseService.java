@@ -1,5 +1,8 @@
 package com.ditto.admin.service;
 
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -41,6 +44,15 @@ public class AdminSystemCourseService {
     /** 반영 기록이 없는 코스의 상태. 이 창구가 생기기 전에 올린 것이 여기 해당한다. */
     private static final String STATE_DONE = "done";
     private static final String STEP_DONE = "반영됨";
+
+    /**
+     * DB 시계의 시간대. {@code course.created_at} 은 {@code SYSTIMESTAMP} 로 들어가는데
+     * 그 서버가 <b>UTC</b> 로 돌고 있다.
+     *
+     * <p>실측이다 — 반영 람다(TZ=Asia/Seoul)가 같은 순간에 적는 값과 정확히 아홉 시간
+     * 차이가 났다(코스 189: 오라클 07:00:02 / 람다 16:00:02).
+     */
+    private static final ZoneOffset DB_ZONE = ZoneOffset.UTC;
 
     private final RecommendedCourseMapper mapper;
     private final CelebApproveClient celebApproveClient;
@@ -183,8 +195,8 @@ public class AdminSystemCourseService {
                 // DB 에는 키만 들어 있다. 자리가 없는 코스는 키도 없어 null 로 나가고,
                 // 그때 카드가 사진 자리를 이름으로 채운다.
                 .heroImageUrl(s3Provider.resolveImageUrl(row.getHeroImageKey()))
-                .createdAt(row.getCreatedAt())
-                .updatedAt(row.getUpdatedAt())
+                .createdAt(withZone(row.getCreatedAt()))
+                .updatedAt(withZone(row.getUpdatedAt()))
                 .celebrity(text(state, "celebrity", null))
                 .state(text(state, "state", STATE_DONE))
                 .step(text(state, "step", STEP_DONE))
@@ -192,6 +204,14 @@ public class AdminSystemCourseService {
                 .warnings(warnings)
                 .places(places)
                 .build();
+    }
+
+    /**
+     * 칸 없는 DB 시각에 시간대를 붙인다. <b>시각을 옮기지 않는다</b> — 같은 순간을
+     * 가리키는 채로 어느 시간대의 값인지만 밝힌다.
+     */
+    private static OffsetDateTime withZone(LocalDateTime value) {
+        return value == null ? null : value.atOffset(DB_ZONE);
     }
 
     private static String text(JsonNode node, String field, String fallback) {

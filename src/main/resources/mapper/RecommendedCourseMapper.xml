@@ -43,18 +43,34 @@
     </select>
 
     <!--
-      목록 카드의 대표 사진 키. **첫 자리의 매장 사진**이고, 아래 findLeadImageKey 와 같은
-      것을 고른다 — 손님 목록과 관리자 목록의 카드가 다른 사진을 달면 같은 코스로 안 보인다.
+      어드민 목록 카드의 대표 사진 키. **셀럽 사진을 먼저 고른다** — 그게 이 코스의
+      얼굴이고, 캐시된 코스 카드도 같은 것을 고른다(`celeb_approve.hero_of` 는 근거
+      사진을 먼저 본다). 매장 사진을 얹으면 두 화면이 같은 코스를 다르게 보여 준다.
 
-      코스마다 findLeadImageKey 를 한 번씩 부르지 않고 스칼라 서브쿼리로 붙이는 이유는,
-      관리자 목록이 페이지를 안 잘라서 그러면 코스 수만큼 왕복(N+1)이 되기 때문이다.
+      **어느 것이 셀럽 사진인지는 키 앞머리로 안다.** POST_IMAGE 에는 종류를 담을 칸이
+      없는데, 반영 람다가 둘을 다른 자리에 둔다.
+
+        course/{share_code}/n.jpg   기사에서 받아 올린 근거 사진 = 셀럽 사진
+        place-picture/…            이미 버킷에 있던 매장 사진을 그대로 가리킨 것
+
+      근거 사진을 못 찾은 코스(사진이 전부 매장 것)는 NVL 이 받아 첫 자리의 매장
+      사진으로 떨어진다 — 손님 목록(findLeadImageKey)이 고르는 것과 같은 사진이다.
+
+      코스마다 따로 부르지 않고 스칼라 서브쿼리로 붙이는 이유는, 관리자 목록이 페이지를
+      안 잘라서 그러면 코스 수만큼 왕복(N+1)이 되기 때문이다.
     -->
     <sql id="adminHeroImageKey">
-        (SELECT MIN(hp.image_url) KEEP (DENSE_RANK FIRST ORDER BY hcp.visit_order)
-           FROM course_place hcp
-           JOIN place hp ON hp.place_id = hcp.place_id
-          WHERE hcp.course_id = c.course_id
-            AND hp.image_url IS NOT NULL) AS heroImageKey
+        NVL(
+          (SELECT MIN(hi.object_key) KEEP (DENSE_RANK FIRST ORDER BY hi.sort_order)
+             FROM post_image hi
+            WHERE hi.post_id = p.post_id
+              AND hi.object_key LIKE 'course/%'),
+          (SELECT MIN(hp.image_url) KEEP (DENSE_RANK FIRST ORDER BY hcp.visit_order)
+             FROM course_place hcp
+             JOIN place hp ON hp.place_id = hcp.place_id
+            WHERE hcp.course_id = c.course_id
+              AND hp.image_url IS NOT NULL)
+        ) AS heroImageKey
     </sql>
 
     <!--
