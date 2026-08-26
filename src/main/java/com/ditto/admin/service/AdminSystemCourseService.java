@@ -91,6 +91,7 @@ public class AdminSystemCourseService {
                         .name(p.getName())
                         // DB 에는 키만 들어 있다. 화면이 그대로 <img src> 로 쓰게 만든다.
                         .imageUrl(s3Provider.resolveImageUrl(p.getImageUrl()))
+                        .imageKey(p.getImageUrl())
                         .floorCode(p.getFloorCode())
                         .visitOrder(p.getVisitOrder())
                         .recommendationReason(p.getRecommendationReason())
