@@ -91,6 +91,39 @@ public class CelebApproveClient implements AutoCloseable {
     }
 
     /**
+     * 기본 추천 코스로 승인. <b>캐시 승인까지 같이 한다.</b>
+     *
+     * <p>입력이 {@link #approve(JsonNode)} 와 같다 — 편집기 하나가 두 버튼을 내려면
+     * 보내는 몸통이 같아야 한다.
+     *
+     * <p>람다는 캐시 승인만 끝내고 <b>즉시</b> 돌아온다. 서비스 DB 반영(문안 LLM 1콜 +
+     * 사진 업로드 + 네 테이블)은 별도 함수에서 비동기로 도는 1~2분짜리라, 여기서
+     * 기다리면 관리자 화면이 그동안 물린다. 진행 상태는
+     * {@link #listPublished()} 로 따로 읽는다.
+     *
+     * @return {@code {"ok":true, …, "publish":{"state":"queued","step":"차례를 기다리는 중"}}}
+     */
+    public JsonNode publish(JsonNode draft) {
+        ObjectNode payload = objectMapper.createObjectNode();
+        payload.set("publish", draft);
+        return call(payload, ErrorCode.CELEB_COURSE_APPROVE_FAILED);
+    }
+
+    /**
+     * 기본 추천 코스 반영이 어디까지 갔나.
+     *
+     * <p><b>목록 자체는 백엔드가 오라클에서 직접 읽는다.</b> 이 창구는 아직 오라클에 행이
+     * 없는 것(진행중·실패)과 "누구 것인가" 를 알려 줄 뿐이다. 그래서 이 호출이 실패해도
+     * 관리자 목록은 그려져야 한다 — 호출자가 예외를 삼킨다.
+     *
+     * @return {@code {"count":n,"courses":[{"course_id":…,"celebrity":…,"state":…}]}}
+     */
+    public JsonNode listPublished() {
+        return call(objectMapper.createObjectNode().put("published", true),
+                ErrorCode.CELEB_COURSE_CACHE_READ_FAILED);
+    }
+
+    /**
      * 인물의 캐시를 통째로 내린다 — 코스(전 축) · 조사 재료 · 표기.
      *
      * <p><b>되돌리는 창구는 없다.</b> 다시 올리려면 배치를 돌려 초안을 새로 만들고

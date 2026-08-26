@@ -75,6 +75,9 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(PUBLIC_ENDPOINTS).permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/community/courses", "/api/v1/community/courses/**").permitAll()
+                        // 기본 추천 코스는 메인에 거는 콘텐츠라 로그인 없이 열린다.
+                        // 커뮤니티 목록과 같은 성격이고, GET 만 연다.
+                        .requestMatchers(HttpMethod.GET, "/api/v1/courses/recommended").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/community/courses/*/comments").hasRole("CUSTOMER")
                         .requestMatchers(HttpMethod.PATCH, "/api/v1/community/courses/*/comments/*").hasRole("CUSTOMER")
                         .requestMatchers(HttpMethod.DELETE, "/api/v1/community/courses/*/comments/*").hasRole("CUSTOMER")
