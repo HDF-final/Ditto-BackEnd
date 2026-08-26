@@ -95,35 +95,14 @@
     </select>
 
     <!--
-      자리 사진은 **셀럽 사진이 먼저다.** 매장 사진은 그 자리에 셀럽 사진이 없을 때만
-      나온다 — 대표 사진을 고르는 차례(`RecommendedCourseMapper.heroImageKey`)와 같다.
-      같은 코스가 화면마다 다른 사진을 달 이유가 없다.
-
-      **자리와 사진은 순번으로 맞물린다.** `ditto-celeb-publish` 가 자리를 1부터 세며
-      `POST_IMAGE.SORT_ORDER` 에 그 번호를 넣으므로 `sort_order = visit_order` 다.
-      코스의 대표 사진만 `course/{share_code}/main.jpg` 로 번호 밖에 두어, 자리를
-      늘리거나 줄여도 이 대응이 안 밀린다.
-
-      근거 사진이 없던 자리에는 반영 람다가 **이미 버킷에 있는 매장 사진 키를 그대로**
-      넣어 둔다. 그래서 이 조인이 매장 사진을 돌려주는 일도 정상이고, 그때는 아래
-      COALESCE 의 두 번째 항과 같은 값이 된다.
-
-      스칼라 서브쿼리로 붙이는 이유는 조인하면 사진이 없는 자리가 빠지기 때문이다.
-      자리는 사진과 무관하게 전부 나와야 한다.
+      자리 사진은 셀럽 사진이 먼저다 — 판단과 이유는 `RecommendedCourseMapper.slotImageKey`
+      에 적혀 있다. **어드민 화면이 같은 조각을 쓴다.**
     -->
     <select id="findPlacesByCourseId"
             resultType="com.ditto.course.dto.response.CoursePlaceResponse">
         SELECT p.place_id,
                p.name,
-               COALESCE(
-                 (SELECT MIN(pi.object_key) KEEP (DENSE_RANK FIRST ORDER BY pi.post_image_id)
-                    FROM post_image pi
-                    JOIN post po ON po.post_id = pi.post_id
-                                AND po.course_id = cp.course_id
-                                AND po.deleted_at IS NULL
-                   WHERE pi.sort_order = cp.visit_order),
-                 p.image_url
-               ) AS image_url,
+               <include refid="com.ditto.recommendation.repository.RecommendedCourseMapper.slotImageKey"/> AS image_url,
                f.floor_code,
                cp.visit_order,
                cp.recommendation_reason,
