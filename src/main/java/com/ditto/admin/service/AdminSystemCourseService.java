@@ -56,17 +56,6 @@ public class AdminSystemCourseService {
      */
     private static final ZoneOffset DB_ZONE = ZoneOffset.UTC;
 
-    /**
-     * 셀럽 사진이 놓인 자리. 반영 람다가 기사에서 받아 올린 근거 사진을
-     * {@code course/{share_code}/{n}.jpg} 로 둔다(매장 사진은 {@code place-picture/} 를 그대로 쓴다).
-     *
-     * <p><b>이 prefix 는 CDN 이 안 내준다.</b> CloudFront 배포에 걸린 동작이 {@code brand-logo/*} ·
-     * {@code place-picture/*} · {@code products/*} · {@code course-resource/*} 넷뿐이고 기본 동작은
-     * ALB 라, {@code course/*} 를 CDN 주소로 만들면 301 로 튕겨 사진이 안 뜬다 — 실측이다.
-     * 그래서 이 prefix 만 버킷 직통 주소로 낸다.
-     */
-    private static final String CELEB_PHOTO_PREFIX = "course/";
-
     private final RecommendedCourseMapper mapper;
     private final CelebApproveClient celebApproveClient;
     private final S3Provider s3Provider;
@@ -90,7 +79,11 @@ public class AdminSystemCourseService {
                         .placeId(p.getPlaceId())
                         .name(p.getName())
                         // DB 에는 키만 들어 있다. 화면이 그대로 <img src> 로 쓰게 만든다.
-                        .imageUrl(s3Provider.resolveImageUrl(p.getImageUrl()))
+                        //
+                        // **`resolveImageUrl` 이 아니라 prefix 를 보는 쪽이다.** 이 자리에
+                        // 셀럽 사진(`course/…`)이 오게 되면서 갈림길이 생겼다 — CloudFront 에
+                        // 그 prefix 동작이 없어 CDN 주소로 만들면 301 로 튕긴다.
+                        .imageUrl(s3Provider.resolveImageUrlByPrefix(p.getImageUrl()))
                         .imageKey(p.getImageUrl())
                         .floorCode(p.getFloorCode())
                         .visitOrder(p.getVisitOrder())
@@ -258,16 +251,14 @@ public class AdminSystemCourseService {
     }
 
     /**
-     * 대표 사진 키 → 주소. 셀럽 사진만 CDN 을 건너뛴다({@link #CELEB_PHOTO_PREFIX} 참고).
-     * 매장 사진으로 떨어진 코스는 손님 목록과 같은 CDN 주소를 그대로 쓴다.
+     * 대표 사진 키 → 주소. 셀럽 사진만 CDN 을 건너뛴다.
+     *
+     * <p>판단은 {@link com.ditto.global.infrastructure.s3.S3Provider#resolveImageUrlByPrefix}
+     * 로 옮겼다. 같은 규칙이 어드민·손님 목록·코스 상세 세 곳에 손으로 적혀 있었는데,
+     * 이제 자리 사진까지 같은 갈림길을 지난다 — 한 군데만 고쳐지는 날이 오기 전에 모았다.
      */
     private String heroUrl(String key) {
-        if (key == null || key.isBlank()) {
-            return null;
-        }
-        return key.startsWith(CELEB_PHOTO_PREFIX)
-                ? s3Provider.resolveDirectImageUrl(key)
-                : s3Provider.resolveImageUrl(key);
+        return s3Provider.resolveImageUrlByPrefix(key);
     }
 
     /**
