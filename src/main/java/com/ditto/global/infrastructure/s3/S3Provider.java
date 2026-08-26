@@ -2,6 +2,8 @@ package com.ditto.global.infrastructure.s3;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.Locale;
@@ -223,6 +225,46 @@ public class S3Provider {
                     properties.getBucket(), objectKey, exception);
             return null;
         }
+    }
+
+    /**
+     * <b>CDN 을 건너뛴 버킷 직통 주소.</b> CloudFront 가 안 내주는 prefix 전용이다.
+     *
+     * <p>{@link #resolveImageUrl}이 {@code public-base-url}(CloudFront)을 붙이는데, 그 배포에는
+     * 동작(behavior)이 {@code brand-logo/*} · {@code place-picture/*} · {@code products/*} ·
+     * {@code course-resource/*} 넷만 걸려 있다. 나머지는 <b>기본 동작이 ALB</b> 라 이미지 요청이
+     * 301 로 튕긴다 — 실측이다.
+     *
+     * <p>그래서 그 밖의 prefix 는 여기로 온다. 버킷 객체가 공개 읽기라 서명이 필요 없고,
+     * 주소가 고정이라 브라우저가 캐시한다(프리사인은 부를 때마다 주소가 바뀐다).
+     *
+     * <p><b>CloudFront 에 그 prefix 동작이 생기면 이 메서드를 쓸 이유가 없어진다.</b> 그때는
+     * 호출부를 {@link #resolveImageUrl} 로 되돌리면 된다.
+     *
+     * @param objectKey S3 object key (null/빈 문자열 허용)
+     * @return 조회용 URL, key가 없으면 null
+     */
+    public String resolveDirectImageUrl(String objectKey) {
+        if (!StringUtils.hasText(objectKey)) {
+            return null;
+        }
+        validateReadableKey(objectKey);
+        return "https://%s.s3.%s.amazonaws.com/%s".formatted(
+                properties.getBucket(), properties.getRegion(), encodeKeyPath(objectKey));
+    }
+
+    /** 경로 조각마다 인코딩한다. 슬래시는 살려야 키가 안 깨진다. */
+    private static String encodeKeyPath(String objectKey) {
+        String[] segments = objectKey.split("/", -1);
+        StringBuilder out = new StringBuilder(objectKey.length());
+        for (int i = 0; i < segments.length; i++) {
+            if (i > 0) {
+                out.append('/');
+            }
+            // URLEncoder 는 폼 인코딩이라 공백을 '+' 로 낸다. 경로에서는 %20 이어야 한다.
+            out.append(URLEncoder.encode(segments[i], StandardCharsets.UTF_8).replace("+", "%20"));
+        }
+        return out.toString();
     }
 
     /** 읽기용 key 검증. prefix·문자셋은 제한하지 않고 경로 이탈만 차단한다. */

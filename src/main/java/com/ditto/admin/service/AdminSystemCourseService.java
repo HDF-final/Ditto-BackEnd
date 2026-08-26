@@ -54,6 +54,17 @@ public class AdminSystemCourseService {
      */
     private static final ZoneOffset DB_ZONE = ZoneOffset.UTC;
 
+    /**
+     * 셀럽 사진이 놓인 자리. 반영 람다가 기사에서 받아 올린 근거 사진을
+     * {@code course/{share_code}/{n}.jpg} 로 둔다(매장 사진은 {@code place-picture/} 를 그대로 쓴다).
+     *
+     * <p><b>이 prefix 는 CDN 이 안 내준다.</b> CloudFront 배포에 걸린 동작이 {@code brand-logo/*} ·
+     * {@code place-picture/*} · {@code products/*} · {@code course-resource/*} 넷뿐이고 기본 동작은
+     * ALB 라, {@code course/*} 를 CDN 주소로 만들면 301 로 튕겨 사진이 안 뜬다 — 실측이다.
+     * 그래서 이 prefix 만 버킷 직통 주소로 낸다.
+     */
+    private static final String CELEB_PHOTO_PREFIX = "course/";
+
     private final RecommendedCourseMapper mapper;
     private final CelebApproveClient celebApproveClient;
     private final S3Provider s3Provider;
@@ -194,7 +205,7 @@ public class AdminSystemCourseService {
                 .imageCount(row.getImageCount())
                 // DB 에는 키만 들어 있다. 자리가 없는 코스는 키도 없어 null 로 나가고,
                 // 그때 카드가 사진 자리를 이름으로 채운다.
-                .heroImageUrl(s3Provider.resolveImageUrl(row.getHeroImageKey()))
+                .heroImageUrl(heroUrl(row.getHeroImageKey()))
                 .createdAt(withZone(row.getCreatedAt()))
                 .updatedAt(withZone(row.getUpdatedAt()))
                 .celebrity(text(state, "celebrity", null))
@@ -204,6 +215,19 @@ public class AdminSystemCourseService {
                 .warnings(warnings)
                 .places(places)
                 .build();
+    }
+
+    /**
+     * 대표 사진 키 → 주소. 셀럽 사진만 CDN 을 건너뛴다({@link #CELEB_PHOTO_PREFIX} 참고).
+     * 매장 사진으로 떨어진 코스는 손님 목록과 같은 CDN 주소를 그대로 쓴다.
+     */
+    private String heroUrl(String key) {
+        if (key == null || key.isBlank()) {
+            return null;
+        }
+        return key.startsWith(CELEB_PHOTO_PREFIX)
+                ? s3Provider.resolveDirectImageUrl(key)
+                : s3Provider.resolveImageUrl(key);
     }
 
     /**
