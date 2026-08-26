@@ -151,7 +151,7 @@ class AdminCourseControllerTest {
     @Test
     @DisplayName("서비스 중인 코스 상세는 편집기가 아는 모양을 그대로 싣는다")
     void returnsCachedCourseDetail() throws Exception {
-        given(adminCourseService.getCachedCourse("카리나")).willReturn(cachedDetail());
+        given(adminCourseService.getCachedCourse("카리나", "BRAND")).willReturn(cachedDetail());
 
         mockMvc.perform(get("/api/v1/admin/admin-courses/cached/{celebrity}", "카리나"))
                 .andExpect(status().isOk())
@@ -160,6 +160,18 @@ class AdminCourseControllerTest {
                 .andExpect(jsonPath("$.data.payload.cached").value(true))
                 .andExpect(jsonPath("$.data.payload.places[0].kind").value("매장"))
                 .andExpect(jsonPath("$.data.payload.places[0].evidence.brand").value("프라다"));
+    }
+
+    @Test
+    @DisplayName("축을 주면 그대로 넘긴다 — 음식 카드를 열었는데 브랜드 코스가 열리면 안 된다")
+    void passesAspectToDetail() throws Exception {
+        given(adminCourseService.getCachedCourse("카리나", "FOOD")).willReturn(cachedDetail());
+
+        mockMvc.perform(get("/api/v1/admin/admin-courses/cached/{celebrity}", "카리나")
+                        .param("aspect", "FOOD"))
+                .andExpect(status().isOk());
+
+        then(adminCourseService).should().getCachedCourse("카리나", "FOOD");
     }
 
     @Test
@@ -180,7 +192,7 @@ class AdminCourseControllerTest {
     @DisplayName("만료된 코스를 열면 404 다")
     void missingCachedCourseIsNotFound() throws Exception {
         willThrow(new BusinessException(ErrorCode.CELEB_COURSE_CACHE_NOT_FOUND))
-                .given(adminCourseService).getCachedCourse("없는사람");
+                .given(adminCourseService).getCachedCourse("없는사람", "BRAND");
 
         mockMvc.perform(get("/api/v1/admin/admin-courses/cached/{celebrity}", "없는사람"))
                 .andExpect(status().isNotFound())

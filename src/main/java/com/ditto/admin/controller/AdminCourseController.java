@@ -70,8 +70,11 @@ public class AdminCourseController {
     @GetMapping("/cached/{celebrity}")
     public ApiResponse<AdminCourseDetailResponse> getCachedCourse(
             @Parameter(description = "인물 이름", example = "카리나")
-            @PathVariable String celebrity) {
-        return ApiResponse.success(adminCourseService.getCachedCourse(celebrity));
+            @PathVariable String celebrity,
+            @Parameter(description = "코스 축. 한 인물이 축마다 다른 코스를 가질 수 있다",
+                    example = "BRAND")
+            @RequestParam(defaultValue = "BRAND") String aspect) {
+        return ApiResponse.success(adminCourseService.getCachedCourse(celebrity, aspect));
     }
 
     @Operation(summary = "서비스 중인 코스 내리기",

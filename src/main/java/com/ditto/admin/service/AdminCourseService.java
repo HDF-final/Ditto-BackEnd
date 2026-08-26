@@ -106,13 +106,14 @@ public class AdminCourseService {
      * <p>관리자가 이걸 고쳐 {@link #approve(String, JsonNode)} 에 다시 넣으면 덮어쓴다.
      * 승인이 멱등이라 따로 "수정" 창구를 두지 않는다.
      */
-    public AdminCourseDetailResponse getCachedCourse(String celebrity) {
+    public AdminCourseDetailResponse getCachedCourse(String celebrity, String aspect) {
         String name = celebrity == null ? "" : celebrity.trim();
         if (name.isEmpty()) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "인물 이름이 비어 있습니다.");
         }
+        String axis = aspect == null || aspect.isBlank() ? "BRAND" : aspect.trim().toUpperCase();
 
-        JsonNode payload = celebApproveClient.findCourse(name);
+        JsonNode payload = celebApproveClient.findCourse(name, axis);
         // 이 창구의 오류는 "그런 코스가 없다"(만료됐거나 아직 승인 전) 아니면 Redis 장애다.
         // 둘을 여기서 가를 수 없다 — 목록 창구가 그때 502 를 내므로 거기서 갈린다.
         rejectError(payload, ErrorCode.CELEB_COURSE_CACHE_NOT_FOUND);

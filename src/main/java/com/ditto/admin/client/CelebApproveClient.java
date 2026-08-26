@@ -82,8 +82,11 @@ public class CelebApproveClient implements AutoCloseable {
      *
      * @return 초안과 같은 칸을 가진 문서, 또는 {@code {"celebrity":…,"error":"…"}}
      */
-    public JsonNode findCourse(String celebrity) {
-        return call(objectMapper.createObjectNode().put("course", celebrity),
+    public JsonNode findCourse(String celebrity, String aspect) {
+        // **축을 같이 보낸다.** 한 인물이 브랜드 코스와 음식 코스를 동시에 갖고 있을 수
+        // 있어(warm-1 이 둘 다 만든다), 축을 안 주면 음식 카드를 열었는데 브랜드 코스가
+        // 열린다 — 그대로 다시 올리면 엉뚱한 축을 덮어쓴다.
+        return call(objectMapper.createObjectNode().put("course", celebrity).put("aspect", aspect),
                 ErrorCode.CELEB_COURSE_CACHE_NOT_FOUND);
     }
 

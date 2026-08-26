@@ -102,7 +102,7 @@ class AdminCourseServiceTest {
     @Test
     @DisplayName("서비스 중인 코스 상세는 초안 상세와 같은 칸으로 온다 — 화면이 한 모양만 알면 된다")
     void reopensCachedCourse() {
-        given(celebApproveClient.findCourse("카리나")).willReturn(json("""
+        given(celebApproveClient.findCourse("카리나", "BRAND")).willReturn(json("""
                 {"celebrity":"카리나","aspect":"BRAND","kind":"PERSON","status":"서비스 중",
                  "shape":"매장 3 · 카페 1 · 여가 1","built_at":"2026-08-26T00:12:00",
                  "approved_at":"2026-08-26T09:20:11","cached":true,"ttl":46063,
@@ -113,7 +113,7 @@ class AdminCourseServiceTest {
                            {"kind":"카페","place_name":"블루보틀","floor":"5F"}]}
                 """));
 
-        AdminCourseDetailResponse response = service.getCachedCourse("카리나");
+        AdminCourseDetailResponse response = service.getCachedCourse("카리나", "BRAND");
 
         assertThat(response.getCelebrity()).isEqualTo("카리나");
         assertThat(response.getStatus()).isEqualTo("서비스 중");
@@ -128,11 +128,11 @@ class AdminCourseServiceTest {
     @Test
     @DisplayName("만료됐거나 승인 전이면 404 다")
     void missingCachedCourseIsNotFound() {
-        given(celebApproveClient.findCourse("없는사람")).willReturn(json("""
+        given(celebApproveClient.findCourse("없는사람", "BRAND")).willReturn(json("""
                 {"celebrity":"없는사람","error":"서비스 중인 코스가 없습니다"}
                 """));
 
-        assertThatThrownBy(() -> service.getCachedCourse("없는사람"))
+        assertThatThrownBy(() -> service.getCachedCourse("없는사람", null))
                 .isInstanceOf(BusinessException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.CELEB_COURSE_CACHE_NOT_FOUND);
     }
@@ -168,12 +168,12 @@ class AdminCourseServiceTest {
         assertThatThrownBy(() -> service.revoke("  "))
                 .isInstanceOf(BusinessException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_INPUT_VALUE);
-        assertThatThrownBy(() -> service.getCachedCourse(null))
+        assertThatThrownBy(() -> service.getCachedCourse(null, "BRAND"))
                 .isInstanceOf(BusinessException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_INPUT_VALUE);
 
         verify(celebApproveClient, never()).revoke(anyString());
-        verify(celebApproveClient, never()).findCourse(anyString());
+        verify(celebApproveClient, never()).findCourse(anyString(), anyString());
     }
 
     @Test
