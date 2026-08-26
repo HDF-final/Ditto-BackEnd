@@ -19,7 +19,11 @@ public class AdminSystemCourseResponse {
     private Long courseId;
     private String name;
     private String description;
-    private String countryCode;
+    /**
+     * 이 코스가 걸린 나라들. DB 에는 {@code 'KR,JP'} 처럼 한 칸에 쉼표로 들어 있는데,
+     * 화면이 칩을 하나씩 그리므로 갈라서 준다.
+     */
+    private List<String> countryCodes;
     private String shareCode;
     private int placeCount;
     private Long postId;
@@ -32,6 +36,18 @@ public class AdminSystemCourseResponse {
      * 그때 카드는 인물 이름 두 글자를 대신 띄운다.
      */
     private String heroImageUrl;
+
+    /**
+     * 관리자가 <b>직접 지정한</b> 대표 사진의 S3 키. 안 지정했으면 null 이고, 그때
+     * {@code heroImageUrl} 은 기본값(셀럽 사진 → 첫 자리 매장 사진)으로 채워져 온다.
+     *
+     * <p>둘 다 주는 것은 편집기가 "지금 기본값을 쓰는 중" 인지 알아야 <b>기본값으로
+     * 되돌리기</b>를 그릴 수 있기 때문이다.
+     */
+    private String mainImage;
+
+    /** 위 키를 바로 쓸 수 있는 주소로 푼 것. 지정 안 했으면 null. */
+    private String mainImageUrl;
 
     /**
      * 올린 때 · 마지막 수정. <b>시간대를 달고 나간다.</b>

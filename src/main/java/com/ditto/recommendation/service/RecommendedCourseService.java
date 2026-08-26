@@ -56,13 +56,51 @@ public class RecommendedCourseService {
                 .courseId(row.getCourseId())
                 .name(row.getName())
                 .description(row.getDescription())
-                .countryCode(row.getCountryCode())
+                .countryCodes(splitCountries(row.getCountryCodes()))
                 .placeCount(row.getPlaceCount())
                 .placeNames(names.size() > PLACE_CHIPS ? names.subList(0, PLACE_CHIPS) : names)
                 // DB 에는 `place-picture/…` 처럼 키만 들어 있다. 화면이 그대로 <img src> 로
                 // 쓸 수 있게 여기서 주소로 만든다 (`CourseService` 와 같은 방식).
-                .imageUrl(s3Provider.resolveImageUrl(mapper.findLeadImageKey(row.getCourseId())))
+                // **어드민 카드와 같은 사진이다.** 관리자가 지정한 것 → 셀럽 사진 →
+                // 첫 자리 매장 사진 차례로 목록 SQL 이 이미 골라 준다(heroImageKey).
+                // 코스마다 findLeadImageKey 를 부르던 것을 걷어냈다 — 왕복이 코스 수만큼 들었다.
+                .imageUrl(heroUrl(row.getHeroImageKey()))
                 .createdAt(row.getCreatedAt())
                 .build();
+    }
+
+    /**
+     * {@code 'KR,JP'} → {@code [KR, JP]}. 값이 없으면 빈 목록이다.
+     *
+     * <p>한 칸에 쉼표로 담는 것은 나라가 넷뿐이고 SYSTEM 코스가 열몇 건이라 조인 표를
+     * 두는 값이 안 들기 때문이다 (sql/course_country.sql 에 그 판단이 적혀 있다).
+     */
+    private static List<String> splitCountries(String value) {
+        if (value == null || value.isBlank()) {
+            return List.of();
+        }
+        return java.util.Arrays.stream(value.split(","))
+                .map(String::trim)
+                .filter(code -> !code.isEmpty())
+                .map(code -> code.toUpperCase(java.util.Locale.ROOT))
+                .distinct()
+                .toList();
+    }
+
+    /**
+     * 대표 사진 키 → 주소. 셀럽 사진만 CDN 을 건너뛴다.
+     *
+     * <p>CloudFront 배포에 걸린 동작이 {@code brand-logo/*} · {@code place-picture/*} ·
+     * {@code products/*} · {@code course-resource/*} 넷뿐이고 기본 동작은 ALB 라,
+     * {@code course/*} 를 CDN 주소로 만들면 301 로 튕겨 사진이 안 뜬다 — 실측이다.
+     * 어드민 화면과 같은 규칙이다({@code AdminSystemCourseService.heroUrl}).
+     */
+    private String heroUrl(String key) {
+        if (key == null || key.isBlank()) {
+            return null;
+        }
+        return key.startsWith("course/")
+                ? s3Provider.resolveDirectImageUrl(key)
+                : s3Provider.resolveImageUrl(key);
     }
 }

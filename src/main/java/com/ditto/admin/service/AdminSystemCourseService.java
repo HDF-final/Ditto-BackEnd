@@ -4,7 +4,9 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 
@@ -89,6 +91,7 @@ public class AdminSystemCourseService {
                         .name(p.getName())
                         // DB 에는 키만 들어 있다. 화면이 그대로 <img src> 로 쓰게 만든다.
                         .imageUrl(s3Provider.resolveImageUrl(p.getImageUrl()))
+                        .imageKey(p.getImageUrl())
                         .floorCode(p.getFloorCode())
                         .visitOrder(p.getVisitOrder())
                         .recommendationReason(p.getRecommendationReason())
@@ -119,13 +122,23 @@ public class AdminSystemCourseService {
         }
         String description = request.getDescription() == null
                 ? row.getDescription() : request.getDescription();
-        // 빈 문자열은 "나라를 지운다" 로 읽는다 — null 과 뜻이 다르다.
-        String country = request.getCountryCode() == null
-                ? row.getCountryCode()
-                : (request.getCountryCode().isBlank() ? null
-                        : request.getCountryCode().trim().toUpperCase());
 
-        mapper.updateInfo(courseId, name, description, country);
+        mapper.updateInfo(courseId, name, description);
+
+        // 빈 배열은 "나라를 전부 뗀다" 로 읽는다 — null("그대로 둬라")과 뜻이 다르다.
+        // 나라가 없는 코스는 손님 화면의 어느 나라 버튼에서도 안 보이니 사실상 내리는 것이다.
+        if (request.getCountryCodes() != null) {
+            mapper.deleteCountries(courseId);
+            for (String code : normalizeCountries(request.getCountryCodes())) {
+                mapper.insertCountry(courseId, code);
+            }
+        }
+
+        // **빈 문자열이 "기본값으로 되돌린다" 는 뜻이다.** null 은 여기서도 "그대로 둬라" 다.
+        if (request.getMainImage() != null) {
+            String key = request.getMainImage().trim();
+            mapper.updateMainImage(courseId, key.isEmpty() ? null : key);
+        }
 
         if (request.getPostContent() != null && row.getPostId() != null) {
             mapper.updatePostContent(courseId, request.getPostContent());
@@ -197,7 +210,9 @@ public class AdminSystemCourseService {
                 .courseId(row.getCourseId())
                 .name(row.getName())
                 .description(row.getDescription())
-                .countryCode(row.getCountryCode())
+                .countryCodes(splitCountries(row.getCountryCodes()))
+                .mainImage(row.getMainImage())
+                .mainImageUrl(heroUrl(row.getMainImage()))
                 .shareCode(row.getShareCode())
                 .placeCount(row.getPlaceCount())
                 .postId(row.getPostId())
@@ -215,6 +230,31 @@ public class AdminSystemCourseService {
                 .warnings(warnings)
                 .places(places)
                 .build();
+    }
+
+    /**
+     * {@code 'KR,JP'} → {@code [KR, JP]}. 값이 없으면 빈 목록이다 — null 을 주면
+     * 화면이 칩을 그리기 전에 매번 null 을 가려야 한다.
+     */
+    private static List<String> splitCountries(String value) {
+        if (value == null || value.isBlank()) {
+            return List.of();
+        }
+        return Arrays.stream(value.split(","))
+                .map(String::trim)
+                .filter(code -> !code.isEmpty())
+                .map(code -> code.toUpperCase(java.util.Locale.ROOT))
+                .distinct()
+                .toList();
+    }
+
+    /** 보낸 나라 목록을 {@code COUNTRY.CODE} 모양으로 고른다. 중복·빈 값은 뺀다. */
+    private static List<String> normalizeCountries(List<String> codes) {
+        return new ArrayList<>(new LinkedHashSet<>(
+                codes.stream()
+                        .filter(code -> code != null && !code.isBlank())
+                        .map(code -> code.trim().toUpperCase(java.util.Locale.ROOT))
+                        .toList()));
     }
 
     /**
