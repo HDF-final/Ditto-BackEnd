@@ -54,6 +54,9 @@ public class S3Provider {
 
     private final S3Client s3Client;
     private final S3Presigner s3Presigner;
+
+    /** CloudFront 에 동작이 걸린 prefix 가 아니라 버킷 직통으로 내야 하는 것. */
+    private static final String DIRECT_PREFIX = "course/";
     private final S3StorageProperties properties;
 
     /**
@@ -225,6 +228,31 @@ public class S3Provider {
                     properties.getBucket(), objectKey, exception);
             return null;
         }
+    }
+
+    /**
+     * <b>key 의 prefix 를 보고 CDN 과 직통 중에 고른다.</b> 코스 사진처럼 두 갈래가
+     * 섞여 오는 자리에서 쓴다.
+     *
+     * <p>반영 람다가 자리 사진을 두 군데에 둔다 — 기사에서 받아 온 셀럽 사진은
+     * {@code course/{share_code}/n.jpg} 로 새로 올리고, 매장 사진은 이미 버킷에 있는
+     * {@code place-picture/…} 를 그대로 가리킨다. 앞의 것은 CloudFront 에 동작이
+     * 없어 {@link #resolveImageUrl} 로 보내면 301 로 튕긴다.
+     *
+     * <p>{@code RecommendedCourseService.heroUrl} 이 쓰던 규칙을 여기로 올린 것이다.
+     * 코스 상세도 같은 판단을 해야 하는데, 같은 규칙이 두 군데에 적혀 있으면 한쪽만
+     * 고쳐지는 날이 온다. <b>대표 사진과 자리 사진이 어긋나면 안 된다.</b>
+     *
+     * @param objectKey S3 object key (null/빈 문자열 허용)
+     * @return 조회용 URL, key가 없으면 null
+     */
+    public String resolveImageUrlByPrefix(String objectKey) {
+        if (!StringUtils.hasText(objectKey)) {
+            return null;
+        }
+        return objectKey.startsWith(DIRECT_PREFIX)
+                ? resolveDirectImageUrl(objectKey)
+                : resolveImageUrl(objectKey);
     }
 
     /**

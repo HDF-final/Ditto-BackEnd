@@ -93,14 +93,12 @@ public class RecommendedCourseService {
      * <p>CloudFront 배포에 걸린 동작이 {@code brand-logo/*} · {@code place-picture/*} ·
      * {@code products/*} · {@code course-resource/*} 넷뿐이고 기본 동작은 ALB 라,
      * {@code course/*} 를 CDN 주소로 만들면 301 로 튕겨 사진이 안 뜬다 — 실측이다.
-     * 어드민 화면과 같은 규칙이다({@code AdminSystemCourseService.heroUrl}).
+     *
+     * <p>판단은 {@link S3Provider#resolveImageUrlByPrefix} 로 옮겼다. 코스 상세도 자리
+     * 사진에 같은 규칙을 써야 하는데, 같은 규칙을 세 군데에 적어 두면 한 군데만
+     * 고쳐지는 날이 온다.
      */
     private String heroUrl(String key) {
-        if (key == null || key.isBlank()) {
-            return null;
-        }
-        return key.startsWith("course/")
-                ? s3Provider.resolveDirectImageUrl(key)
-                : s3Provider.resolveImageUrl(key);
+        return s3Provider.resolveImageUrlByPrefix(key);
     }
 }
