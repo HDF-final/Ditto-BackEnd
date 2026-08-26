@@ -74,6 +74,16 @@ ditto:
     # 조회 창구는 Redis 를 한 번 읽고 끝난다. 짧아야 람다가 죽었을 때 화면이 안 매달린다.
     read-timeout: 10s
 
+  # ===== 코스 승인 (관리자 쓰기) =====
+  # 관리자가 고친 초안을 손님 캐시(celeb:course:*)로 올리고 초안을 지운다.
+  # celeb-draft 와 따로 두는 것은 저쪽이 조회 전용이고 타임아웃 정책이 다르기 때문이다.
+  celeb-approve:
+    function-name: ${CELEB_APPROVE_FUNCTION_NAME:ditto-celeb-approve}
+    region: ${AWS_REGION:ap-northeast-2}
+    connect-timeout: 5s
+    # Redis 네 번 + Oracle MERGE + 만료 행 청소. 콜드스타트도 있다.
+    read-timeout: 30s
+
   # ===== 실내 지도 원장 자산 =====
   # 층 그래프·장소 원장·방 폴리곤은 한 번 만들어지면 바뀌지 않는 정적 파일이라 S3 에 두고
   # CloudFront(course-resource/*)로 내보낸다. 백엔드는 그 파일을 대신 실어 나르지 않는다 —
