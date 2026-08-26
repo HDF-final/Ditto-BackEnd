@@ -10,7 +10,7 @@ import java.util.Map;
  *
  * <p>OCR 은 간판에 적힌 영어(EATALY)를 읽지만 카탈로그는 한글(이탈리)로 관리된다. 표시 이름은
  * 그대로 두고, 인식만 언어에 무관하게 이어주기 위한 매핑을 코드로 둔다. 값(한글)은 place 상호에
- * 부분 포함되는 핵심 토큰으로 두어(예: NIKE→나이키 는 "나이키 라이즈" 에도 걸린다) LIKE 매칭에 쓴다.
+ * 부분 포함되는 핵심 토큰으로 두어(예: NIKE→나이키 는 "나이키 라이즈" 에도 걸린다) 인메모리 매칭에 쓴다.
  */
 public final class BrandAliasDictionary {
 
@@ -262,6 +262,50 @@ public final class BrandAliasDictionary {
             }
         }
         return terms;
+    }
+
+    /**
+     * OCR 오타를 영문 별칭 키에 퍼지로 맞춰 한글 상호를 찾는다. {@code EATALX} ≈ {@code EATALY} → 이탈리.
+     */
+    public static List<AliasHit> fuzzyCanonicalTerms(String normalizedOcr, double threshold, int minLength) {
+        if (normalizedOcr == null || normalizedOcr.length() < minLength) {
+            return List.of();
+        }
+        List<AliasHit> hits = new ArrayList<>();
+        for (Map.Entry<String, String> entry : ENG_TO_KO.entrySet()) {
+            String keyNorm = OcrTextNormalizer.normalize(entry.getKey());
+            if (keyNorm.length() < minLength) {
+                continue;
+            }
+            double similarity = TextSimilarity.similarity(normalizedOcr, keyNorm);
+            if (similarity < threshold) {
+                continue;
+            }
+            String korean = OcrTextNormalizer.normalize(entry.getValue());
+            if (korean.isEmpty()) {
+                continue;
+            }
+            hits.add(new AliasHit(korean, similarity));
+        }
+        return hits;
+    }
+
+    public static class AliasHit {
+        private final String koreanNormalized;
+        private final double keySimilarity;
+
+        public AliasHit(String koreanNormalized, double keySimilarity) {
+            this.koreanNormalized = koreanNormalized;
+            this.keySimilarity = keySimilarity;
+        }
+
+        public String getKoreanNormalized() {
+            return koreanNormalized;
+        }
+
+        public double getKeySimilarity() {
+            return keySimilarity;
+        }
     }
 
     /**

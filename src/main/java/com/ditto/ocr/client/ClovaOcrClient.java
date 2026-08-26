@@ -116,23 +116,30 @@ public class ClovaOcrClient {
 
         List<RecognizedWord> words = image.getFields().stream()
                 .filter(f -> StringUtils.hasText(f.getInferText()))
-                .map(f -> new RecognizedWord(
-                        f.getInferText().trim(),
-                        f.getInferConfidence() == null ? 0.0 : f.getInferConfidence(),
-                        area(f)))
+                .map(this::toWord)
                 .sorted(Comparator.comparingDouble(RecognizedWord::getArea).reversed())
                 .toList();
         return new ClovaOcrResult(words);
     }
 
-    /** 바운딩 박스 꼭짓점으로 사각형 면적을 근사한다(폭 × 높이). */
-    private double area(ClovaOcrResponse.Field field) {
+    private RecognizedWord toWord(ClovaOcrResponse.Field field) {
+        double[] box = bbox(field);
+        return new RecognizedWord(
+                field.getInferText().trim(),
+                field.getInferConfidence() == null ? 0.0 : field.getInferConfidence(),
+                box[0], box[1], box[2], box[3]);
+    }
+
+    /** 바운딩 박스 꼭짓점으로 축 정렬 사각형 [minX, minY, maxX, maxY] 를 근사한다. */
+    private double[] bbox(ClovaOcrResponse.Field field) {
         if (field.getBoundingPoly() == null || field.getBoundingPoly().getVertices() == null) {
-            return 0.0;
+            return new double[] {0, 0, 0, 0};
         }
         List<ClovaOcrResponse.Vertex> vertices = field.getBoundingPoly().getVertices();
-        double minX = Double.MAX_VALUE, minY = Double.MAX_VALUE;
-        double maxX = -Double.MAX_VALUE, maxY = -Double.MAX_VALUE;
+        double minX = Double.MAX_VALUE;
+        double minY = Double.MAX_VALUE;
+        double maxX = -Double.MAX_VALUE;
+        double maxY = -Double.MAX_VALUE;
         for (ClovaOcrResponse.Vertex v : vertices) {
             if (v.getX() == null || v.getY() == null) {
                 continue;
@@ -143,8 +150,8 @@ public class ClovaOcrClient {
             maxY = Math.max(maxY, v.getY());
         }
         if (maxX < minX || maxY < minY) {
-            return 0.0;
+            return new double[] {0, 0, 0, 0};
         }
-        return (maxX - minX) * (maxY - minY);
+        return new double[] {minX, minY, maxX, maxY};
     }
 }

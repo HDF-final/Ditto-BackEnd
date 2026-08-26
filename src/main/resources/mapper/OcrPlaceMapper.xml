@@ -11,11 +11,11 @@
     </select>
 
     <!--
-      정규화된 인식 텍스트로 상호를 부분 일치 검색한다. 상호도 같은 규칙으로 정규화
-      (영숫자·한글만 남기고 대문자화)해 양쪽을 맞춘 뒤 LIKE 로 매칭한다. 최종 유사도
-      랭킹은 애플리케이션(OcrPlaceMatcher)에서 수행하므로 여기서는 후보만 넉넉히 추린다.
+      OCR 매칭용 카탈로그. 오타를 LIKE 로 잡을 수 없고 REGEXP_REPLACE 를 행마다
+      돌리는 비용도 커서, 길찾기 가능 장소를 한 번에 읽고 애플리케이션에서
+      exact / alias / fuzzy 를 수행한다. 더현대 규모(약 100여 곳)에서는 인메모리가 맞다.
     -->
-    <select id="findCandidatesByNormalizedName"
+    <select id="findAllNavigablePlaces"
             resultType="com.ditto.ocr.repository.OcrPlaceMapper$CandidateRow">
         SELECT p.place_id,
                p.navigation_key AS navigationKey,
@@ -23,10 +23,8 @@
                f.floor_code AS floor
           FROM place p
           JOIN floor f ON f.floor_id = p.floor_id
-         WHERE UPPER(REGEXP_REPLACE(p.name, '[^0-9A-Za-z가-힣]', ''))
-               LIKE '%' || #{norm} || '%'
+         WHERE p.navigation_key IS NOT NULL
          ORDER BY p.name
-         FETCH FIRST #{limit} ROWS ONLY
     </select>
 
 </mapper>

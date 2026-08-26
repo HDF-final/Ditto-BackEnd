@@ -11,14 +11,22 @@ public final class TextSimilarity {
     private TextSimilarity() {
     }
 
+    /** 포함 매칭을 인정하는 더 짧은 쪽의 최소 길이. 한두 글자 포함은 오탐이 난다. */
+    private static final int MIN_CONTAINMENT_LENGTH = 3;
+
     /**
-     * 두 정규화 문자열의 유사도(0~1). 포함 관계면 1.0, 아니면 편집 거리 비율.
+     * 두 정규화 문자열의 유사도(0~1). 같으면 1.0, 짧은 쪽이 3글자 이상이고 포함되면 1.0,
+     * 아니면 편집 거리 비율.
      */
     public static double similarity(String a, String b) {
         if (a == null || b == null || a.isEmpty() || b.isEmpty()) {
             return 0.0;
         }
-        if (a.contains(b) || b.contains(a)) {
+        if (a.equals(b)) {
+            return 1.0;
+        }
+        int minLen = Math.min(a.length(), b.length());
+        if (minLen >= MIN_CONTAINMENT_LENGTH && (a.contains(b) || b.contains(a))) {
             return 1.0;
         }
         int distance = levenshtein(a, b);

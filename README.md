@@ -336,6 +336,9 @@ Ditto-BackEnd/
     │   │   ├── navigation/               # 실내 내비게이션 도메인
     │   │   │   ├── controller/  service/  repository/  domain/  dto/
     │   │   │
+    │   │   ├── ocr/                      # 간판 OCR 현재 위치 인식
+    │   │   │   ├── controller/  service/  repository/  client/  support/
+    │   │   │
     │   │   ├── admin/                    # 관리자 도메인
     │   │   │   ├── controller/  service/  repository/  domain/  dto/
     │   │   │   ├── client/               # 코스 초안 람다 호출 (ditto-celeb-warm-2, 읽기 전용)
@@ -594,8 +597,23 @@ HTTP로 호출하고 응답을 `ApiResponse`로 감싸 돌려줄 뿐입니다. �
 | 층별 내비게이션 데이터 조회 | `GET` | `/api/v1/navigation/maps/{mapId}/floors/{floor}` | X |
 | 코스 이동 경로 계산 | `POST` | `/api/v1/navigation/courses/{courseId}/route` | O |
 | 현재 위치 확인·경로 시작점 설정 | `POST` | `/api/v1/navigation/location` | O |
-| OCR 현재 위치 인식 | `POST` | `/api/v1/navigation/location/ocr` | O |
 | 장소 방문 완료·코스 진행률 조회 | `POST` | `/api/v1/navigation/courses/{courseId}/progress` | O |
+
+### OCR 간판 인식 — `/api/v1/ocr`
+
+간판 사진으로 현재 매장을 찾는다. 순서는 고정이다.
+
+1. **이미지 전처리** — 긴 변 1600px·약 1MB로 줄여 CLOVA 업로드/인식 latency를 낮춘다.
+2. **bbox 후처리** — 층수·가격·할인율처럼 상호가 될 수 없는 형태와 너무 작은 글자만 버리고, 같은 줄의 분리 단어(`POP`+`MART`)를 붙인다. `SALE`·`세일중`은 여기서 지우지 않는다.
+3. **인메모리 엔티티 매칭** — 카탈로그를 한 번에 읽어 exact / alias / fuzzy로 고른다. 프로모 문구는 단어 리스트가 아니라, 매장과 점수가 안 나오면 후보에서 떨어진다. SQL `LIKE`는 오타를 못 견딘다.
+
+후보 응답에서 `confidence`는 CLOVA가 글자를 읽은 신뢰도이고, `matchScore`는 그 글자가 카탈로그 상호와 얼마나 맞는기다. 둘을 한 점수로 섞지 않는다.
+
+| 기능 | Method | Endpoint | 인증 |
+| --- | --- | --- | --- |
+| OCR 현재 위치 인식 (세션 없음) | `POST` | `/api/v1/ocr/locations/recognize` | X |
+| OCR 길찾기 세션 시작 | `POST` | `/api/v1/ocr/sessions` | O |
+| OCR 간판 인식 (세션) | `POST` | `/api/v1/ocr/recognitions` | O |
 
 ### 관리자 (Admin) — `/api/v1/admin`
 
@@ -946,6 +964,10 @@ ORACLE_PASSWORD=CHANGE_ME
 
 # Gemini API
 GEMINI_API_KEY=CHANGE_ME
+
+# 네이버 CLOVA OCR (간판 인식). 콘솔에서 발급한 Invoke URL·Secret 만 둔다.
+CLOVA_OCR_INVOKE_URL=
+CLOVA_OCR_SECRET=
 
 # AI 엔진 base URL (생략 시 http://127.0.0.1:8000)
 AI_ENGINE_BASE_URL=http://127.0.0.1:8000
