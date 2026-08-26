@@ -198,6 +198,15 @@ public class S3Provider {
      * 업로드 경로와 달리 {@code images/} prefix 제약과 ASCII 제한을 두지 않으므로 한글·공백이 든
      * 파일명도 허용하되, 경로 이탈 문자는 막는다. key가 비어 있으면 {@code null}을 반환한다.
      *
+     * <p><b>CDN 주소를 만들 때 key 를 인코딩한다.</b> 버킷에 {@code 63_크리스챤 디올.jpg} 처럼
+     * 공백이 든 파일명이 있는데, 그대로 이어 붙이면 주소 안에 진짜 공백이 남아 요청이
+     * 실패한다. 더 고약한 것은 <b>받는 쪽에 따라 조용히 깨진다</b>는 점이다 — CSS
+     * {@code url()} 은 따옴표가 없으면 공백에서 토큰이 끊겨 선언째 무시되고, 화면에는
+     * 회색 자리만 남는다. 실제로 기본 추천 코스 목록의 카드 사진이 그렇게 비었다.
+     *
+     * <p>형제인 {@link #resolveDirectImageUrl} 은 처음부터 인코딩하고 있었다. 같은 종류의
+     * 값을 내는 메서드 둘이 다르게 굴면 어느 쪽으로 나가느냐에 따라 결과가 갈린다.
+     *
      * @param objectKey S3 object key (null/빈 문자열 허용)
      * @return 조회용 URL, key가 없으면 null
      */
@@ -208,7 +217,7 @@ public class S3Provider {
         validateReadableKey(objectKey);
 
         if (StringUtils.hasText(properties.getPublicBaseUrl())) {
-            return removeTrailingSlash(properties.getPublicBaseUrl()) + "/" + objectKey;
+            return removeTrailingSlash(properties.getPublicBaseUrl()) + "/" + encodeKeyPath(objectKey);
         }
 
         GetObjectRequest getObjectRequest = GetObjectRequest.builder()
