@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import com.ditto.admin.client.CelebApproveClient;
 import com.ditto.admin.client.CelebDraftClient;
 import com.ditto.admin.dto.response.AdminCourseApproveResponse;
+import com.ditto.admin.dto.response.AdminCourseCacheListResponse;
 import com.ditto.admin.dto.response.AdminCourseDetailResponse;
 import com.ditto.admin.dto.response.AdminCourseListResponse;
 import com.ditto.admin.dto.response.AdminCoursePlaceCatalogResponse;
@@ -69,6 +70,30 @@ public class AdminCourseService {
                 .builtAt(textOrNull(payload, "built_at"))
                 .placeCount(payload.path("places").size())
                 .warningCount(payload.path("warnings").size())
+                .payload(payload)
+                .build();
+    }
+
+    /**
+     * 지금 손님에게 나가고 있는 코스 목록.
+     *
+     * <p>승인이 끝나면 그 인물은 초안 목록에서 사라진다 — 초안을 지우는 것이 승인의
+     * 마지막 단계다. 관리자가 "올린 것이 지금 어떻게 나가나" 를 볼 자리가 여기다.
+     *
+     * <p>부르는 곳이 {@code CelebDraftClient} 가 아니라 승인 람다인 것은, 서빙 캐시
+     * ({@code celeb:course:*})를 아는 쪽이 거기이기 때문이다 — 초안 람다는 그 키를
+     * 읽는 코드가 아예 없다(그게 "초안은 손님에게 안 나간다" 의 보장이다).
+     */
+    public AdminCourseCacheListResponse getCachedCourses() {
+        JsonNode payload = celebApproveClient.listCourses();
+        // **빈 목록은 정상이다.** 그날 승인 전이면 아무것도 없는 것이 맞다. 람다는
+        // Redis 에 못 붙었을 때만 {"error": …} 를 낸다 — 그 둘을 창구에서 갈라 뒀다.
+        rejectError(payload, ErrorCode.CELEB_COURSE_CACHE_READ_FAILED);
+
+        return AdminCourseCacheListResponse.builder()
+                .functionName(celebApproveClient.getFunctionName())
+                .fetchedAt(Instant.now())
+                .count(payload.path("courses").size())
                 .payload(payload)
                 .build();
     }
@@ -158,8 +183,10 @@ public class AdminCourseService {
         if (error.isMissingNode() || error.isNull()) {
             return;
         }
-        log.warn("코스 초안 창구가 오류를 돌려줬다. functionName={}, code={}, error={}",
-                celebDraftClient.getFunctionName(), errorCode.getCode(), error.asText(""));
+        // **어느 람다를 불렀는지 코드로 안다.** 이름을 박아 두면 서비스 중인 코스가
+        // 실패했는데 로그에는 초안 람다 이름이 찍힌다.
+        log.warn("코스 창구가 오류를 돌려줬다. code={}, error={}",
+                errorCode.getCode(), error.asText(""));
         throw new BusinessException(errorCode);
     }
 

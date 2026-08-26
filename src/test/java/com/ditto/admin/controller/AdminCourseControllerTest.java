@@ -20,6 +20,7 @@ import org.springframework.context.annotation.ComponentScan;
 import org.springframework.context.annotation.FilterType;
 import org.springframework.test.web.servlet.MockMvc;
 
+import com.ditto.admin.dto.response.AdminCourseCacheListResponse;
 import com.ditto.admin.dto.response.AdminCourseDetailResponse;
 import com.ditto.admin.dto.response.AdminCourseListResponse;
 import com.ditto.admin.dto.response.AdminCoursePlaceCatalogResponse;
@@ -114,17 +115,47 @@ class AdminCourseControllerTest {
     }
 
     @Test
-    @DisplayName("/run 과 /places 는 인물 이름으로 새지 않는다 — 고정 경로가 변수보다 구체적이다")
+    @DisplayName("서비스 중인 코스 목록은 대표 사진까지 머리말에 싣는다")
+    void returnsCachedCourseList() throws Exception {
+        given(adminCourseService.getCachedCourses()).willReturn(cached());
+
+        mockMvc.perform(get("/api/v1/admin/admin-courses/cached"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.functionName").value("ditto-celeb-approve"))
+                .andExpect(jsonPath("$.data.count").value(2))
+                .andExpect(jsonPath("$.data.payload.courses[0].celebrity").value("르세라핌"))
+                .andExpect(jsonPath("$.data.payload.courses[0].aspect").value("BRAND"))
+                .andExpect(jsonPath("$.data.payload.courses[0].hero.kind").value("evidence"))
+                .andExpect(jsonPath("$.data.payload.courses[1].ttl").value(46853));
+    }
+
+    @Test
+    @DisplayName("/run · /places · /cached 는 인물 이름으로 새지 않는다 — 고정 경로가 변수보다 구체적이다")
     void fixedPathsBeatCelebrityPath() throws Exception {
         given(adminCourseService.getRunStatus()).willReturn(run());
         given(adminCourseService.getPlaces(false)).willReturn(catalog());
+        given(adminCourseService.getCachedCourses()).willReturn(cached());
 
         mockMvc.perform(get("/api/v1/admin/admin-courses/run")).andExpect(status().isOk());
         mockMvc.perform(get("/api/v1/admin/admin-courses/places")).andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/admin/admin-courses/cached")).andExpect(status().isOk());
 
         then(adminCourseService).should().getRunStatus();
         then(adminCourseService).should().getPlaces(false);
+        then(adminCourseService).should().getCachedCourses();
         then(adminCourseService).should(org.mockito.Mockito.never()).getDraft(anyString());
+    }
+
+    @Test
+    @DisplayName("캐시를 못 읽으면 502 로 알려 준다 — 빈 목록을 성공으로 내보내지 않는다")
+    void unreadableCacheIsBadGateway() throws Exception {
+        willThrow(new BusinessException(ErrorCode.CELEB_COURSE_CACHE_READ_FAILED))
+                .given(adminCourseService).getCachedCourses();
+
+        mockMvc.perform(get("/api/v1/admin/admin-courses/cached"))
+                .andExpect(status().isBadGateway())
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.code").value("CD004"));
     }
 
     @Test
@@ -164,6 +195,28 @@ class AdminCourseControllerTest {
                           {"celebrity":"카리나","kind":"PERSON","status":"ok",
                            "shape":"매장 3 · 카페 1 · 여가 1","places":5,"warnings":2,
                            "built_at":"2026-08-25T14:15:10","ttl":85785}]}
+                        """))
+                .build();
+    }
+
+    private AdminCourseCacheListResponse cached() throws Exception {
+        return AdminCourseCacheListResponse.builder()
+                .functionName("ditto-celeb-approve")
+                .fetchedAt(Instant.parse("2026-08-26T05:20:00Z"))
+                .count(2)
+                .payload(objectMapper.readTree("""
+                        {"count":2,"courses":[
+                          {"celebrity":"르세라핌","aspect":"BRAND","shape":"매장 3 · 카페 1 · 여가 1",
+                           "places":5,"warnings":0,"reply":"이번 코스는…",
+                           "approved_at":"2026-08-26T09:20:16","built_at":"2026-08-26T00:11:02",
+                           "hero":{"url":"https://issuepicker.com/a.jpg","kind":"evidence",
+                                   "caption":"르세라핌 × 루이비통"},
+                           "aliases":["LE SSERAFIM","르세라핌"],"research":true,"ttl":46853},
+                          {"celebrity":"카리나","aspect":"BRAND","shape":"매장 3 · 카페 1 · 여가 1",
+                           "places":5,"warnings":2,"reply":"카리나의…",
+                           "approved_at":"2026-08-26T09:20:11","built_at":"2026-08-26T00:12:00",
+                           "hero":{"url":"https://hdf.s3/b.jpg","kind":"place","caption":"프라다"},
+                           "aliases":["KARINA","카리나"],"research":true,"ttl":46853}]}
                         """))
                 .build();
     }

@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.ditto.admin.dto.response.AdminCourseApproveResponse;
+import com.ditto.admin.dto.response.AdminCourseCacheListResponse;
 import com.ditto.admin.dto.response.AdminCourseDetailResponse;
 import com.ditto.admin.dto.response.AdminCourseListResponse;
 import com.ditto.admin.dto.response.AdminCoursePlaceCatalogResponse;
@@ -51,6 +52,14 @@ public class AdminCourseController {
     @GetMapping("/run")
     public ApiResponse<AdminCourseRunResponse> getRunStatus() {
         return ApiResponse.success(adminCourseService.getRunStatus());
+    }
+
+    @Operation(summary = "서비스 중인(캐시된) 코스 목록 조회",
+            description = "승인이 끝나 지금 손님에게 나가고 있는 코스. 머리말만 돌려주고, "
+                    + "전부 다음 00시(KST)에 만료된다 — ttl 이 그때까지 남은 초다.")
+    @GetMapping("/cached")
+    public ApiResponse<AdminCourseCacheListResponse> getCachedCourses() {
+        return ApiResponse.success(adminCourseService.getCachedCourses());
     }
 
     @Operation(summary = "더현대 장소 카탈로그 조회",

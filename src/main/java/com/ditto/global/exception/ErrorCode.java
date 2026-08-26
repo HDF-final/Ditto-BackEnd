@@ -77,6 +77,7 @@ public enum ErrorCode {
     CELEB_DRAFT_NOT_FOUND(HttpStatus.NOT_FOUND, "CD001", "승인 대기 코스 초안을 찾을 수 없습니다."),
     CELEB_DRAFT_READ_FAILED(HttpStatus.BAD_GATEWAY, "CD002", "승인 대기 코스 초안을 읽지 못했습니다."),
     CELEB_COURSE_APPROVE_FAILED(HttpStatus.BAD_GATEWAY, "CD003", "코스 승인에 실패했습니다."),
+    CELEB_COURSE_CACHE_READ_FAILED(HttpStatus.BAD_GATEWAY, "CD004", "서비스 중인 코스를 읽지 못했습니다."),
 
     // ===== External (AI / OCR) =====
     AI_SERVICE_ERROR(HttpStatus.BAD_GATEWAY, "E001", "AI 서비스 처리 중 오류가 발생했습니다."),

@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import com.ditto.admin.client.CelebApproveClient;
 import com.ditto.admin.client.CelebDraftClient;
 import com.ditto.admin.dto.response.AdminCourseApproveResponse;
+import com.ditto.admin.dto.response.AdminCourseCacheListResponse;
 import com.ditto.admin.dto.response.AdminCourseDetailResponse;
 import com.ditto.admin.dto.response.AdminCourseListResponse;
 import com.ditto.admin.dto.response.AdminCoursePlaceCatalogResponse;
@@ -55,6 +56,46 @@ class AdminCourseServiceTest {
         assertThat(response.getFunctionName()).isEqualTo("ditto-celeb-warm-2");
         assertThat(response.getFetchedAt()).isNotNull();
         assertThat(response.getPayload().path("drafts")).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("서비스 중인 코스는 승인 람다에서 읽는다 — 초안 람다는 서빙 캐시를 모른다")
+    void readsCachedCoursesFromApproveLambda() {
+        given(celebApproveClient.listCourses()).willReturn(json("""
+                {"count":2,"courses":[
+                  {"celebrity":"르세라핌","aspect":"BRAND","places":5,"ttl":46853},
+                  {"celebrity":"카리나","aspect":"BRAND","places":5,"ttl":46853}]}
+                """));
+
+        AdminCourseCacheListResponse response = service.getCachedCourses();
+
+        assertThat(response.getCount()).isEqualTo(2);
+        assertThat(response.getFunctionName()).isEqualTo("ditto-celeb-approve");
+        assertThat(response.getFetchedAt()).isNotNull();
+        assertThat(response.getPayload().path("courses")).hasSize(2);
+        verify(celebDraftClient, never()).listDrafts();
+    }
+
+    @Test
+    @DisplayName("승인 전이라 빈 목록인 것은 정상이다 — 오류로 올리지 않는다")
+    void emptyCacheIsNotAnError() {
+        given(celebApproveClient.listCourses()).willReturn(json("""
+                {"count":0,"courses":[]}
+                """));
+
+        assertThat(service.getCachedCourses().getCount()).isZero();
+    }
+
+    @Test
+    @DisplayName("Redis 에 못 붙었으면 502 로 올린다 — 빈 목록과 갈라야 장애가 안 묻힌다")
+    void unreachableCacheIsRejected() {
+        given(celebApproveClient.listCourses()).willReturn(json("""
+                {"error":"Redis 에 못 붙었습니다"}
+                """));
+
+        assertThatThrownBy(() -> service.getCachedCourses())
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.CELEB_COURSE_CACHE_READ_FAILED);
     }
 
     @Test

@@ -82,6 +82,14 @@ class AdminCourseSecurityTest {
                 .andExpect(jsonPath("$.code").value("A001"));
     }
 
+    @Test
+    @DisplayName("인증되지 않은 사용자는 서비스 중인 코스 목록도 볼 수 없다")
+    void anonymousCannotReadCachedCourses() throws Exception {
+        mockMvc.perform(get("/api/v1/admin/admin-courses/cached"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("A001"));
+    }
+
     private AdminCourseListResponse list() throws Exception {
         return AdminCourseListResponse.builder()
                 .functionName("ditto-celeb-warm-2")
