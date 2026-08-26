@@ -24,6 +24,9 @@ public class PublicCourseResponse {
     @Schema(description = "게시글 제목", example = "내가 다녀온 K-MZ 코스")
     private String title;
 
+    @Schema(description = "작성자 닉네임", example = "Yuki_T")
+    private String writerNickname;
+
     @Schema(description = "좋아요 수", example = "12")
     private Long likeCount;
 

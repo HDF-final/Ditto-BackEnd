@@ -366,6 +366,7 @@ class PostServiceTest {
                 .postId(1L)
                 .courseId(3L)
                 .title("내가 다녀온 K-MZ 코스")
+                .writerNickname("Yuki_T")
                 .likeCount(12L)
                 .bookmarkCount(4L)
                 .build();
@@ -382,6 +383,7 @@ class PostServiceTest {
         assertThat(contentItem.getPostId()).isEqualTo(1L);
         assertThat(contentItem.getCourseId()).isEqualTo(3L);
         assertThat(contentItem.getTitle()).isEqualTo("내가 다녀온 K-MZ 코스");
+        assertThat(contentItem.getWriterNickname()).isEqualTo("Yuki_T");
         assertThat(contentItem.getLikeCount()).isEqualTo(12L);
         assertThat(contentItem.getBookmarkCount()).isEqualTo(4L);
 

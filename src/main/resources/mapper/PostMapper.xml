@@ -72,11 +72,14 @@
         SELECT p.post_id,
                p.course_id,
                c.name AS title,
+               u.name AS writer_nickname,
                p.likes_count AS like_count,
                p.save_count AS bookmark_count
           FROM post p
           JOIN course c
             ON c.course_id = p.course_id
+          LEFT JOIN app_user u
+            ON u.user_id = p.user_id
          WHERE p.deleted_at IS NULL
            AND p.course_id IS NOT NULL
            AND c.deleted_at IS NULL
