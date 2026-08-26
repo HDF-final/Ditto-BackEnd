@@ -29,8 +29,11 @@ public class OcrLocationController {
     @Operation(
             summary = "OCR 현재 위치 인식",
             description = "간판 이미지를 인식해 브랜드명과 매칭되는 장소 후보를 돌려준다. "
-                    + "세션 없이 이미지만으로 동작하며, 인식은 외부 CLOVA OCR 이 처리하고 "
-                    + "장애·타임아웃은 E002(502) 로 변환된다.")
+                    + "세션 없이 이미지만으로 동작한다. 이미지는 CLOVA 호출 전에 축소하고, "
+                    + "층·가격·할인율만 형태로 버린 뒤 카탈로그 exact/alias/fuzzy 로 장소를 고른다. "
+                    + "SALE·세일중 은 리스트로 지우지 않고 매장과 안 맞으면 후보에서 떨어진다. "
+                    + "후보의 confidence 는 OCR 신뢰도, "
+                    + "matchScore 는 카탈로그 매칭 점수다. CLOVA 장애·타임아웃은 E002(502) 로 변환된다.")
     @PostMapping(value = "/recognize", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.OK)
     public ApiResponse<OcrRecognitionResponse> recognize(

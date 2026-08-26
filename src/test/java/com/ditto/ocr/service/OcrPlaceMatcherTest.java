@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 
 import com.ditto.ocr.client.ClovaOcrResult;
 import com.ditto.ocr.client.RecognizedWord;
+import com.ditto.ocr.config.OcrProperties;
 import com.ditto.ocr.dto.response.OcrCandidateResponse;
 import com.ditto.ocr.repository.OcrPlaceMapper;
 import com.ditto.ocr.repository.OcrPlaceMapper.CandidateRow;
@@ -17,11 +18,12 @@ import com.ditto.ocr.support.TextSimilarity;
 
 /**
  * OCR 매칭 파이프라인의 노이즈 내성·랭킹 검증.
- * DB 는 정규화 규칙을 흉내 낸 인메모리 매퍼 스텁으로 대체한다.
+ * DB 는 카탈로그 전체를 돌려주는 인메모리 매퍼 스텁으로 대체한다.
  */
 class OcrPlaceMatcherTest {
 
     private OcrPlaceMatcher matcherWith(CandidateRow... rows) {
+        List<CandidateRow> catalog = List.of(rows);
         OcrPlaceMapper stub = new OcrPlaceMapper() {
             @Override
             public String findNavigationKeyByPlaceId(Long placeId) {
@@ -29,15 +31,11 @@ class OcrPlaceMatcherTest {
             }
 
             @Override
-            public List<CandidateRow> findCandidatesByNormalizedName(String norm, int limit) {
-                // 실제 SQL 의 정규화 LIKE 를 흉내 낸다.
-                return List.of(rows).stream()
-                        .filter(r -> OcrTextNormalizer.normalize(r.getName()).contains(norm))
-                        .limit(limit)
-                        .toList();
+            public List<CandidateRow> findAllNavigablePlaces() {
+                return catalog;
             }
         };
-        return new OcrPlaceMatcher(stub);
+        return new OcrPlaceMatcher(stub, new OcrProperties());
     }
 
     private CandidateRow row(long id, String name) {
@@ -62,6 +60,7 @@ class OcrPlaceMatcherTest {
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getPlaceId()).isEqualTo(11L);
+        assertThat(result.get(0).getMatchScore()).isEqualTo(1.0);
     }
 
     @Test
@@ -77,6 +76,45 @@ class OcrPlaceMatcherTest {
                 3, 5);
 
         assertThat(result).extracting(OcrCandidateResponse::getPlaceId).contains(20L);
+    }
+
+    @Test
+    @DisplayName("SALE 만 있으면 카탈로그에 매칭하지 않는다")
+    void saleAloneDoesNotMatch() {
+        OcrPlaceMatcher matcher = matcherWith(row(20L, "TAMBURINS"), row(11L, "EATALY"));
+
+        List<OcrCandidateResponse> result = matcher.match(
+                words(new RecognizedWord("SALE", 0.99, 5000)), 3, 5);
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    @DisplayName("세일중은 단어 리스트가 아니라 카탈로그 불일치로 버려진다")
+    void saleJungDoesNotNeedAStopwordList() {
+        OcrPlaceMatcher matcher = matcherWith(row(20L, "TAMBURINS"), row(11L, "EATALY"));
+
+        List<OcrCandidateResponse> result = matcher.match(
+                words(new RecognizedWord("세일중", 0.99, 5000)), 3, 5);
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    @DisplayName("가장 큰 글자가 세일중이어도 카탈로그에 있는 브랜드가 대표명이 된다")
+    void promoDoesNotBecomeRecognizedBrand() {
+        OcrPlaceMatcher matcher = matcherWith(row(20L, "TAMBURINS"));
+
+        OcrPlaceMatcher.MatchResult result = matcher.resolve(
+                words(
+                        new RecognizedWord("세일중", 0.99, 8000),
+                        new RecognizedWord("SALE", 0.98, 7000),
+                        new RecognizedWord("TAMBURINS", 0.91, 2000)),
+                5);
+
+        assertThat(result.getRecognizedBrandName()).isEqualTo("TAMBURINS");
+        assertThat(result.getCandidates()).extracting(OcrCandidateResponse::getPlaceId)
+                .containsExactly(20L);
     }
 
     @Test
@@ -96,8 +134,8 @@ class OcrPlaceMatcherTest {
     @Test
     @DisplayName("포함 매칭이 오탈자 근접 매칭보다 높은 점수를 받는다")
     void containmentScoresHigherThanFuzzy() {
-        double exact = OcrPlaceMatcher.score("EATALY", "EATALY", 1.0);
-        double fuzzy = OcrPlaceMatcher.score("EATALX", "EATALY", 1.0);
+        double exact = OcrPlaceMatcher.matchScore("EATALY", "EATALY");
+        double fuzzy = OcrPlaceMatcher.matchScore("EATALX", "EATALY");
         assertThat(exact).isGreaterThan(fuzzy);
         assertThat(fuzzy).isGreaterThan(0.0);
     }
@@ -106,6 +144,50 @@ class OcrPlaceMatcherTest {
     @DisplayName("한 글자 오인식은 편집거리 유사도로 높게 유지된다")
     void oneCharTypoStaysSimilar() {
         assertThat(TextSimilarity.similarity("EATALX", "EATALY")).isGreaterThan(0.8);
+    }
+
+    @Test
+    @DisplayName("LIKE 로는 못 찾는 OCR 오타도 인메모리 fuzzy 로 매칭된다")
+    void typoMatchesWithoutLike() {
+        OcrPlaceMatcher matcher = matcherWith(row(11L, "EATALY"));
+        String typo = OcrTextNormalizer.normalize("EATALX");
+        assertThat(OcrTextNormalizer.normalize("EATALY").contains(typo)).isFalse();
+
+        List<OcrCandidateResponse> result = matcher.match(
+                words(new RecognizedWord("EATALX", 0.88, 3000)), 3, 5);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getPlaceId()).isEqualTo(11L);
+        assertThat(result.get(0).getMatchScore()).isGreaterThan(0.8);
+        assertThat(result.get(0).getMatchScore()).isLessThan(1.0);
+        assertThat(result.get(0).getConfidence()).isEqualTo(0.88);
+    }
+
+    @Test
+    @DisplayName("영어 오타도 별칭 퍼지로 한글 상호에 매칭되고 matchScore 에 오타가 남는다")
+    void englishTypoFuzzyMatchesKoreanPlace() {
+        OcrPlaceMatcher matcher = matcherWith(row(122L, "이탈리"));
+
+        List<OcrCandidateResponse> result = matcher.match(
+                words(new RecognizedWord("EATALX", 0.91, 3000)), 3, 5);
+
+        assertThat(result).extracting(OcrCandidateResponse::getPlaceId).containsExactly(122L);
+        assertThat(result.get(0).getMatchScore()).isGreaterThan(0.8);
+        assertThat(result.get(0).getMatchScore()).isLessThan(1.0);
+        assertThat(result.get(0).getConfidence()).isEqualTo(0.91);
+    }
+
+    @Test
+    @DisplayName("exact 매칭은 matchScore 1.0 이고 confidence 는 OCR 값을 그대로 둔다")
+    void separatesOcrConfidenceFromMatchScore() {
+        OcrPlaceMatcher matcher = matcherWith(row(11L, "EATALY"));
+
+        List<OcrCandidateResponse> result = matcher.match(
+                words(new RecognizedWord("EATALY", 0.73, 3000)), 3, 5);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getMatchScore()).isEqualTo(1.0);
+        assertThat(result.get(0).getConfidence()).isEqualTo(0.73);
     }
 
     @Test
@@ -120,6 +202,7 @@ class OcrPlaceMatcherTest {
 
         assertThat(spaced).extracting(OcrCandidateResponse::getPlaceId).containsExactly(16L);
         assertThat(packed).extracting(OcrCandidateResponse::getPlaceId).containsExactly(16L);
+        assertThat(spaced.get(0).getMatchScore()).isEqualTo(1.0);
     }
 
     @Test
@@ -145,6 +228,7 @@ class OcrPlaceMatcherTest {
                 words(new RecognizedWord("EATALY", 0.95, 3000)), 3, 5);
 
         assertThat(result).extracting(OcrCandidateResponse::getPlaceId).containsExactly(122L);
+        assertThat(result.get(0).getMatchScore()).isEqualTo(1.0);
     }
 
     @Test

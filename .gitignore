@@ -44,3 +44,5 @@ src/main/resources/sql/
 ### OS ###
 .DS_Store
 Thumbs.db
+
+.gradle-user-home/

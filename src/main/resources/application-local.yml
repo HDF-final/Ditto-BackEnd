@@ -100,6 +100,16 @@ ditto:
   ocr:
     session-ttl: 30m
     max-candidates: 5
+    brand-top-n: 5
+    preprocess:
+      enabled: true
+      max-long-side-px: 1600
+      max-bytes: 1048576
+      jpeg-quality: 0.82
+    matching:
+      fuzzy-threshold: 0.8
+      min-fuzzy-length: 4
+      min-match-score: 0.8
     clova:
       invoke-url: ${CLOVA_OCR_INVOKE_URL:}
       secret: ${CLOVA_OCR_SECRET:}

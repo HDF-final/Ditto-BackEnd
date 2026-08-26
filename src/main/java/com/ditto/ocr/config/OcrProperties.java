@@ -24,10 +24,54 @@ public class OcrProperties {
     /** 브랜드명 하나로 돌려줄 최대 후보 장소 수. */
     private int maxCandidates = 5;
 
-    /** 매칭에 쓸 상위 인식 텍스트 조각 수(도드라짐 순). 브랜드가 최대 글자가 아닐 때를 대비한다. */
-    private int brandTopN = 3;
+    /**
+     * 예전 매칭이 면적 상위 N개만 보던 한도. 지금은 카탈로그 대조가 프로모를 걸러서
+     * 이 값을 매칭에 쓰지 않는다. 설정 호환을 위해 남겨 둔다.
+     */
+    private int brandTopN = 5;
+
+    private final Preprocess preprocess = new Preprocess();
+
+    private final Matching matching = new Matching();
 
     private final Clova clova = new Clova();
+
+    /**
+     * CLOVA 호출 전 이미지 축소. 스마트폰 원본(수 MB·수천 px)을 그대로 보내면
+     * 업로드+인식 latency 가 커진다.
+     */
+    @Getter
+    @Setter
+    public static class Preprocess {
+
+        private boolean enabled = true;
+
+        /** 긴 변 최대 픽셀. 이보다 크면 비율을 유지한 채 줄인다. */
+        private int maxLongSidePx = 1600;
+
+        /** 재인코딩 후 목표 상한(바이트). 넘으면 JPEG 품질을 한 번 더 낮춘다. */
+        private int maxBytes = 1_048_576;
+
+        /** JPEG 품질(0~1). */
+        private float jpegQuality = 0.82f;
+    }
+
+    /**
+     * 카탈로그 인메모리 엔티티 매칭. SQL LIKE 대신 exact / alias / fuzzy 를 쓴다.
+     */
+    @Getter
+    @Setter
+    public static class Matching {
+
+        /** fuzzy 후보로 인정하는 최소 유사도(0~1). */
+        private double fuzzyThreshold = 0.8;
+
+        /** 이보다 짧은 토큰은 오타 보정 없이 exact·alias 만 본다. */
+        private int minFuzzyLength = 4;
+
+        /** 응답에 올릴 최소 matchScore. OCR 신뢰도({@code confidence})와는 별개다. */
+        private double minMatchScore = 0.8;
+    }
 
     /** 네이버 CLOVA OCR(General) 접속 설정. */
     @Getter
