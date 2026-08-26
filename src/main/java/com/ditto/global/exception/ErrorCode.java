@@ -53,6 +53,7 @@ public enum ErrorCode {
     COMMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "CM002", "댓글을 찾을 수 없습니다."),
     ALREADY_LIKED(HttpStatus.CONFLICT, "CM003", "이미 좋아요한 코스입니다."),
     ALREADY_BOOKMARKED(HttpStatus.CONFLICT, "CM004", "이미 북마크한 코스입니다."),
+    POST_IMAGE_LIMIT_EXCEEDED(HttpStatus.BAD_REQUEST, "CM005", "게시글에 첨부할 수 있는 사진 수를 초과했습니다."),
 
     // ===== Navigation =====
     MAP_MANIFEST_NOT_FOUND(HttpStatus.NOT_FOUND, "N001", "지도 매니페스트를 찾을 수 없습니다."),

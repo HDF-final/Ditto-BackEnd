@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ditto.community.repository.PostImageMapper">
+
+    <insert id="insert"
+            parameterType="com.ditto.community.repository.PostImageMapper$PostImageInsertCommand"
+            useGeneratedKeys="true"
+            keyProperty="postImageId"
+            keyColumn="post_image_id">
+        INSERT INTO post_image (
+            post_id,
+            object_key,
+            sort_order
+        ) VALUES (
+            #{postId,jdbcType=NUMERIC},
+            #{imageKey,jdbcType=VARCHAR},
+            #{sortOrder,jdbcType=NUMERIC}
+        )
+    </insert>
+
+    <select id="countByPostId" resultType="int">
+        SELECT COUNT(*)
+          FROM post_image
+         WHERE post_id = #{postId,jdbcType=NUMERIC}
+    </select>
+
+    <select id="nextSortOrder" resultType="int">
+        SELECT NVL(MAX(sort_order), -1) + 1
+          FROM post_image
+         WHERE post_id = #{postId,jdbcType=NUMERIC}
+    </select>
+
+    <select id="findKeysByPostId" resultType="string">
+        SELECT object_key
+          FROM post_image
+         WHERE post_id = #{postId,jdbcType=NUMERIC}
+         ORDER BY sort_order ASC, post_image_id ASC
+    </select>
+
+    <select id="findKeysByPostIds"
+            resultType="com.ditto.community.repository.PostImageMapper$PostImageKeyRow">
+        SELECT post_id AS postId,
+               object_key AS imageKey
+          FROM post_image
+         WHERE post_id IN
+        <foreach collection="postIds" item="postId" open="(" separator="," close=")">
+            #{postId,jdbcType=NUMERIC}
+        </foreach>
+         ORDER BY post_id ASC, sort_order ASC, post_image_id ASC
+    </select>
+
+</mapper>

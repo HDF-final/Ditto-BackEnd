@@ -1,5 +1,7 @@
 package com.ditto.community.dto.response;
 
+import java.util.List;
+
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -32,4 +34,7 @@ public class PublicCourseResponse {
 
     @Schema(description = "북마크(저장) 수", example = "4")
     private Long bookmarkCount;
+
+    @Schema(description = "게시글에 첨부된 사진 조회 URL 목록(정렬 순, 없으면 빈 배열)")
+    private List<String> imageUrls;
 }
