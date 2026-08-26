@@ -7,9 +7,11 @@ import org.springframework.stereotype.Service;
 import com.ditto.admin.client.CelebApproveClient;
 import com.ditto.admin.client.CelebDraftClient;
 import com.ditto.admin.dto.response.AdminCourseApproveResponse;
+import com.ditto.admin.dto.response.AdminCourseCacheListResponse;
 import com.ditto.admin.dto.response.AdminCourseDetailResponse;
 import com.ditto.admin.dto.response.AdminCourseListResponse;
 import com.ditto.admin.dto.response.AdminCoursePlaceCatalogResponse;
+import com.ditto.admin.dto.response.AdminCourseRevokeResponse;
 import com.ditto.admin.dto.response.AdminCourseRunResponse;
 import com.ditto.global.exception.BusinessException;
 import com.ditto.global.exception.ErrorCode;
@@ -69,6 +71,93 @@ public class AdminCourseService {
                 .builtAt(textOrNull(payload, "built_at"))
                 .placeCount(payload.path("places").size())
                 .warningCount(payload.path("warnings").size())
+                .payload(payload)
+                .build();
+    }
+
+    /**
+     * 지금 손님에게 나가고 있는 코스 목록.
+     *
+     * <p>승인이 끝나면 그 인물은 초안 목록에서 사라진다 — 초안을 지우는 것이 승인의
+     * 마지막 단계다. 관리자가 "올린 것이 지금 어떻게 나가나" 를 볼 자리가 여기다.
+     *
+     * <p>부르는 곳이 {@code CelebDraftClient} 가 아니라 승인 람다인 것은, 서빙 캐시
+     * ({@code celeb:course:*})를 아는 쪽이 거기이기 때문이다 — 초안 람다는 그 키를
+     * 읽는 코드가 아예 없다(그게 "초안은 손님에게 안 나간다" 의 보장이다).
+     */
+    public AdminCourseCacheListResponse getCachedCourses() {
+        JsonNode payload = celebApproveClient.listCourses();
+        // **빈 목록은 정상이다.** 그날 승인 전이면 아무것도 없는 것이 맞다. 람다는
+        // Redis 에 못 붙었을 때만 {"error": …} 를 낸다 — 그 둘을 창구에서 갈라 뒀다.
+        rejectError(payload, ErrorCode.CELEB_COURSE_CACHE_READ_FAILED);
+
+        return AdminCourseCacheListResponse.builder()
+                .functionName(celebApproveClient.getFunctionName())
+                .fetchedAt(Instant.now())
+                .count(payload.path("courses").size())
+                .payload(payload)
+                .build();
+    }
+
+    /**
+     * 서비스 중인 코스 하나. <b>초안과 같은 칸으로 온다</b> — 화면이 두 가지 모양을
+     * 알 이유가 없어, 응답 그릇도 초안 상세와 같은 것을 쓴다.
+     *
+     * <p>관리자가 이걸 고쳐 {@link #approve(String, JsonNode)} 에 다시 넣으면 덮어쓴다.
+     * 승인이 멱등이라 따로 "수정" 창구를 두지 않는다.
+     */
+    public AdminCourseDetailResponse getCachedCourse(String celebrity, String aspect) {
+        String name = celebrity == null ? "" : celebrity.trim();
+        if (name.isEmpty()) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "인물 이름이 비어 있습니다.");
+        }
+        String axis = aspect == null || aspect.isBlank() ? "BRAND" : aspect.trim().toUpperCase();
+
+        JsonNode payload = celebApproveClient.findCourse(name, axis);
+        // 이 창구의 오류는 "그런 코스가 없다"(만료됐거나 아직 승인 전) 아니면 Redis 장애다.
+        // 둘을 여기서 가를 수 없다 — 목록 창구가 그때 502 를 내므로 거기서 갈린다.
+        rejectError(payload, ErrorCode.CELEB_COURSE_CACHE_NOT_FOUND);
+
+        return AdminCourseDetailResponse.builder()
+                .functionName(celebApproveClient.getFunctionName())
+                .fetchedAt(Instant.now())
+                .celebrity(payload.path("celebrity").asText(name))
+                .kind(textOrNull(payload, "kind"))
+                .status(textOrNull(payload, "status"))
+                .shape(textOrNull(payload, "shape"))
+                .builtAt(textOrNull(payload, "built_at"))
+                .placeCount(payload.path("places").size())
+                .warningCount(payload.path("warnings").size())
+                .payload(payload)
+                .build();
+    }
+
+    /**
+     * 인물의 캐시를 통째로 내린다 — 코스(전 축) · 조사 재료 · 표기.
+     *
+     * <p><b>되돌리는 창구는 없다.</b> 다시 올리려면 배치를 돌려 초안을 새로 만들고
+     * 승인한다. 화면이 두 번 눌러야 나가게 해 둔 것이 그 때문이다.
+     *
+     * <p>지운 것이 없어도(이미 만료됐다) 오류가 아니다 — 관리자가 원한 상태가 이미
+     * 그것이고, 화면은 목록에서 카드가 사라지는 것으로 결과를 본다.
+     */
+    public AdminCourseRevokeResponse revoke(String celebrity) {
+        String name = celebrity == null ? "" : celebrity.trim();
+        if (name.isEmpty()) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "인물 이름이 비어 있습니다.");
+        }
+
+        JsonNode payload = celebApproveClient.revoke(name);
+        rejectError(payload, ErrorCode.CELEB_COURSE_REVOKE_FAILED);
+        log.info("코스를 내렸다. celebrity={}, keys={}, aliases={}",
+                name, payload.path("keys").asInt(), payload.path("aliases").asInt());
+
+        return AdminCourseRevokeResponse.builder()
+                .functionName(celebApproveClient.getFunctionName())
+                .revokedAt(Instant.now())
+                .celebrity(name)
+                .keys(payload.path("keys").asInt())
+                .aliases(payload.path("aliases").asInt())
                 .payload(payload)
                 .build();
     }
@@ -158,8 +247,10 @@ public class AdminCourseService {
         if (error.isMissingNode() || error.isNull()) {
             return;
         }
-        log.warn("코스 초안 창구가 오류를 돌려줬다. functionName={}, code={}, error={}",
-                celebDraftClient.getFunctionName(), errorCode.getCode(), error.asText(""));
+        // **어느 람다를 불렀는지 코드로 안다.** 이름을 박아 두면 서비스 중인 코스가
+        // 실패했는데 로그에는 초안 람다 이름이 찍힌다.
+        log.warn("코스 창구가 오류를 돌려줬다. code={}, error={}",
+                errorCode.getCode(), error.asText(""));
         throw new BusinessException(errorCode);
     }
 
