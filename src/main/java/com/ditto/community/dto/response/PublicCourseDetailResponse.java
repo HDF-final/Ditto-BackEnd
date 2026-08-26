@@ -26,6 +26,9 @@ public class PublicCourseDetailResponse {
     @Schema(description = "게시글 본문", example = "추천 동선입니다.")
     private String content;
 
+    @Schema(description = "게시글에 첨부된 사진 조회 URL 목록(정렬 순, 없으면 빈 배열)")
+    private List<String> imageUrls;
+
     @Schema(description = "연결된 코스 정보")
     private CourseInfo course;
 

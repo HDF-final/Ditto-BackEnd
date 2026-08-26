@@ -58,6 +58,12 @@ class PostServiceTest {
     private com.ditto.community.repository.PostCommentMapper postCommentMapper;
 
     @Mock
+    private com.ditto.community.repository.PostImageMapper postImageMapper;
+
+    @Mock
+    private com.ditto.global.infrastructure.s3.S3Provider s3Provider;
+
+    @Mock
     private ContentTranslationService contentTranslationService;
 
     @InjectMocks

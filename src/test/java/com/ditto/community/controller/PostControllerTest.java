@@ -51,6 +51,9 @@ class PostControllerTest {
     private PostService postService;
 
     @MockBean
+    private com.ditto.community.service.PostImageService postImageService;
+
+    @MockBean
     private PostCommentService postCommentService;
 
     @MockBean
