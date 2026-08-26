@@ -42,6 +42,15 @@ public class AdminCourseApproveResponse {
     @Schema(description = "관리자가 봐야 할 것. 올라가긴 했으나 원장 반영이 일부 빠진 경우 등")
     private JsonNode warnings;
 
+    @Schema(description = "기본 추천 코스 반영 상태 — queued·running·done·failed. "
+            + "캐시 승인만 했으면 null 이다",
+            example = "queued")
+    private String publishState;
+
+    @Schema(description = "반영이 지금 무엇을 하고 있나. 사람이 읽는 한 줄",
+            example = "차례를 기다리는 중")
+    private String publishStep;
+
     @Schema(description = "람다 응답 원문 — wrote(무엇을 썼나)와 oracle(원장 반영)이 들어 있다")
     private JsonNode payload;
 }

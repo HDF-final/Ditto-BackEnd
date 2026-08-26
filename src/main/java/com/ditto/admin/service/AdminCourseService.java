@@ -203,6 +203,26 @@ public class AdminCourseService {
      * 나가는 값이라 되돌릴 창구가 없다.
      */
     public AdminCourseApproveResponse approve(String celebrity, JsonNode draft) {
+        return send(celebrity, draft, false);
+    }
+
+    /**
+     * 초안을 <b>기본 추천 코스로</b> 올린다. 캐시 승인까지 같이 한다.
+     *
+     * <p>람다가 캐시 승인만 끝내고 즉시 돌아온다 — 서비스 DB 반영(문안 LLM 1콜 + 사진
+     * 업로드 + 네 테이블)은 별도 함수에서 비동기로 도는 1~2분짜리다. 그래서 이 응답의
+     * {@code publishState} 는 대개 {@code queued} 이고, 관리자는 기본 추천 코스 화면에서
+     * 진행 상태를 본다.
+     */
+    public AdminCourseApproveResponse publish(String celebrity, JsonNode draft) {
+        return send(celebrity, draft, true);
+    }
+
+    /**
+     * 승인과 기본 추천 코스 반영은 <b>보내는 몸통이 같다</b> — 편집기 하나가 두 버튼을
+     * 내려면 그래야 한다. 다른 것은 어느 창구로 부르는가뿐이라 여기서 합친다.
+     */
+    private AdminCourseApproveResponse send(String celebrity, JsonNode draft, boolean toPublish) {
         String name = celebrity == null ? "" : celebrity.trim();
         if (name.isEmpty()) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE, "인물 이름이 비어 있습니다.");
@@ -216,7 +236,9 @@ public class AdminCourseService {
                     "경로의 인물(" + name + ")과 본문의 인물(" + inBody + ")이 다릅니다.");
         }
 
-        JsonNode payload = celebApproveClient.approve(draft);
+        JsonNode payload = toPublish
+                ? celebApproveClient.publish(draft)
+                : celebApproveClient.approve(draft);
 
         // 람다는 검증 실패를 예외가 아니라 {"ok":false,"errors":[…]} 로 돌려준다.
         // 이걸 놓치면 아무것도 안 올라갔는데 화면이 "승인했습니다" 라고 한다.
@@ -234,6 +256,10 @@ public class AdminCourseService {
                 .placeCount(payload.path("places").asInt())
                 .expiresAt(textOrNull(payload, "expires_at"))
                 .warnings(payload.get("warnings"))
+                // 화면이 원문을 파고들지 않게 위로 끌어올린다. 캐시 승인만 했으면
+                // `publish` 칸이 아예 없어서 둘 다 null 이다.
+                .publishState(textOrNull(payload.path("publish"), "state"))
+                .publishStep(textOrNull(payload.path("publish"), "step"))
                 .payload(payload)
                 .build();
     }

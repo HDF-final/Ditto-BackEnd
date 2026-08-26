@@ -116,4 +116,18 @@ public class AdminCourseController {
             @RequestBody JsonNode draft) {
         return ApiResponse.success(adminCourseService.approve(celebrity, draft));
     }
+
+    @Operation(summary = "기본 추천 코스로 승인",
+            description = "캐시 승인까지 같이 하고, 그 위에 서비스 DB(COURSE·COURSE_PLACE·"
+                    + "POST·POST_IMAGE)에도 넣는다. 이렇게 올린 코스는 만료가 없고 "
+                    + "메인·코스 추천 리스트에 걸린다(커뮤니티에는 안 나온다). "
+                    + "DB 반영은 뒤에서 1~2분간 도므로 응답은 publishState=queued 로 즉시 온다 — "
+                    + "진행 상태는 기본 추천 코스 목록에서 본다.")
+    @PostMapping("/{celebrity}/publish")
+    public ApiResponse<AdminCourseApproveResponse> publish(
+            @Parameter(description = "인물 이름", example = "카리나")
+            @PathVariable String celebrity,
+            @RequestBody JsonNode draft) {
+        return ApiResponse.success(adminCourseService.publish(celebrity, draft));
+    }
 }
