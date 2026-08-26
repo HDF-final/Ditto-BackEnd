@@ -25,6 +25,14 @@ public class AdminSystemCourseResponse {
     private Long postId;
     private String postContent;
     private int imageCount;
+
+    /**
+     * 목록 카드의 대표 사진. <b>첫 자리의 매장 사진</b>이고 손님 목록이 쓰는 것과 같다.
+     * 화면이 그대로 {@code <img src>} 로 쓰게 S3 주소로 풀어서 준다. 자리가 없으면 null 이고
+     * 그때 카드는 인물 이름 두 글자를 대신 띄운다.
+     */
+    private String heroImageUrl;
+
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 

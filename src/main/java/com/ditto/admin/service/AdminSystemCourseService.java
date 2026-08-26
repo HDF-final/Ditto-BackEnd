@@ -180,6 +180,9 @@ public class AdminSystemCourseService {
                 .postId(row.getPostId())
                 .postContent(row.getPostContent())
                 .imageCount(row.getImageCount())
+                // DB 에는 키만 들어 있다. 자리가 없는 코스는 키도 없어 null 로 나가고,
+                // 그때 카드가 사진 자리를 이름으로 채운다.
+                .heroImageUrl(s3Provider.resolveImageUrl(row.getHeroImageKey()))
                 .createdAt(row.getCreatedAt())
                 .updatedAt(row.getUpdatedAt())
                 .celebrity(text(state, "celebrity", null))

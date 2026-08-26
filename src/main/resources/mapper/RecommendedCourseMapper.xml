@@ -43,6 +43,21 @@
     </select>
 
     <!--
+      목록 카드의 대표 사진 키. **첫 자리의 매장 사진**이고, 아래 findLeadImageKey 와 같은
+      것을 고른다 — 손님 목록과 관리자 목록의 카드가 다른 사진을 달면 같은 코스로 안 보인다.
+
+      코스마다 findLeadImageKey 를 한 번씩 부르지 않고 스칼라 서브쿼리로 붙이는 이유는,
+      관리자 목록이 페이지를 안 잘라서 그러면 코스 수만큼 왕복(N+1)이 되기 때문이다.
+    -->
+    <sql id="adminHeroImageKey">
+        (SELECT MIN(hp.image_url) KEEP (DENSE_RANK FIRST ORDER BY hcp.visit_order)
+           FROM course_place hcp
+           JOIN place hp ON hp.place_id = hcp.place_id
+          WHERE hcp.course_id = c.course_id
+            AND hp.image_url IS NOT NULL) AS heroImageKey
+    </sql>
+
+    <!--
       관리자 목록은 **페이지를 안 자른다.** 지금 서비스에 걸려 있는 것을 빠짐없이 봐야
       하는 화면이고, SYSTEM 코스는 사람이 하나씩 승인해 만드는 것이라 수십 개 규모다.
     -->
@@ -60,7 +75,8 @@
                (SELECT COUNT(*) FROM post_image i WHERE i.post_id = p.post_id)
                               AS imageCount,
                c.created_at   AS createdAt,
-               c.updated_at   AS updatedAt
+               c.updated_at   AS updatedAt,
+               <include refid="adminHeroImageKey"/>
           FROM course c
           LEFT JOIN post p
             ON p.course_id = c.course_id
@@ -84,7 +100,8 @@
                (SELECT COUNT(*) FROM post_image i WHERE i.post_id = p.post_id)
                               AS imageCount,
                c.created_at   AS createdAt,
-               c.updated_at   AS updatedAt
+               c.updated_at   AS updatedAt,
+               <include refid="adminHeroImageKey"/>
           FROM course c
           LEFT JOIN post p
             ON p.course_id = c.course_id
