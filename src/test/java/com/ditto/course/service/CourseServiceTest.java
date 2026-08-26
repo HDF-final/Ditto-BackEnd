@@ -184,10 +184,14 @@ class CourseServiceTest {
                 VisitStatus.VISITED.name(), LocalDateTime.now());
         given(courseMapper.findById(5L)).willReturn(Optional.of(course));
         given(courseMapper.findPlacesByCourseId(5L)).willReturn(List.of(firstPlace, secondPlace));
-        given(s3Provider.resolveImageUrl("place-picture/74_탬버린즈.jpg"))
+        given(s3Provider.resolveImageUrlByPrefix("place-picture/74_탬버린즈.jpg"))
                 .willReturn("https://cdn.example.com/place-picture/74_탬버린즈.jpg");
-        given(s3Provider.resolveImageUrl("place-picture/73_설화수.jpg"))
+        given(s3Provider.resolveImageUrlByPrefix("place-picture/73_설화수.jpg"))
                 .willReturn("https://cdn.example.com/place-picture/73_설화수.jpg");
+        // 대표 사진은 셀럽 사진 쪽 prefix 다 — CDN 이 아니라 버킷 직통으로 나가야 한다.
+        given(courseMapper.findHeroImageKey(5L)).willReturn("course/CELE1AA1/1.jpg");
+        given(s3Provider.resolveImageUrlByPrefix("course/CELE1AA1/1.jpg"))
+                .willReturn("https://bucket.s3.ap-northeast-2.amazonaws.com/course/CELE1AA1/1.jpg");
 
         CourseDetailResponse response = courseService.getDetail(USER_ID, 5L);
 
@@ -195,6 +199,8 @@ class CourseServiceTest {
         assertThat(response.getName()).isEqualTo("나의 코스");
         assertThat(response.getDescription()).isEqualTo("설명");
         assertThat(response.getCreationType()).isEqualTo("MANUAL");
+        assertThat(response.getImageUrl())
+                .isEqualTo("https://bucket.s3.ap-northeast-2.amazonaws.com/course/CELE1AA1/1.jpg");
         assertThat(response.getPlaces()).extracting(CoursePlaceResponse::getVisitOrder)
                 .containsExactly(1, 2);
         assertThat(response.getPlaces().get(0).getPlaceId()).isEqualTo(11L);
@@ -206,6 +212,24 @@ class CourseServiceTest {
         assertThat(response.getPlaces().get(0).getVisitStatus()).isEqualTo(VisitStatus.PENDING.name());
         assertThat(response.getPlaces().get(0).getVisitedAt()).isNull();
         verify(courseMapper, never()).existsPublicPostByCourseId(5L);
+    }
+
+    @Test
+    @DisplayName("사진이 하나도 없는 코스는 대표 사진이 null 이다 (화면이 기본 이미지로 떨어진다)")
+    void getDetailWithoutAnyImage() {
+        Course course = Course.of(5L, USER_ID, null, "나의 코스", "설명", "MANUAL");
+        CoursePlaceResponse place = new CoursePlaceResponse(
+                11L, "템버린즈", null, "1F", 1, "향수 브랜드",
+                VisitStatus.PENDING.name(), null);
+        given(courseMapper.findById(5L)).willReturn(Optional.of(course));
+        given(courseMapper.findPlacesByCourseId(5L)).willReturn(List.of(place));
+        given(courseMapper.findHeroImageKey(5L)).willReturn(null);
+
+        CourseDetailResponse response = courseService.getDetail(USER_ID, 5L);
+
+        assertThat(response.getImageUrl()).isNull();
+        assertThat(response.getPlaces()).hasSize(1);
+        assertThat(response.getPlaces().get(0).getImageUrl()).isNull();
     }
 
     @Test

@@ -102,11 +102,17 @@ public class CourseService {
 
     private CourseDetailResponse loadDetail(Course course) {
         List<CoursePlaceResponse> places = courseMapper.findPlacesByCourseId(course.getCourseId());
-        // DB에는 S3 object key가 저장되어 있으므로 클라이언트에는 조회용(presigned) URL로 변환해 내려준다.
+        // DB에는 S3 object key가 저장되어 있으므로 클라이언트에는 조회용 URL로 변환해 내려준다.
+        //
+        // **`resolveImageUrl` 이 아니라 prefix 를 보는 쪽을 쓴다.** 자리 사진이 두 갈래로
+        // 오기 때문이다 — 셀럽 사진은 `course/…` 라 CloudFront 에 동작이 없어 301 로
+        // 튕기고, 매장 사진은 `place-picture/…` 라 CDN 으로 나가야 한다.
         for (CoursePlaceResponse place : places) {
-            place.setImageUrl(s3Provider.resolveImageUrl(place.getImageUrl()));
+            place.setImageUrl(s3Provider.resolveImageUrlByPrefix(place.getImageUrl()));
         }
-        return CourseDetailResponse.from(course, places);
+        return CourseDetailResponse.from(
+                course, places, s3Provider.resolveImageUrlByPrefix(
+                        courseMapper.findHeroImageKey(course.getCourseId())));
     }
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -134,6 +140,8 @@ public class CourseService {
                         "course", courseKey, "name", response.getName(), language),
                 contentTranslationService.translate(
                         "course", courseKey, "description", response.getDescription(), language),
+                // 사진 주소는 번역하지 않는다 — 언어가 달라도 같은 코스의 같은 사진이다.
+                response.getImageUrl(),
                 response.getCreationType(),
                 response.getSourceCourseId(),
                 response.getCreatedAt(),
