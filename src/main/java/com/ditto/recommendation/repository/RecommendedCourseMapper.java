@@ -87,6 +87,9 @@ public interface RecommendedCourseMapper {
         private int imageCount;
         private LocalDateTime createdAt;
         private LocalDateTime updatedAt;
+
+        /** 목록 카드의 대표 사진 키(첫 자리의 매장 사진). 자리가 없으면 null. */
+        private String heroImageKey;
     }
 
     @Getter
