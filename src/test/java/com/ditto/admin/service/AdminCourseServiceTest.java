@@ -2,6 +2,7 @@ package com.ditto.admin.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
@@ -12,7 +13,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import com.ditto.admin.client.CelebApproveClient;
 import com.ditto.admin.client.CelebDraftClient;
+import com.ditto.admin.dto.response.AdminCourseApproveResponse;
 import com.ditto.admin.dto.response.AdminCourseDetailResponse;
 import com.ditto.admin.dto.response.AdminCourseListResponse;
 import com.ditto.admin.dto.response.AdminCoursePlaceCatalogResponse;
@@ -27,13 +30,16 @@ class AdminCourseServiceTest {
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private CelebDraftClient celebDraftClient;
+    private CelebApproveClient celebApproveClient;
     private AdminCourseService service;
 
     @BeforeEach
     void setUp() {
         celebDraftClient = mock(CelebDraftClient.class);
+        celebApproveClient = mock(CelebApproveClient.class);
         given(celebDraftClient.getFunctionName()).willReturn("ditto-celeb-warm-2");
-        service = new AdminCourseService(celebDraftClient);
+        given(celebApproveClient.getFunctionName()).willReturn("ditto-celeb-approve");
+        service = new AdminCourseService(celebDraftClient, celebApproveClient);
     }
 
     @Test
@@ -180,6 +186,88 @@ class AdminCourseServiceTest {
         assertThat(response.getDate()).isEqualTo("2026-08-25");
         assertThat(response.getQueued()).isEqualTo(3);
         assertThat(response.getDoneCount()).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("승인은 람다가 돌려준 것을 머리말로 올린다")
+    void liftsApproveHeadline() {
+        given(celebApproveClient.approve(any())).willReturn(json("""
+                {"ok":true,"celebrity":"카리나","places":5,
+                 "expires_at":"2026-08-27T00:00:00","warnings":["브랜드 3곳을 원장에서 못 찾았다"]}
+                """));
+
+        AdminCourseApproveResponse response =
+                service.approve("카리나", json("{\"celebrity\":\"카리나\",\"places\":[]}"));
+
+        assertThat(response.getCelebrity()).isEqualTo("카리나");
+        assertThat(response.getFunctionName()).isEqualTo("ditto-celeb-approve");
+        assertThat(response.getApprovedAt()).isNotNull();
+        assertThat(response.getPlaceCount()).isEqualTo(5);
+        assertThat(response.getExpiresAt()).isEqualTo("2026-08-27T00:00:00");
+        assertThat(response.getWarnings()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("경고가 없어도 승인은 성공이다 — warnings 가 없는 응답도 있다")
+    void approvesWithoutWarnings() {
+        given(celebApproveClient.approve(any())).willReturn(json(
+                "{\"ok\":true,\"celebrity\":\"장원영\",\"places\":5}"));
+
+        AdminCourseApproveResponse response =
+                service.approve("장원영", json("{\"celebrity\":\"장원영\"}"));
+
+        assertThat(response.getExpiresAt()).isNull();
+        assertThat(response.getWarnings()).isNull();
+    }
+
+    @Test
+    @DisplayName("경로와 본문의 인물이 다르면 람다를 부르기 전에 막는다 — 남의 캐시를 덮어쓴다")
+    void rejectsCelebrityMismatch() {
+        assertThatThrownBy(() -> service.approve("카리나", json(
+                "{\"celebrity\":\"장원영\",\"places\":[]}")))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_INPUT_VALUE);
+
+        verify(celebApproveClient, never()).approve(any());
+    }
+
+    @Test
+    @DisplayName("승인도 이름을 다듬어서 본문과 대조한다")
+    void trimsCelebrityNameOnApprove() {
+        given(celebApproveClient.approve(any())).willReturn(json(
+                "{\"ok\":true,\"celebrity\":\"카리나\",\"places\":5}"));
+
+        service.approve("  카리나  ", json("{\"celebrity\":\"카리나\"}"));
+
+        verify(celebApproveClient).approve(any());
+    }
+
+    @Test
+    @DisplayName("빈 이름과 빈 본문은 람다를 부르기 전에 400 으로 막는다")
+    void rejectsBlankApproveInput() {
+        assertThatThrownBy(() -> service.approve("   ", json("{\"celebrity\":\"카리나\"}")))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_INPUT_VALUE);
+
+        assertThatThrownBy(() -> service.approve("카리나", null))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_INPUT_VALUE);
+
+        verify(celebApproveClient, never()).approve(any());
+    }
+
+    @Test
+    @DisplayName("ok:false 는 성공이 아니다 — 이걸 놓치면 안 올라갔는데 승인했다고 한다")
+    void rejectedApproveIsNotSuccess() {
+        given(celebApproveClient.approve(any())).willReturn(json("""
+                {"ok":false,"celebrity":"카리나",
+                 "errors":["2번째 자리에 이유가 없습니다","사진 주소가 http 가 아닙니다"]}
+                """));
+
+        assertThatThrownBy(() -> service.approve("카리나", json("{\"celebrity\":\"카리나\"}")))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_INPUT_VALUE)
+                .hasMessageContaining("이유가 없습니다");
     }
 
     private JsonNode json(String raw) {
