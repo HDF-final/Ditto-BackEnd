@@ -1,6 +1,8 @@
 package com.ditto.community.service;
 
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -17,6 +19,7 @@ import com.ditto.community.dto.response.PublicCourseResponse;
 import com.ditto.community.dto.response.UpdateCoursePostResponse;
 import com.ditto.community.repository.PostImageMapper;
 import com.ditto.community.repository.PostImageMapper.PostImageInsertCommand;
+import com.ditto.community.repository.PostImageMapper.PostImageKeyRow;
 import com.ditto.community.repository.PostImageMapper.PostImageRow;
 import com.ditto.course.domain.Course;
 import com.ditto.course.dto.response.CoursePlaceResponse;
@@ -79,7 +82,10 @@ public class PostService {
                 ? postMapper.countPublicCourses(authorId, normalizedAuthor)
                 : postMapper.countPublicCourses();
 
-        return new PageResponse<>(content != null ? content : List.of(), page, totalElements);
+        List<PublicCourseResponse> posts = content != null ? content : List.of();
+        attachImageUrls(posts);
+
+        return new PageResponse<>(posts, page, totalElements);
     }
 
     private String normalizeAuthor(String author) {
@@ -269,7 +275,7 @@ public class PostService {
             List<MultipartFile> images) {
         List<PostImageRow> deletedImages = deleteRequestedImages(postId, request);
         for (PostImageRow deletedImage : deletedImages) {
-            s3Provider.deleteImage(deletedImage.getObjectKey());
+            s3Provider.deleteImage(deletedImage.getImageKey());
         }
 
         List<MultipartFile> uploadImages = images == null
@@ -277,14 +283,14 @@ public class PostService {
                 : images.stream()
                         .filter(image -> image != null && !image.isEmpty())
                         .toList();
-        int nextSortOrder = postImageMapper.findMaxSortOrder(postId) + 1;
+        int nextSortOrder = postImageMapper.nextSortOrder(postId);
         for (MultipartFile image : uploadImages) {
             S3UploadResult uploadResult = s3Provider.uploadImage(image, "community/posts");
-            postImageMapper.insert(new PostImageInsertCommand(
-                    null,
-                    postId,
-                    uploadResult.getKey(),
-                    nextSortOrder++));
+            postImageMapper.insert(PostImageInsertCommand.builder()
+                    .postId(postId)
+                    .imageKey(uploadResult.getKey())
+                    .sortOrder(nextSortOrder++)
+                    .build());
         }
     }
 
@@ -322,7 +328,7 @@ public class PostService {
             return List.of();
         }
         return images.stream()
-                .map(PostImageRow::getObjectKey)
+                .map(PostImageRow::getImageKey)
                 .map(s3Provider::resolveImageUrl)
                 .filter(StringUtils::hasText)
                 .toList();
@@ -335,10 +341,40 @@ public class PostService {
         return images.stream()
                 .map(image -> PostImageResponse.builder()
                         .postImageId(image.getPostImageId())
-                        .imageUrl(s3Provider.resolveImageUrl(image.getObjectKey()))
+                        .imageUrl(s3Provider.resolveImageUrl(image.getImageKey()))
                         .sortOrder(image.getSortOrder())
                         .build())
                 .toList();
+    }
+
+    private void attachImageUrls(List<PublicCourseResponse> posts) {
+        if (posts == null || posts.isEmpty()) {
+            return;
+        }
+
+        List<Long> postIds = posts.stream()
+                .map(PublicCourseResponse::getPostId)
+                .filter(postId -> postId != null && postId > 0)
+                .distinct()
+                .toList();
+        if (postIds.isEmpty()) {
+            return;
+        }
+
+        List<PostImageKeyRow> imageRows = postImageMapper.findKeysByPostIds(postIds);
+        if (imageRows == null || imageRows.isEmpty()) {
+            posts.forEach(post -> post.setImageUrls(List.of()));
+            return;
+        }
+
+        Map<Long, List<String>> imageUrlsByPostId = imageRows.stream()
+                .filter(row -> row.getPostId() != null && StringUtils.hasText(row.getImageKey()))
+                .collect(Collectors.groupingBy(
+                        PostImageKeyRow::getPostId,
+                        Collectors.mapping(row -> s3Provider.resolveImageUrl(row.getImageKey()), Collectors.toList())));
+
+        posts.forEach(post -> post.setImageUrls(
+                imageUrlsByPostId.getOrDefault(post.getPostId(), List.of())));
     }
 
     @Transactional

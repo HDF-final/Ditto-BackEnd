@@ -278,7 +278,7 @@ class PostServiceTest {
                         .build());
         given(courseMapper.updateInfo(100L, "수정된 제목", "기존 설명")).willReturn(1);
         given(postMapper.update(any(PostUpdateCommand.class))).willReturn(1);
-        given(postImageMapper.findMaxSortOrder(2L)).willReturn(0);
+        given(postImageMapper.nextSortOrder(2L)).willReturn(1);
         given(postImageMapper.findByPostId(2L)).willReturn(List.of(
                 new PostImageRow(10L, 2L, "images/community/posts/new.png", 1)));
         given(s3Provider.resolveImageUrl("images/community/posts/new.png"))
@@ -295,7 +295,7 @@ class PostServiceTest {
 
         ArgumentCaptor<PostImageInsertCommand> captor = ArgumentCaptor.forClass(PostImageInsertCommand.class);
         verify(postImageMapper).insert(captor.capture());
-        assertThat(captor.getValue().getObjectKey()).isEqualTo("images/community/posts/new.png");
+        assertThat(captor.getValue().getImageKey()).isEqualTo("images/community/posts/new.png");
         assertThat(captor.getValue().getSortOrder()).isEqualTo(1);
         assertThat(response.getImageUrls()).containsExactly("https://example.com/new.png");
     }
@@ -312,7 +312,7 @@ class PostServiceTest {
         given(postMapper.update(any(PostUpdateCommand.class))).willReturn(1);
         given(postImageMapper.findByPostIdAndIds(2L, List.of(10L))).willReturn(List.of(oldImage));
         given(postImageMapper.deleteByIds(2L, List.of(10L))).willReturn(1);
-        given(postImageMapper.findMaxSortOrder(2L)).willReturn(-1);
+        given(postImageMapper.nextSortOrder(2L)).willReturn(0);
         given(postImageMapper.findByPostId(2L)).willReturn(List.of());
 
         UpdateCoursePostResponse response = postService.updateCoursePost(

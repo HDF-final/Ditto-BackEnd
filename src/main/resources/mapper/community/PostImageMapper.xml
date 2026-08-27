@@ -7,7 +7,7 @@
             resultType="com.ditto.community.repository.PostImageMapper$PostImageRow">
         SELECT post_image_id,
                post_id,
-               object_key,
+               object_key AS image_key,
                sort_order
           FROM post_image
          WHERE post_id = #{postId,jdbcType=NUMERIC}
@@ -19,7 +19,7 @@
             resultType="com.ditto.community.repository.PostImageMapper$PostImageRow">
         SELECT post_image_id,
                post_id,
-               object_key,
+               object_key AS image_key,
                sort_order
           FROM post_image
          WHERE post_id = #{postId,jdbcType=NUMERIC}
@@ -31,10 +31,38 @@
                   post_image_id ASC
     </select>
 
-    <select id="findMaxSortOrder" resultType="int">
-        SELECT COALESCE(MAX(sort_order), -1)
+    <select id="countByPostId" resultType="int">
+        SELECT COUNT(*)
           FROM post_image
          WHERE post_id = #{postId,jdbcType=NUMERIC}
+    </select>
+
+    <select id="nextSortOrder" resultType="int">
+        SELECT NVL(MAX(sort_order), -1) + 1
+          FROM post_image
+         WHERE post_id = #{postId,jdbcType=NUMERIC}
+    </select>
+
+    <select id="findKeysByPostId" resultType="string">
+        SELECT object_key
+          FROM post_image
+         WHERE post_id = #{postId,jdbcType=NUMERIC}
+         ORDER BY sort_order ASC,
+                  post_image_id ASC
+    </select>
+
+    <select id="findKeysByPostIds"
+            resultType="com.ditto.community.repository.PostImageMapper$PostImageKeyRow">
+        SELECT post_id,
+               object_key AS image_key
+          FROM post_image
+         WHERE post_id IN
+        <foreach collection="postIds" item="postId" open="(" separator="," close=")">
+               #{postId,jdbcType=NUMERIC}
+        </foreach>
+         ORDER BY post_id ASC,
+                  sort_order ASC,
+                  post_image_id ASC
     </select>
 
     <insert id="insert"
@@ -48,7 +76,7 @@
             sort_order
         ) VALUES (
             #{postId,jdbcType=NUMERIC},
-            #{objectKey,jdbcType=VARCHAR},
+            #{imageKey,jdbcType=VARCHAR},
             #{sortOrder,jdbcType=NUMERIC}
         )
     </insert>

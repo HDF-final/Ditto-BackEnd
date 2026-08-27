@@ -6,6 +6,7 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -19,9 +20,15 @@ public interface PostImageMapper {
             @Param("postId") Long postId,
             @Param("imageIds") List<Long> imageIds);
 
-    Integer findMaxSortOrder(@Param("postId") Long postId);
+    int countByPostId(@Param("postId") Long postId);
 
-    int insert(PostImageInsertCommand command);
+    int nextSortOrder(@Param("postId") Long postId);
+
+    List<String> findKeysByPostId(@Param("postId") Long postId);
+
+    List<PostImageKeyRow> findKeysByPostIds(@Param("postIds") List<Long> postIds);
+
+    void insert(PostImageInsertCommand command);
 
     int deleteByPostId(@Param("postId") Long postId);
 
@@ -36,18 +43,28 @@ public interface PostImageMapper {
     class PostImageRow {
         private Long postImageId;
         private Long postId;
-        private String objectKey;
+        private String imageKey;
         private Integer sortOrder;
+    }
+
+    @Getter
+    @Setter
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    class PostImageInsertCommand {
+        private Long postImageId;
+        private Long postId;
+        private String imageKey;
+        private int sortOrder;
     }
 
     @Getter
     @Setter
     @NoArgsConstructor
     @AllArgsConstructor
-    class PostImageInsertCommand {
-        private Long postImageId;
+    class PostImageKeyRow {
         private Long postId;
-        private String objectKey;
-        private Integer sortOrder;
+        private String imageKey;
     }
 }
