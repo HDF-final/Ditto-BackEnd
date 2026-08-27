@@ -3,6 +3,34 @@
         "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.ditto.community.repository.PostImageMapper">
 
+    <select id="findByPostId"
+            resultType="com.ditto.community.repository.PostImageMapper$PostImageRow">
+        SELECT post_image_id,
+               post_id,
+               object_key AS image_key,
+               sort_order
+          FROM post_image
+         WHERE post_id = #{postId,jdbcType=NUMERIC}
+         ORDER BY sort_order ASC,
+                  post_image_id ASC
+    </select>
+
+    <select id="findByPostIdAndIds"
+            resultType="com.ditto.community.repository.PostImageMapper$PostImageRow">
+        SELECT post_image_id,
+               post_id,
+               object_key AS image_key,
+               sort_order
+          FROM post_image
+         WHERE post_id = #{postId,jdbcType=NUMERIC}
+           AND post_image_id IN
+        <foreach collection="imageIds" item="imageId" open="(" separator="," close=")">
+               #{imageId,jdbcType=NUMERIC}
+        </foreach>
+         ORDER BY sort_order ASC,
+                  post_image_id ASC
+    </select>
+
     <insert id="insert"
             parameterType="com.ditto.community.repository.PostImageMapper$PostImageInsertCommand"
             useGeneratedKeys="true"
@@ -40,8 +68,8 @@
 
     <select id="findKeysByPostIds"
             resultType="com.ditto.community.repository.PostImageMapper$PostImageKeyRow">
-        SELECT post_id AS postId,
-               object_key AS imageKey
+        SELECT post_id,
+               object_key AS image_key
           FROM post_image
          WHERE post_id IN
         <foreach collection="postIds" item="postId" open="(" separator="," close=")">
@@ -49,5 +77,19 @@
         </foreach>
          ORDER BY post_id ASC, sort_order ASC, post_image_id ASC
     </select>
+
+    <delete id="deleteByPostId">
+        DELETE FROM post_image
+         WHERE post_id = #{postId,jdbcType=NUMERIC}
+    </delete>
+
+    <delete id="deleteByIds">
+        DELETE FROM post_image
+         WHERE post_id = #{postId,jdbcType=NUMERIC}
+           AND post_image_id IN
+        <foreach collection="imageIds" item="imageId" open="(" separator="," close=")">
+               #{imageId,jdbcType=NUMERIC}
+        </foreach>
+    </delete>
 
 </mapper>

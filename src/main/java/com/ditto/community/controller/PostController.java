@@ -96,14 +96,19 @@ public class PostController {
                 postService.createCoursePost(SecurityUtils.requireUserId(), request));
     }
 
-    @Operation(summary = "코스 게시글 수정", description = "로그인한 사용자가 자신이 작성한 코스 게시글의 제목과 내용을 수정합니다.")
-    @PatchMapping("/{postId}")
+    @Operation(
+            summary = "코스 게시글 수정",
+            description = "로그인한 사용자가 자신이 작성한 코스 게시글의 제목, 내용, 첨부 사진을 수정합니다. "
+                    + "request part에 title/content/deleteImageIds/deleteAllImages를 JSON으로 보내고, "
+                    + "새로 추가할 사진은 images part에 첨부합니다.")
+    @PatchMapping(value = "/{postId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.OK)
     public ApiResponse<UpdateCoursePostResponse> updateCoursePost(
             @PathVariable Long postId,
-            @Valid @RequestBody UpdateCoursePostRequest request) {
+            @Valid @RequestPart("request") UpdateCoursePostRequest request,
+            @RequestPart(value = "images", required = false) List<MultipartFile> images) {
         return ApiResponse.success("성공",
-                postService.updateCoursePost(SecurityUtils.requireUserId(), postId, request));
+                postService.updateCoursePost(SecurityUtils.requireUserId(), postId, request, images));
     }
 
     @Operation(summary = "코스 게시글 삭제", description = "로그인한 사용자가 자신이 작성한 코스 게시글을 소프트 삭제합니다.")
