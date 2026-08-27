@@ -10,7 +10,6 @@
                name,
                description,
                creation_type,
-               share_code,
                view_count,
                created_at,
                updated_at,
@@ -18,12 +17,6 @@
           FROM course
          WHERE course_id = #{courseId}
            AND deleted_at IS NULL
-    </select>
-
-    <select id="countByShareCode" resultType="int">
-        SELECT COUNT(*)
-          FROM course
-         WHERE share_code = #{shareCode}
     </select>
 
     <select id="countPlaceInCourse" resultType="int">
@@ -101,11 +94,15 @@
            AND deleted_at IS NULL
     </select>
 
+    <!--
+      자리 사진은 셀럽 사진이 먼저다 — 판단과 이유는 `RecommendedCourseMapper.slotImageKey`
+      에 적혀 있다. **어드민 화면이 같은 조각을 쓴다.**
+    -->
     <select id="findPlacesByCourseId"
             resultType="com.ditto.course.dto.response.CoursePlaceResponse">
         SELECT p.place_id,
                p.name,
-               p.image_url,
+               <include refid="com.ditto.recommendation.repository.RecommendedCourseMapper.slotImageKey"/> AS image_url,
                f.floor_code,
                cp.visit_order,
                cp.recommendation_reason,
@@ -116,6 +113,21 @@
           JOIN floor f ON f.floor_id = p.floor_id
          WHERE cp.course_id = #{courseId}
          ORDER BY cp.visit_order ASC
+    </select>
+
+    <!--
+      코스의 대표 사진 키. **목록이 쓰는 그 조각을 그대로 부른다** — 목록 카드와 상세
+      머리 사진이 같은 코스에서 다르면 누른 사람이 다른 코스를 연 줄 안다.
+
+      `findById` 에 붙이지 않고 따로 두는 것은, 그 메서드가 소유권 확인·수정·삭제까지
+      전부 거쳐 가는 길목이라서다. 사진이 필요 없는 호출까지 서브쿼리 셋을 지고 갈
+      이유가 없다.
+    -->
+    <select id="findHeroImageKey" resultType="string">
+        SELECT <include refid="com.ditto.recommendation.repository.RecommendedCourseMapper.heroImageKey"/>
+          FROM course c
+         WHERE c.course_id = #{courseId}
+           AND c.deleted_at IS NULL
     </select>
 
     <insert id="insert"
@@ -129,7 +141,6 @@
             name,
             description,
             creation_type,
-            share_code,
             view_count,
             created_at
         ) VALUES (
@@ -138,7 +149,6 @@
             #{name,jdbcType=VARCHAR},
             #{description,jdbcType=VARCHAR},
             #{creationType,jdbcType=VARCHAR},
-            #{shareCode,jdbcType=VARCHAR},
             0,
             SYSTIMESTAMP
         )

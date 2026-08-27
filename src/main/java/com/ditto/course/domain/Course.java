@@ -16,7 +16,6 @@ public class Course {
     private String name;
     private String description;
     private String creationType;
-    private String shareCode;
     private Long viewCount;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
@@ -33,8 +32,7 @@ public class Course {
             Long sourceCourseId,
             String name,
             String description,
-            String creationType,
-            String shareCode) {
+            String creationType) {
         Course course = new Course();
         course.courseId = courseId;
         course.userId = userId;
@@ -42,7 +40,6 @@ public class Course {
         course.name = name;
         course.description = description;
         course.creationType = creationType;
-        course.shareCode = shareCode;
         return course;
     }
 }

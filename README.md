@@ -169,9 +169,8 @@ public enum ErrorCode {
     COMMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "CM002", "댓글을 찾을 수 없습니다."),
     ALREADY_LIKED(HttpStatus.CONFLICT, "CM003", "이미 좋아요한 코스입니다."),
 
-    // Navigation / Mobile
+    // Navigation
     MAP_MANIFEST_NOT_FOUND(HttpStatus.NOT_FOUND, "N001", "지도 매니페스트를 찾을 수 없습니다."),
-    INVALID_ACCESS_CODE(HttpStatus.BAD_REQUEST, "N002", "유효하지 않은 접속 코드입니다."),
 
     // External (AI / OCR)
     AI_SERVICE_ERROR(HttpStatus.BAD_GATEWAY, "E001", "AI 서비스 처리 중 오류가 발생했습니다."),
@@ -337,8 +336,8 @@ Ditto-BackEnd/
     │   │   ├── navigation/               # 실내 내비게이션 도메인
     │   │   │   ├── controller/  service/  repository/  domain/  dto/
     │   │   │
-    │   │   ├── mobile/                   # 모바일 접속 코드 도메인
-    │   │   │   ├── controller/  service/  repository/  domain/  dto/
+    │   │   ├── ocr/                      # 간판 OCR 현재 위치 인식
+    │   │   │   ├── controller/  service/  repository/  client/  support/
     │   │   │
     │   │   ├── admin/                    # 관리자 도메인
     │   │   │   ├── controller/  service/  repository/  domain/  dto/
@@ -588,7 +587,7 @@ HTTP로 호출하고 응답을 `ApiResponse`로 감싸 돌려줄 뿐입니다. �
 | 뉴스피드 수정 | `PUT` | `/api/v1/news/{newsId}` | ADMIN |
 | 뉴스피드 삭제 | `DELETE` | `/api/v1/news/{newsId}` | ADMIN |
 
-### 실내 내비게이션 · 모바일 (Navigation & Mobile) — `/api/v1/navigation`, `/api/v1/mobile`
+### 실내 내비게이션 (Navigation) — `/api/v1/navigation`
 
 | 기능 | Method | Endpoint | 인증 |
 | --- | --- | --- | --- |
@@ -598,10 +597,23 @@ HTTP로 호출하고 응답을 `ApiResponse`로 감싸 돌려줄 뿐입니다. �
 | 층별 내비게이션 데이터 조회 | `GET` | `/api/v1/navigation/maps/{mapId}/floors/{floor}` | X |
 | 코스 이동 경로 계산 | `POST` | `/api/v1/navigation/courses/{courseId}/route` | O |
 | 현재 위치 확인·경로 시작점 설정 | `POST` | `/api/v1/navigation/location` | O |
-| OCR 현재 위치 인식 | `POST` | `/api/v1/navigation/location/ocr` | O |
 | 장소 방문 완료·코스 진행률 조회 | `POST` | `/api/v1/navigation/courses/{courseId}/progress` | O |
-| 모바일 접속 코드 발급 | `POST` | `/api/v1/mobile/access-codes` | O |
-| 접속 코드 검증·코스 불러오기 | `POST` | `/api/v1/mobile/access-codes/verify` | X |
+
+### OCR 간판 인식 — `/api/v1/ocr`
+
+간판 사진으로 현재 매장을 찾는다. 순서는 고정이다.
+
+1. **이미지 전처리** — 긴 변 1600px·약 1MB로 줄여 CLOVA 업로드/인식 latency를 낮춘다.
+2. **bbox 후처리** — 층수·가격·할인율처럼 상호가 될 수 없는 형태와 너무 작은 글자만 버리고, 같은 줄의 분리 단어(`POP`+`MART`)를 붙인다. `SALE`·`세일중`은 여기서 지우지 않는다.
+3. **인메모리 엔티티 매칭** — 카탈로그를 한 번에 읽어 exact / alias / fuzzy로 고른다. 프로모 문구는 단어 리스트가 아니라, 매장과 점수가 안 나오면 후보에서 떨어진다. SQL `LIKE`는 오타를 못 견딘다.
+
+후보 응답에서 `confidence`는 CLOVA가 글자를 읽은 신뢰도이고, `matchScore`는 그 글자가 카탈로그 상호와 얼마나 맞는기다. 둘을 한 점수로 섞지 않는다.
+
+| 기능 | Method | Endpoint | 인증 |
+| --- | --- | --- | --- |
+| OCR 현재 위치 인식 (세션 없음) | `POST` | `/api/v1/ocr/locations/recognize` | X |
+| OCR 길찾기 세션 시작 | `POST` | `/api/v1/ocr/sessions` | O |
+| OCR 간판 인식 (세션) | `POST` | `/api/v1/ocr/recognitions` | O |
 
 ### 관리자 (Admin) — `/api/v1/admin`
 
@@ -630,6 +642,7 @@ HTTP로 호출하고 응답을 `ApiResponse`로 감싸 돌려줄 뿐입니다. �
 | 검색 유입 콘텐츠 조회 | `GET` | `/api/v1/admin/seo/contents` | ADMIN |
 | 승인 대기 코스 초안 목록 조회 | `GET` | `/api/v1/admin/admin-courses` | ADMIN |
 | 오늘 초안 생성 실행 상황 조회 | `GET` | `/api/v1/admin/admin-courses/run` | ADMIN |
+| 더현대 장소 카탈로그 조회 | `GET` | `/api/v1/admin/admin-courses/places` | ADMIN |
 | 인물 한 명의 코스 초안 조회 | `GET` | `/api/v1/admin/admin-courses/{celebrity}` | ADMIN |
 
 트렌드 조회 API는 Lambda가 기존 이미지 버킷에 갱신하는 `latest-*.json` 세 파일만 읽습니다.
@@ -646,6 +659,9 @@ HTTP로 호출하고 응답을 `ApiResponse`로 감싸 돌려줄 뿐입니다. �
 | 목록 | `{"drafts":true}` | 인물·상태·코스 모양·경고 수·남은 TTL (머리말만) |
 | 상세 | `{"draft":"카리나"}` | 코스 전문 — 장소마다 근거 문장·출처 기사·사진, 그리고 승인 람다가 쓸 조사 원문(`research`)과 다음 턴을 잇는 세션 상태(`state`) |
 | 실행 상황 | `{"run":true}` | 오늘 배치가 어디까지 갔나 (`queued` / `done`) |
+| 장소 카탈로그 | `{"places":true}` | 더현대 장소 전부(147곳). 관리자가 초안의 자리를 갈아 끼울 때 고를 재료 |
+
+장소 카탈로그는 관리자 화면이 DB 에 직접 붙지 않게 하려고 람다에서 받아 옵니다 — 초안을 만드는 람다가 이미 장소 DB 와 사진 DB 둘 다에 붙어 있어 거기서 내주는 편이 쌉니다. 람다가 5분간 들고 있으므로 매장이 새로 들어온 날은 `?fresh=true` 로 갱신합니다. 조회에 실패해도 오류가 아니라 **빈 목록**이 옵니다.
 
 - 초안을 **만들거나 지우거나 서빙 캐시(`celeb:course:*`)로 올리지 않습니다.** 그 셋은 배치와
   승인 람다의 일이고, 여기서 열어 두면 관리자 화면의 실수 한 번이 손님에게 그대로 나갑니다.
@@ -948,6 +964,10 @@ ORACLE_PASSWORD=CHANGE_ME
 
 # Gemini API
 GEMINI_API_KEY=CHANGE_ME
+
+# 네이버 CLOVA OCR (간판 인식). 콘솔에서 발급한 Invoke URL·Secret 만 둔다.
+CLOVA_OCR_INVOKE_URL=
+CLOVA_OCR_SECRET=
 
 # AI 엔진 base URL (생략 시 http://127.0.0.1:8000)
 AI_ENGINE_BASE_URL=http://127.0.0.1:8000

@@ -45,7 +45,10 @@ public class OcrNavigationController {
     @Operation(
             summary = "OCR 간판 인식",
             description = "간판 이미지를 인식해 브랜드명과 매칭되는 장소 후보를 돌려준다. "
-                    + "인식은 외부 CLOVA OCR 이 처리하며, 장애·타임아웃은 E002(502) 로 변환된다.")
+                    + "이미지 전처리 → CLOVA → 층·가격·% 후처리 → 카탈로그 매칭 순이다. "
+                    + "프로모 문구는 단어 리스트가 아니라 매장 목록과 안 맞으면 버린다. "
+                    + "후보의 confidence 는 OCR 신뢰도, matchScore 는 카탈로그 매칭 점수다. "
+                    + "CLOVA 장애·타임아웃은 E002(502) 로 변환된다.")
     @PostMapping(value = "/recognitions", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.OK)
     public ApiResponse<OcrRecognitionResponse> recognize(

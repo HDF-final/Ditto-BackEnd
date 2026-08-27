@@ -27,11 +27,13 @@ import com.ditto.community.dto.response.BookmarkResponse;
 import com.ditto.community.dto.response.CommentResponse;
 import com.ditto.community.dto.response.CreateCoursePostResponse;
 import com.ditto.community.dto.response.LikeResponse;
+import com.ditto.community.dto.response.PostImageUploadResponse;
 import com.ditto.community.dto.response.PublicCourseDetailResponse;
 import com.ditto.community.dto.response.PublicCourseResponse;
 import com.ditto.community.dto.response.UpdateCoursePostResponse;
 import com.ditto.community.service.PostBookmarkService;
 import com.ditto.community.service.PostCommentService;
+import com.ditto.community.service.PostImageService;
 import com.ditto.community.service.PostLikeService;
 import com.ditto.community.service.PostService;
 import com.ditto.global.common.response.ApiResponse;
@@ -52,6 +54,7 @@ import lombok.RequiredArgsConstructor;
 public class PostController {
 
     private final PostService postService;
+    private final PostImageService postImageService;
     private final PostCommentService postCommentService;
     private final PostLikeService postLikeService;
     private final PostBookmarkService postBookmarkService;
@@ -122,6 +125,21 @@ public class PostController {
     public ApiResponse<Void> deleteCoursePost(@PathVariable Long postId) {
         postService.deleteCoursePost(SecurityUtils.requireUserId(), postId);
         return ApiResponse.success("성공", null);
+    }
+
+    @Operation(
+            summary = "코스 게시글 사진 업로드",
+            description = "작성자가 자신의 코스 게시글에 사진을 첨부합니다. 여러 장을 한 번에 올릴 수 있으며, "
+                    + "응답으로 게시글에 첨부된 전체 사진 조회 URL 목록을 정렬 순으로 돌려줍니다.")
+    @PostMapping(value = "/{postId}/images", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @ResponseStatus(HttpStatus.OK)
+    public ApiResponse<PostImageUploadResponse> uploadImages(
+            @Parameter(description = "사진을 첨부할 게시글 ID", example = "1")
+            @PathVariable Long postId,
+            @Parameter(description = "첨부할 사진 목록 (multipart/form-data)")
+            @RequestPart("images") List<MultipartFile> images) {
+        return ApiResponse.success("성공",
+                postImageService.uploadImages(SecurityUtils.requireUserId(), postId, images));
     }
 
     @Operation(summary = "코스 게시글 댓글 작성", description = "로그인한 고객(ROLE_CUSTOMER)이 코스 게시글에 댓글을 작성합니다.")

@@ -11,5 +11,8 @@ public class CreateCoursePostResponse {
 
     private final Long postId;
     private final Long courseId;
+    private final Long writerId;
+    private final String writerNickname;
+    private final String country;
     private final String title;
 }

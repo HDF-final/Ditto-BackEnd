@@ -66,16 +66,16 @@ class PostServiceTest {
     private com.ditto.community.repository.PostCommentMapper postCommentMapper;
 
     @Mock
-    private ContentTranslationService contentTranslationService;
-
-    @Mock
-    private UserMapper userMapper;
-
-    @Mock
     private S3Provider s3Provider;
 
     @Mock
     private PostImageMapper postImageMapper;
+
+    @Mock
+    private ContentTranslationService contentTranslationService;
+
+    @Mock
+    private UserMapper userMapper;
 
     @InjectMocks
     private PostService postService;
@@ -83,7 +83,7 @@ class PostServiceTest {
     @Test
     @DisplayName("본인 소유 코스로 게시글을 작성한다")
     void createCoursePost() {
-        Course course = Course.of(100L, USER_ID, null, "나의 코스", null, CourseCreationType.MANUAL.name(), "ABCD1234");
+        Course course = Course.of(100L, USER_ID, null, "나의 코스", null, CourseCreationType.MANUAL.name());
         given(courseMapper.findById(100L)).willReturn(Optional.of(course));
         given(postMapper.insert(any(PostInsertCommand.class))).willAnswer(invocation -> {
             PostInsertCommand command = invocation.getArgument(0);
@@ -118,7 +118,7 @@ class PostServiceTest {
     @Test
     @DisplayName("복사 후 본인 소유가 된 코스도 게시글을 작성할 수 있다")
     void createCoursePostWithCopiedOwnCourse() {
-        Course course = Course.of(101L, USER_ID, 3L, "복사 코스", null, CourseCreationType.COPIED.name(), "COPY1234");
+        Course course = Course.of(101L, USER_ID, 3L, "복사 코스", null, CourseCreationType.COPIED.name());
         given(courseMapper.findById(101L)).willReturn(Optional.of(course));
         given(postMapper.insert(any(PostInsertCommand.class))).willAnswer(invocation -> {
             PostInsertCommand command = invocation.getArgument(0);
@@ -171,7 +171,7 @@ class PostServiceTest {
     @Test
     @DisplayName("다른 사용자 소유 코스는 게시글 작성이 거부된다")
     void rejectWhenCourseOwnedByOtherUser() {
-        Course course = Course.of(100L, 99L, null, "다른 사람 코스", null, CourseCreationType.MANUAL.name(), "ABCD1234");
+        Course course = Course.of(100L, 99L, null, "다른 사람 코스", null, CourseCreationType.MANUAL.name());
         given(courseMapper.findById(100L)).willReturn(Optional.of(course));
 
         assertThatThrownBy(() -> postService.createCoursePost(
@@ -191,7 +191,7 @@ class PostServiceTest {
     @Test
     @DisplayName("SYSTEM 기본 코스는 직접 게시글 작성이 거부된다")
     void rejectWhenSystemCourse() {
-        Course course = Course.of(3L, null, null, "기본 코스", null, CourseCreationType.SYSTEM.name(), "SYSTEM01");
+        Course course = Course.of(3L, null, null, "기본 코스", null, CourseCreationType.SYSTEM.name());
         given(courseMapper.findById(3L)).willReturn(Optional.of(course));
 
         assertThatThrownBy(() -> postService.createCoursePost(
@@ -211,7 +211,7 @@ class PostServiceTest {
     @Test
     @DisplayName("Mapper INSERT 실패 시 트랜잭션 메서드에서 예외가 전파된다")
     void insertFailurePropagatesInTransaction() throws NoSuchMethodException {
-        Course course = Course.of(100L, USER_ID, null, "나의 코스", null, CourseCreationType.MANUAL.name(), "ABCD1234");
+        Course course = Course.of(100L, USER_ID, null, "나의 코스", null, CourseCreationType.MANUAL.name());
         given(courseMapper.findById(100L)).willReturn(Optional.of(course));
         given(postMapper.insert(any(PostInsertCommand.class))).willThrow(new IllegalStateException("insert failed"));
 
@@ -235,7 +235,7 @@ class PostServiceTest {
     @DisplayName("본인이 작성한 게시글의 제목과 내용을 수정한다")
     void updateCoursePost() {
         PostRow post = new PostRow(2L, 100L, USER_ID, "기존 제목", "기존 내용", 3, 4, null, null);
-        Course course = Course.of(100L, USER_ID, null, "기존 제목", "기존 설명", CourseCreationType.MANUAL.name(), "ABCD1234");
+        Course course = Course.of(100L, USER_ID, null, "기존 제목", "기존 설명", CourseCreationType.MANUAL.name());
         given(postMapper.findActiveById(2L)).willReturn(Optional.of(post));
         given(courseMapper.findById(100L)).willReturn(Optional.of(course));
         given(courseMapper.updateInfo(100L, "수정된 제목", "기존 설명")).willReturn(1);
@@ -266,7 +266,7 @@ class PostServiceTest {
     @DisplayName("게시글 수정 시 새 사진을 POST_IMAGE에 추가한다")
     void updateCoursePostAddsImages() {
         PostRow post = new PostRow(2L, 100L, USER_ID, "기존 제목", "기존 내용", 3, 4, null, null);
-        Course course = Course.of(100L, USER_ID, null, "기존 제목", "기존 설명", CourseCreationType.MANUAL.name(), "ABCD1234");
+        Course course = Course.of(100L, USER_ID, null, "기존 제목", "기존 설명", CourseCreationType.MANUAL.name());
         MockMultipartFile image = new MockMultipartFile(
                 "images", "new.png", "image/png", "image".getBytes());
         given(postMapper.findActiveById(2L)).willReturn(Optional.of(post));
@@ -281,7 +281,7 @@ class PostServiceTest {
         given(postImageMapper.nextSortOrder(2L)).willReturn(1);
         given(postImageMapper.findByPostId(2L)).willReturn(List.of(
                 new PostImageRow(10L, 2L, "images/community/posts/new.png", 1)));
-        given(s3Provider.resolveImageUrl("images/community/posts/new.png"))
+        given(s3Provider.resolveDirectImageUrl("images/community/posts/new.png"))
                 .willReturn("https://example.com/new.png");
 
         UpdateCoursePostResponse response = postService.updateCoursePost(
@@ -304,7 +304,7 @@ class PostServiceTest {
     @DisplayName("게시글 수정 시 deleteImageIds에 포함된 기존 사진을 삭제한다")
     void updateCoursePostDeletesImage() {
         PostRow post = new PostRow(2L, 100L, USER_ID, "기존 제목", "기존 내용", 3, 4, null, null);
-        Course course = Course.of(100L, USER_ID, null, "기존 제목", "기존 설명", CourseCreationType.MANUAL.name(), "ABCD1234");
+        Course course = Course.of(100L, USER_ID, null, "기존 제목", "기존 설명", CourseCreationType.MANUAL.name());
         PostImageRow oldImage = new PostImageRow(10L, 2L, "images/community/posts/old.jpg", 0);
         given(postMapper.findActiveById(2L)).willReturn(Optional.of(post));
         given(courseMapper.findById(100L)).willReturn(Optional.of(course));
@@ -371,7 +371,7 @@ class PostServiceTest {
     @DisplayName("UPDATE 결과가 0건이면 POST_NOT_FOUND")
     void rejectUpdateWhenUpdatedCountZero() {
         PostRow post = new PostRow(2L, 100L, USER_ID, "기존 제목", "기존 내용", 3, 4, null, null);
-        Course course = Course.of(100L, USER_ID, null, "기존 제목", "기존 설명", CourseCreationType.MANUAL.name(), "ABCD1234");
+        Course course = Course.of(100L, USER_ID, null, "기존 제목", "기존 설명", CourseCreationType.MANUAL.name());
         given(postMapper.findActiveById(2L)).willReturn(Optional.of(post));
         given(courseMapper.findById(100L)).willReturn(Optional.of(course));
         given(courseMapper.updateInfo(100L, "수정 제목", "기존 설명")).willReturn(1);
@@ -471,6 +471,7 @@ class PostServiceTest {
                 .postId(1L)
                 .courseId(3L)
                 .title("내가 다녀온 K-MZ 코스")
+                .writerNickname("Yuki_T")
                 .likeCount(12L)
                 .bookmarkCount(4L)
                 .build();
@@ -487,6 +488,7 @@ class PostServiceTest {
         assertThat(contentItem.getPostId()).isEqualTo(1L);
         assertThat(contentItem.getCourseId()).isEqualTo(3L);
         assertThat(contentItem.getTitle()).isEqualTo("내가 다녀온 K-MZ 코스");
+        assertThat(contentItem.getWriterNickname()).isEqualTo("Yuki_T");
         assertThat(contentItem.getLikeCount()).isEqualTo(12L);
         assertThat(contentItem.getBookmarkCount()).isEqualTo(4L);
 

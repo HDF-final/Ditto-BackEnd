@@ -68,6 +68,16 @@ public class CelebDraftClient implements AutoCloseable {
         return call(payload().put("run", true));
     }
 
+    /**
+     * 더현대 장소 전부. 관리자가 초안의 자리를 갈아 끼울 때 고를 재료다.
+     *
+     * <p>{@code fresh} 는 람다가 5분간 들고 있는 목록을 무시하고 다시 조회하게 한다.
+     * 매장이 새로 들어온 날 관리자가 스스로 갱신할 손잡이다.
+     */
+    public JsonNode findPlaces(boolean fresh) {
+        return call(payload().put("places", true).put("fresh", fresh));
+    }
+
     @Override
     public void close() {
         lambdaClient.close();

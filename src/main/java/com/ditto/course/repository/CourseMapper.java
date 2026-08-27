@@ -22,8 +22,6 @@ public interface CourseMapper {
 
     Optional<Course> findById(@Param("courseId") Long courseId);
 
-    int countByShareCode(@Param("shareCode") String shareCode);
-
     int countPlaceInCourse(
             @Param("courseId") Long courseId,
             @Param("placeId") Long placeId);
@@ -59,6 +57,16 @@ public interface CourseMapper {
 
     List<CoursePlaceResponse> findPlacesByCourseId(@Param("courseId") Long courseId);
 
+    /**
+     * 코스의 대표 사진 <b>키</b>. 주소가 아니다 — {@code S3Provider} 가 앞을 붙인다.
+     *
+     * <p>관리자가 지정한 것 → 셀럽 사진 → 첫 자리 매장 사진 차례로 고른다.
+     * 기본 추천 코스 목록이 쓰는 것과 <b>같은 조각</b>이라 목록과 상세가 안 어긋난다.
+     *
+     * @return 사진이 하나도 없으면 {@code null}
+     */
+    String findHeroImageKey(@Param("courseId") Long courseId);
+
     int insert(CourseInsertCommand command);
 
     int insertPlace(CoursePlaceInsertCommand command);
@@ -92,7 +100,6 @@ public interface CourseMapper {
         private String name;
         private String description;
         private String creationType;
-        private String shareCode;
     }
 
     @Getter

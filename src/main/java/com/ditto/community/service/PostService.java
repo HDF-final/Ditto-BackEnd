@@ -1,8 +1,9 @@
 package com.ditto.community.service;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -51,10 +52,10 @@ public class PostService {
     private final CourseMapper courseMapper;
     private final PostMapper postMapper;
     private final com.ditto.community.repository.PostCommentMapper postCommentMapper;
+    private final PostImageMapper postImageMapper;
+    private final S3Provider s3Provider;
     private final ContentTranslationService contentTranslationService;
     private final UserMapper userMapper;
-    private final S3Provider s3Provider;
-    private final PostImageMapper postImageMapper;
 
     /**
      * 커뮤니티에 공개된 코스 게시글 목록을 최신순으로 페이징 조회한다.
@@ -82,10 +83,12 @@ public class PostService {
                 ? postMapper.countPublicCourses(authorId, normalizedAuthor)
                 : postMapper.countPublicCourses();
 
-        List<PublicCourseResponse> posts = content != null ? content : List.of();
-        attachImageUrls(posts);
+        if (content == null || content.isEmpty()) {
+            return new PageResponse<>(List.of(), page, totalElements);
+        }
 
-        return new PageResponse<>(posts, page, totalElements);
+        attachImageUrls(content);
+        return new PageResponse<>(content, page, totalElements);
     }
 
     private String normalizeAuthor(String author) {
@@ -93,6 +96,37 @@ public class PostService {
             return null;
         }
         return author.trim();
+    }
+
+    /**
+     * 목록의 각 게시글에 첨부 사진 URL을 채운다.
+     * 게시글 수만큼 쿼리하지 않도록 사진 key를 한 번에 조회한 뒤 게시글별로 묶어 URL로 변환한다.
+     */
+    private void attachImageUrls(List<PublicCourseResponse> content) {
+        List<Long> postIds = content.stream()
+                .map(PublicCourseResponse::getPostId)
+                .toList();
+
+        Map<Long, List<String>> urlsByPostId = new LinkedHashMap<>();
+        for (PostImageKeyRow row : postImageMapper.findKeysByPostIds(postIds)) {
+            // 저장값은 S3 object key다. 버킷이 공개 읽기라 셀럽 사진(course/*)과 같은 버킷 직통 URL로 내려준다.
+            // images/* 는 CloudFront behavior가 없어 resolveImageUrl로는 프로덕션에서 301로 튕긴다.
+            String url = s3Provider.resolveDirectImageUrl(row.getImageKey());
+            urlsByPostId.computeIfAbsent(row.getPostId(), key -> new ArrayList<>()).add(url);
+        }
+
+        for (PublicCourseResponse post : content) {
+            post.setImageUrls(urlsByPostId.getOrDefault(post.getPostId(), List.of()));
+        }
+    }
+
+    /** 게시글 하나의 첨부 사진 key를 정렬 순서대로 조회해 버킷 직통 공개 URL로 변환한다. */
+    private List<String> resolveImageUrls(Long postId) {
+        List<String> urls = new ArrayList<>();
+        for (String key : postImageMapper.findKeysByPostId(postId)) {
+            urls.add(s3Provider.resolveDirectImageUrl(key));
+        }
+        return urls;
     }
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -329,7 +363,7 @@ public class PostService {
         }
         return images.stream()
                 .map(PostImageRow::getImageKey)
-                .map(s3Provider::resolveImageUrl)
+                .map(s3Provider::resolveDirectImageUrl)
                 .filter(StringUtils::hasText)
                 .toList();
     }
@@ -341,40 +375,10 @@ public class PostService {
         return images.stream()
                 .map(image -> PostImageResponse.builder()
                         .postImageId(image.getPostImageId())
-                        .imageUrl(s3Provider.resolveImageUrl(image.getImageKey()))
+                        .imageUrl(s3Provider.resolveDirectImageUrl(image.getImageKey()))
                         .sortOrder(image.getSortOrder())
                         .build())
                 .toList();
-    }
-
-    private void attachImageUrls(List<PublicCourseResponse> posts) {
-        if (posts == null || posts.isEmpty()) {
-            return;
-        }
-
-        List<Long> postIds = posts.stream()
-                .map(PublicCourseResponse::getPostId)
-                .filter(postId -> postId != null && postId > 0)
-                .distinct()
-                .toList();
-        if (postIds.isEmpty()) {
-            return;
-        }
-
-        List<PostImageKeyRow> imageRows = postImageMapper.findKeysByPostIds(postIds);
-        if (imageRows == null || imageRows.isEmpty()) {
-            posts.forEach(post -> post.setImageUrls(List.of()));
-            return;
-        }
-
-        Map<Long, List<String>> imageUrlsByPostId = imageRows.stream()
-                .filter(row -> row.getPostId() != null && StringUtils.hasText(row.getImageKey()))
-                .collect(Collectors.groupingBy(
-                        PostImageKeyRow::getPostId,
-                        Collectors.mapping(row -> s3Provider.resolveImageUrl(row.getImageKey()), Collectors.toList())));
-
-        posts.forEach(post -> post.setImageUrls(
-                imageUrlsByPostId.getOrDefault(post.getPostId(), List.of())));
     }
 
     @Transactional

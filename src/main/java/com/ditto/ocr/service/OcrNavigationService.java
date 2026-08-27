@@ -1,7 +1,6 @@
 package com.ditto.ocr.service;
 
 import java.util.Collections;
-import java.util.List;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
@@ -11,12 +10,15 @@ import com.ditto.global.exception.BusinessException;
 import com.ditto.global.exception.ErrorCode;
 import com.ditto.ocr.client.ClovaOcrClient;
 import com.ditto.ocr.client.ClovaOcrResult;
+import com.ditto.ocr.config.OcrProperties;
 import com.ditto.ocr.domain.OcrSession;
 import com.ditto.ocr.dto.request.OcrSessionStartRequest;
-import com.ditto.ocr.dto.response.OcrCandidateResponse;
 import com.ditto.ocr.dto.response.OcrRecognitionResponse;
 import com.ditto.ocr.dto.response.OcrSessionStartResponse;
 import com.ditto.ocr.repository.OcrPlaceMapper;
+import com.ditto.ocr.support.OcrImagePreprocessor;
+import com.ditto.ocr.support.OcrWordPostProcessor;
+import com.ditto.ocr.support.PreprocessedImage;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,7 +26,10 @@ import lombok.extern.slf4j.Slf4j;
 /**
  * OCR 길찾기.
  *
- * <p>세션 시작은 DB(장소 식별자 조회)만 쓰고, 인식은 외부 CLOVA OCR 호출 + 후보 매칭이다.
+ * <p>세션 시작은 DB(장소 식별자 조회)만 쓰고, 인식은 다음 순서로 처리한다.
+ * (1) 대용량 이미지 전처리 → (2) CLOVA OCR → 층·가격·% 형태만 후처리 →
+ * (3) 카탈로그 인메모리 exact/alias/fuzzy 매칭. 프로모 문구는 사전으로 지우지 않고
+ * 카탈로그에 없으면 후보에서 떨어진다. {@code matchScore} 와 OCR {@code confidence} 는 분리.
  * 인식은 외부 응답을 수십 ms~수 초 기다리므로 트랜잭션으로 커넥션을 잡지 않는다.
  */
 @Slf4j
@@ -36,7 +41,9 @@ public class OcrNavigationService {
     private final OcrPlaceMapper ocrPlaceMapper;
     private final ClovaOcrClient clovaOcrClient;
     private final OcrPlaceMatcher placeMatcher;
-    private final com.ditto.ocr.config.OcrProperties properties;
+    private final OcrImagePreprocessor imagePreprocessor;
+    private final OcrWordPostProcessor wordPostProcessor;
+    private final OcrProperties properties;
 
     /** 세션을 시작하고 시작 장소의 길찾기 식별자를 함께 돌려준다. */
     public OcrSessionStartResponse startSession(OcrSessionStartRequest request) {
@@ -73,8 +80,13 @@ public class OcrNavigationService {
     private OcrRecognitionResponse recognizeImage(MultipartFile image) {
         validateImage(image);
 
-        ClovaOcrResult result = clovaOcrClient.recognize(
-                readBytes(image), formatOf(image), image.getOriginalFilename());
+        String originalFormat = formatOf(image);
+        PreprocessedImage processed = imagePreprocessor.process(readBytes(image), originalFormat);
+        String fileName = processed.isTransformed() ? "ocr.jpg" : image.getOriginalFilename();
+
+        ClovaOcrResult raw = clovaOcrClient.recognize(
+                processed.getBytes(), processed.getFormat(), fileName);
+        ClovaOcrResult result = wordPostProcessor.process(raw);
 
         String recognitionId = "ocr_" + UUID.randomUUID().toString().replace("-", "");
 
@@ -87,13 +99,13 @@ public class OcrNavigationService {
                     .build();
         }
 
-        List<OcrCandidateResponse> candidates =
-                placeMatcher.match(result, properties.getBrandTopN(), properties.getMaxCandidates());
+        OcrPlaceMatcher.MatchResult matched =
+                placeMatcher.resolve(result, properties.getMaxCandidates());
 
         return OcrRecognitionResponse.builder()
                 .recognitionId(recognitionId)
-                .recognizedBrandName(result.primaryText())
-                .candidates(candidates)
+                .recognizedBrandName(matched.getRecognizedBrandName())
+                .candidates(matched.getCandidates())
                 .build();
     }
 

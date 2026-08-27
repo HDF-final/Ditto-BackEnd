@@ -53,10 +53,10 @@ public enum ErrorCode {
     COMMENT_NOT_FOUND(HttpStatus.NOT_FOUND, "CM002", "댓글을 찾을 수 없습니다."),
     ALREADY_LIKED(HttpStatus.CONFLICT, "CM003", "이미 좋아요한 코스입니다."),
     ALREADY_BOOKMARKED(HttpStatus.CONFLICT, "CM004", "이미 북마크한 코스입니다."),
+    POST_IMAGE_LIMIT_EXCEEDED(HttpStatus.BAD_REQUEST, "CM005", "게시글에 첨부할 수 있는 사진 수를 초과했습니다."),
 
-    // ===== Navigation / Mobile =====
+    // ===== Navigation =====
     MAP_MANIFEST_NOT_FOUND(HttpStatus.NOT_FOUND, "N001", "지도 매니페스트를 찾을 수 없습니다."),
-    INVALID_ACCESS_CODE(HttpStatus.BAD_REQUEST, "N002", "유효하지 않은 접속 코드입니다."),
 
     // ===== Brand =====
     BRAND_NOT_FOUND(HttpStatus.NOT_FOUND, "BR001", "브랜드를 찾을 수 없습니다."),
@@ -77,6 +77,10 @@ public enum ErrorCode {
     // ===== Admin / Celeb course drafts =====
     CELEB_DRAFT_NOT_FOUND(HttpStatus.NOT_FOUND, "CD001", "승인 대기 코스 초안을 찾을 수 없습니다."),
     CELEB_DRAFT_READ_FAILED(HttpStatus.BAD_GATEWAY, "CD002", "승인 대기 코스 초안을 읽지 못했습니다."),
+    CELEB_COURSE_APPROVE_FAILED(HttpStatus.BAD_GATEWAY, "CD003", "코스 승인에 실패했습니다."),
+    CELEB_COURSE_CACHE_READ_FAILED(HttpStatus.BAD_GATEWAY, "CD004", "서비스 중인 코스를 읽지 못했습니다."),
+    CELEB_COURSE_CACHE_NOT_FOUND(HttpStatus.NOT_FOUND, "CD005", "서비스 중인 코스를 찾을 수 없습니다."),
+    CELEB_COURSE_REVOKE_FAILED(HttpStatus.BAD_GATEWAY, "CD006", "코스를 내리지 못했습니다."),
 
     // ===== External (AI / OCR) =====
     AI_SERVICE_ERROR(HttpStatus.BAD_GATEWAY, "E001", "AI 서비스 처리 중 오류가 발생했습니다."),

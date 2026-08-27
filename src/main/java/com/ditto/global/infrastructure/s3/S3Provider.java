@@ -2,6 +2,8 @@ package com.ditto.global.infrastructure.s3;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.Locale;
@@ -52,6 +54,9 @@ public class S3Provider {
 
     private final S3Client s3Client;
     private final S3Presigner s3Presigner;
+
+    /** CloudFront 에 동작이 걸린 prefix 가 아니라 버킷 직통으로 내야 하는 것. */
+    private static final String DIRECT_PREFIX = "course/";
     private final S3StorageProperties properties;
 
     /**
@@ -193,6 +198,15 @@ public class S3Provider {
      * 업로드 경로와 달리 {@code images/} prefix 제약과 ASCII 제한을 두지 않으므로 한글·공백이 든
      * 파일명도 허용하되, 경로 이탈 문자는 막는다. key가 비어 있으면 {@code null}을 반환한다.
      *
+     * <p><b>CDN 주소를 만들 때 key 를 인코딩한다.</b> 버킷에 {@code 63_크리스챤 디올.jpg} 처럼
+     * 공백이 든 파일명이 있는데, 그대로 이어 붙이면 주소 안에 진짜 공백이 남아 요청이
+     * 실패한다. 더 고약한 것은 <b>받는 쪽에 따라 조용히 깨진다</b>는 점이다 — CSS
+     * {@code url()} 은 따옴표가 없으면 공백에서 토큰이 끊겨 선언째 무시되고, 화면에는
+     * 회색 자리만 남는다. 실제로 기본 추천 코스 목록의 카드 사진이 그렇게 비었다.
+     *
+     * <p>형제인 {@link #resolveDirectImageUrl} 은 처음부터 인코딩하고 있었다. 같은 종류의
+     * 값을 내는 메서드 둘이 다르게 굴면 어느 쪽으로 나가느냐에 따라 결과가 갈린다.
+     *
      * @param objectKey S3 object key (null/빈 문자열 허용)
      * @return 조회용 URL, key가 없으면 null
      */
@@ -203,7 +217,7 @@ public class S3Provider {
         validateReadableKey(objectKey);
 
         if (StringUtils.hasText(properties.getPublicBaseUrl())) {
-            return removeTrailingSlash(properties.getPublicBaseUrl()) + "/" + objectKey;
+            return removeTrailingSlash(properties.getPublicBaseUrl()) + "/" + encodeKeyPath(objectKey);
         }
 
         GetObjectRequest getObjectRequest = GetObjectRequest.builder()
@@ -223,6 +237,71 @@ public class S3Provider {
                     properties.getBucket(), objectKey, exception);
             return null;
         }
+    }
+
+    /**
+     * <b>key 의 prefix 를 보고 CDN 과 직통 중에 고른다.</b> 코스 사진처럼 두 갈래가
+     * 섞여 오는 자리에서 쓴다.
+     *
+     * <p>반영 람다가 자리 사진을 두 군데에 둔다 — 기사에서 받아 온 셀럽 사진은
+     * {@code course/{share_code}/n.jpg} 로 새로 올리고, 매장 사진은 이미 버킷에 있는
+     * {@code place-picture/…} 를 그대로 가리킨다. 앞의 것은 CloudFront 에 동작이
+     * 없어 {@link #resolveImageUrl} 로 보내면 301 로 튕긴다.
+     *
+     * <p>{@code RecommendedCourseService.heroUrl} 이 쓰던 규칙을 여기로 올린 것이다.
+     * 코스 상세도 같은 판단을 해야 하는데, 같은 규칙이 두 군데에 적혀 있으면 한쪽만
+     * 고쳐지는 날이 온다. <b>대표 사진과 자리 사진이 어긋나면 안 된다.</b>
+     *
+     * @param objectKey S3 object key (null/빈 문자열 허용)
+     * @return 조회용 URL, key가 없으면 null
+     */
+    public String resolveImageUrlByPrefix(String objectKey) {
+        if (!StringUtils.hasText(objectKey)) {
+            return null;
+        }
+        return objectKey.startsWith(DIRECT_PREFIX)
+                ? resolveDirectImageUrl(objectKey)
+                : resolveImageUrl(objectKey);
+    }
+
+    /**
+     * <b>CDN 을 건너뛴 버킷 직통 주소.</b> CloudFront 가 안 내주는 prefix 전용이다.
+     *
+     * <p>{@link #resolveImageUrl}이 {@code public-base-url}(CloudFront)을 붙이는데, 그 배포에는
+     * 동작(behavior)이 {@code brand-logo/*} · {@code place-picture/*} · {@code products/*} ·
+     * {@code course-resource/*} 넷만 걸려 있다. 나머지는 <b>기본 동작이 ALB</b> 라 이미지 요청이
+     * 301 로 튕긴다 — 실측이다.
+     *
+     * <p>그래서 그 밖의 prefix 는 여기로 온다. 버킷 객체가 공개 읽기라 서명이 필요 없고,
+     * 주소가 고정이라 브라우저가 캐시한다(프리사인은 부를 때마다 주소가 바뀐다).
+     *
+     * <p><b>CloudFront 에 그 prefix 동작이 생기면 이 메서드를 쓸 이유가 없어진다.</b> 그때는
+     * 호출부를 {@link #resolveImageUrl} 로 되돌리면 된다.
+     *
+     * @param objectKey S3 object key (null/빈 문자열 허용)
+     * @return 조회용 URL, key가 없으면 null
+     */
+    public String resolveDirectImageUrl(String objectKey) {
+        if (!StringUtils.hasText(objectKey)) {
+            return null;
+        }
+        validateReadableKey(objectKey);
+        return "https://%s.s3.%s.amazonaws.com/%s".formatted(
+                properties.getBucket(), properties.getRegion(), encodeKeyPath(objectKey));
+    }
+
+    /** 경로 조각마다 인코딩한다. 슬래시는 살려야 키가 안 깨진다. */
+    private static String encodeKeyPath(String objectKey) {
+        String[] segments = objectKey.split("/", -1);
+        StringBuilder out = new StringBuilder(objectKey.length());
+        for (int i = 0; i < segments.length; i++) {
+            if (i > 0) {
+                out.append('/');
+            }
+            // URLEncoder 는 폼 인코딩이라 공백을 '+' 로 낸다. 경로에서는 %20 이어야 한다.
+            out.append(URLEncoder.encode(segments[i], StandardCharsets.UTF_8).replace("+", "%20"));
+        }
+        return out.toString();
     }
 
     /** 읽기용 key 검증. prefix·문자셋은 제한하지 않고 경로 이탈만 차단한다. */

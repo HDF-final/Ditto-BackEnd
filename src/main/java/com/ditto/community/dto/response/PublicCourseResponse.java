@@ -35,12 +35,12 @@ public class PublicCourseResponse {
     @Schema(description = "게시글 제목", example = "내가 다녀온 K-MZ 코스")
     private String title;
 
-    @Schema(description = "게시글 사진 조회 URL 목록")
-    private List<String> imageUrls;
-
     @Schema(description = "좋아요 수", example = "12")
     private Long likeCount;
 
     @Schema(description = "북마크(저장) 수", example = "4")
     private Long bookmarkCount;
+
+    @Schema(description = "게시글에 첨부된 사진 조회 URL 목록(정렬 순, 없으면 빈 배열)")
+    private List<String> imageUrls;
 }

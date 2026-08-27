@@ -11,6 +11,7 @@ import java.net.URI;
 import java.time.Duration;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -210,6 +211,51 @@ class S3ProviderTest {
         assertErrorCode(
                 () -> s3Provider.deleteImage(key),
                 ErrorCode.S3_DELETE_FAILED);
+    }
+
+    @Test
+    @DisplayName("CDN 주소를 만들 때 공백이 든 key 를 인코딩한다")
+    void resolveImageUrlEncodesSpaces() {
+        // 버킷에 실제로 있는 이름이다. 인코딩을 안 하면 주소 안에 진짜 공백이 남아,
+        // 따옴표 없는 CSS url() 이 선언째 무시하고 카드가 회색으로 빈다 — 실측이다.
+        String url = s3Provider.resolveImageUrl("place-picture/63_크리스챤 디올.jpg");
+
+        assertThat(url).doesNotContain(" ");
+        assertThat(url).isEqualTo(
+                "https://cdn.ditto.test/place-picture/63_%ED%81%AC%EB%A6%AC%EC%8A%A4%EC%B1%A4%20%EB%94%94%EC%98%AC.jpg");
+    }
+
+    @Test
+    @DisplayName("슬래시는 살린다 — 살리지 않으면 key 가 깨진다")
+    void resolveImageUrlKeepsSlashes() {
+        assertThat(s3Provider.resolveImageUrl("place-picture/74_탬버린즈.jpg"))
+                .startsWith("https://cdn.ditto.test/place-picture/")
+                .doesNotContain("%2F");
+    }
+
+    @Test
+    @DisplayName("형제 메서드 둘이 같은 key 를 같은 모양으로 인코딩한다")
+    void bothResolversEncodeTheSameWay() {
+        String key = "place-picture/카페 H.jpg";
+
+        String cdn = s3Provider.resolveImageUrl(key);
+        String direct = s3Provider.resolveDirectImageUrl(key);
+
+        // 호스트는 다르지만 경로는 같아야 한다. 한쪽만 인코딩하면 어느 길로 나가느냐에
+        // 따라 사진이 뜨고 안 뜨고가 갈린다.
+        assertThat(cdn).endsWith("/place-picture/%EC%B9%B4%ED%8E%98%20H.jpg");
+        assertThat(direct).endsWith("/place-picture/%EC%B9%B4%ED%8E%98%20H.jpg");
+    }
+
+    @Test
+    @DisplayName("prefix 로 CDN 과 직통을 가른다 — course/* 만 버킷 직통이다")
+    void resolveImageUrlByPrefixRoutesCelebPhotosDirect() {
+        assertThat(s3Provider.resolveImageUrlByPrefix("course/CELE1AA1/1.jpg"))
+                .startsWith("https://" + BUCKET + ".s3.ap-northeast-2.amazonaws.com/");
+        assertThat(s3Provider.resolveImageUrlByPrefix("place-picture/74_탬버린즈.jpg"))
+                .startsWith("https://cdn.ditto.test/");
+        assertThat(s3Provider.resolveImageUrlByPrefix(null)).isNull();
+        assertThat(s3Provider.resolveImageUrlByPrefix("  ")).isNull();
     }
 
     private void assertErrorCode(Runnable executable, ErrorCode expected) {

@@ -55,6 +55,9 @@ class PostControllerTest {
     private PostService postService;
 
     @MockBean
+    private com.ditto.community.service.PostImageService postImageService;
+
+    @MockBean
     private PostCommentService postCommentService;
 
     @MockBean
@@ -70,6 +73,7 @@ class PostControllerTest {
                 .postId(1L)
                 .courseId(3L)
                 .title("내가 다녀온 K-MZ 코스")
+                .writerNickname("Yuki_T")
                 .likeCount(12L)
                 .bookmarkCount(4L)
                 .build();
@@ -88,6 +92,7 @@ class PostControllerTest {
                 .andExpect(jsonPath("$.data.content[0].postId").value(1L))
                 .andExpect(jsonPath("$.data.content[0].courseId").value(3L))
                 .andExpect(jsonPath("$.data.content[0].title").value("내가 다녀온 K-MZ 코스"))
+                .andExpect(jsonPath("$.data.content[0].writerNickname").value("Yuki_T"))
                 .andExpect(jsonPath("$.data.content[0].likeCount").value(12L))
                 .andExpect(jsonPath("$.data.content[0].bookmarkCount").value(4L));
 
