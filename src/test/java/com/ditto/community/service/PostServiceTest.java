@@ -17,12 +17,15 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.ditto.community.dto.request.CreateCoursePostRequest;
 import com.ditto.community.dto.request.UpdateCoursePostRequest;
 import com.ditto.community.dto.response.CreateCoursePostResponse;
 import com.ditto.community.dto.response.UpdateCoursePostResponse;
+import com.ditto.community.repository.PostImageMapper.PostImageInsertCommand;
+import com.ditto.community.repository.PostImageMapper.PostImageRow;
 import com.ditto.course.domain.Course;
 import com.ditto.course.domain.CourseCreationType;
 import com.ditto.course.repository.CourseMapper;
@@ -41,6 +44,7 @@ import com.ditto.course.dto.response.CoursePlaceResponse;
 import com.ditto.course.repository.PostMapper.PublicCourseDetailPostRow;
 import com.ditto.global.common.response.PageResponse;
 import com.ditto.global.i18n.ContentLanguage;
+import com.ditto.global.infrastructure.s3.S3UploadResult;
 import com.ditto.global.infrastructure.translation.ContentTranslationService;
 
 @ExtendWith(MockitoExtension.class)
@@ -210,8 +214,12 @@ class PostServiceTest {
     @DisplayName("본인이 작성한 게시글의 제목과 내용을 수정한다")
     void updateCoursePost() {
         PostRow post = new PostRow(2L, 100L, USER_ID, "기존 제목", "기존 내용", 3, 4, null, null);
+        Course course = Course.of(100L, USER_ID, null, "기존 제목", "기존 설명", CourseCreationType.MANUAL.name());
         given(postMapper.findActiveById(2L)).willReturn(Optional.of(post));
+        given(courseMapper.findById(100L)).willReturn(Optional.of(course));
+        given(courseMapper.updateInfo(100L, "수정된 제목", "기존 설명")).willReturn(1);
         given(postMapper.update(any(PostUpdateCommand.class))).willReturn(1);
+        given(postImageMapper.findByPostId(2L)).willReturn(List.of());
 
         UpdateCoursePostResponse response = postService.updateCoursePost(
                 USER_ID,
@@ -230,6 +238,74 @@ class PostServiceTest {
         assertThat(command.getContent()).isEqualTo("수정된 내용");
         assertThat(response.getPostId()).isEqualTo(2L);
         assertThat(response.getTitle()).isEqualTo("수정된 제목");
+        assertThat(response.getContent()).isEqualTo("수정된 내용");
+        assertThat(response.getImageUrls()).isEmpty();
+        verify(courseMapper).updateInfo(100L, "수정된 제목", "기존 설명");
+    }
+
+    @Test
+    @DisplayName("게시글 수정 시 새 사진을 POST_IMAGE에 추가한다")
+    void updateCoursePostAddsImages() {
+        PostRow post = new PostRow(2L, 100L, USER_ID, "기존 제목", "기존 내용", 3, 4, null, null);
+        Course course = Course.of(100L, USER_ID, null, "기존 제목", "기존 설명", CourseCreationType.MANUAL.name());
+        MockMultipartFile image = new MockMultipartFile(
+                "images", "new.png", "image/png", "image".getBytes());
+        given(postMapper.findActiveById(2L)).willReturn(Optional.of(post));
+        given(courseMapper.findById(100L)).willReturn(Optional.of(course));
+        given(courseMapper.updateInfo(100L, "수정된 제목", "기존 설명")).willReturn(1);
+        given(postMapper.update(any(PostUpdateCommand.class))).willReturn(1);
+        given(postImageMapper.nextSortOrder(2L)).willReturn(1);
+        given(s3Provider.uploadImage(image, "community/posts")).willReturn(
+                S3UploadResult.builder()
+                        .key("images/community/posts/new.png")
+                        .url("https://example.com/new.png")
+                        .build());
+        given(postImageMapper.findByPostId(2L)).willReturn(List.of(
+                new PostImageRow(10L, 2L, "images/community/posts/new.png", 1)));
+        given(s3Provider.resolveDirectImageUrl("images/community/posts/new.png"))
+                .willReturn("https://example.com/new.png");
+
+        UpdateCoursePostResponse response = postService.updateCoursePost(
+                USER_ID,
+                2L,
+                UpdateCoursePostRequest.builder()
+                        .title("수정된 제목")
+                        .content("수정된 내용")
+                        .build(),
+                List.of(image));
+
+        ArgumentCaptor<PostImageInsertCommand> captor = ArgumentCaptor.forClass(PostImageInsertCommand.class);
+        verify(postImageMapper).insert(captor.capture());
+        assertThat(captor.getValue().getImageKey()).isEqualTo("images/community/posts/new.png");
+        assertThat(captor.getValue().getSortOrder()).isEqualTo(1);
+        assertThat(response.getImageUrls()).containsExactly("https://example.com/new.png");
+    }
+
+    @Test
+    @DisplayName("게시글 수정 시 deleteImageIds에 포함된 기존 사진을 삭제한다")
+    void updateCoursePostDeletesImage() {
+        PostRow post = new PostRow(2L, 100L, USER_ID, "기존 제목", "기존 내용", 3, 4, null, null);
+        Course course = Course.of(100L, USER_ID, null, "기존 제목", "기존 설명", CourseCreationType.MANUAL.name());
+        PostImageRow oldImage = new PostImageRow(10L, 2L, "images/community/posts/old.jpg", 0);
+        given(postMapper.findActiveById(2L)).willReturn(Optional.of(post));
+        given(courseMapper.findById(100L)).willReturn(Optional.of(course));
+        given(courseMapper.updateInfo(100L, "수정된 제목", "기존 설명")).willReturn(1);
+        given(postMapper.update(any(PostUpdateCommand.class))).willReturn(1);
+        given(postImageMapper.findByPostIdAndIds(2L, List.of(10L))).willReturn(List.of(oldImage));
+        given(postImageMapper.findByPostId(2L)).willReturn(List.of());
+
+        UpdateCoursePostResponse response = postService.updateCoursePost(
+                USER_ID,
+                2L,
+                UpdateCoursePostRequest.builder()
+                        .title("수정된 제목")
+                        .content("수정된 내용")
+                        .deleteImageIds(List.of(10L))
+                        .build());
+
+        verify(postImageMapper).deleteByIds(2L, List.of(10L));
+        verify(s3Provider).deleteImage("images/community/posts/old.jpg");
+        assertThat(response.getImageUrls()).isEmpty();
     }
 
     @Test
@@ -275,7 +351,10 @@ class PostServiceTest {
     @DisplayName("UPDATE 결과가 0건이면 POST_NOT_FOUND")
     void rejectUpdateWhenUpdatedCountZero() {
         PostRow post = new PostRow(2L, 100L, USER_ID, "기존 제목", "기존 내용", 3, 4, null, null);
+        Course course = Course.of(100L, USER_ID, null, "기존 제목", "기존 설명", CourseCreationType.MANUAL.name());
         given(postMapper.findActiveById(2L)).willReturn(Optional.of(post));
+        given(courseMapper.findById(100L)).willReturn(Optional.of(course));
+        given(courseMapper.updateInfo(100L, "수정 제목", "기존 설명")).willReturn(1);
         given(postMapper.update(any(PostUpdateCommand.class))).willReturn(0);
 
         assertThatThrownBy(() -> postService.updateCoursePost(

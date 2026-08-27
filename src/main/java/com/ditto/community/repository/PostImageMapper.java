@@ -14,6 +14,12 @@ import lombok.Setter;
 @Mapper
 public interface PostImageMapper {
 
+    List<PostImageRow> findByPostId(@Param("postId") Long postId);
+
+    List<PostImageRow> findByPostIdAndIds(
+            @Param("postId") Long postId,
+            @Param("imageIds") List<Long> imageIds);
+
     void insert(PostImageInsertCommand command);
 
     int countByPostId(@Param("postId") Long postId);
@@ -26,6 +32,23 @@ public interface PostImageMapper {
 
     /** 목록 조회의 N+1을 피하기 위해 여러 게시글의 사진 key를 한 번에 조회한다. */
     List<PostImageKeyRow> findKeysByPostIds(@Param("postIds") List<Long> postIds);
+
+    int deleteByPostId(@Param("postId") Long postId);
+
+    int deleteByIds(
+            @Param("postId") Long postId,
+            @Param("imageIds") List<Long> imageIds);
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    class PostImageRow {
+        private Long postImageId;
+        private Long postId;
+        private String imageKey;
+        private Integer sortOrder;
+    }
 
     @Getter
     @Setter

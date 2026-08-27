@@ -29,6 +29,9 @@ public class PublicCourseDetailResponse {
     @Schema(description = "게시글에 첨부된 사진 조회 URL 목록(정렬 순, 없으면 빈 배열)")
     private List<String> imageUrls;
 
+    @Schema(description = "게시글 사진 목록(ID 포함, 정렬 순, 없으면 빈 배열)")
+    private List<PostImageResponse> images;
+
     @Schema(description = "연결된 코스 정보")
     private CourseInfo course;
 
