@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -19,15 +20,18 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.ditto.community.dto.request.CreateCommentRequest;
+import com.ditto.community.dto.request.UpdateCoursePostRequest;
 import com.ditto.community.dto.response.CommentResponse;
 import com.ditto.community.dto.response.PublicCourseDetailResponse;
 import com.ditto.community.dto.response.PublicCourseResponse;
+import com.ditto.community.dto.response.UpdateCoursePostResponse;
 import com.ditto.community.service.PostCommentService;
 import com.ditto.community.service.PostService;
 import com.ditto.global.common.response.PageResponse;
@@ -196,6 +200,54 @@ class PostControllerTest {
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.code").value("CM001"))
                 .andExpect(jsonPath("$.message").value("게시글을 찾을 수 없습니다."));
+    }
+
+    @Test
+    @DisplayName("게시글 수정은 제목, 후기, 선택 사진을 multipart로 전달한다")
+    void updateCoursePostSuccess() throws Exception {
+        AuthUser principal = new AuthUser(2L, "customer@test.com", "ROLE_CUSTOMER");
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(principal, null, List.of(new SimpleGrantedAuthority("ROLE_CUSTOMER"))));
+        UpdateCoursePostRequest request = UpdateCoursePostRequest.builder()
+                .title("수정된 제목")
+                .content("수정된 후기")
+                .build();
+        MockMultipartFile requestPart = new MockMultipartFile(
+                "request",
+                "",
+                MediaType.APPLICATION_JSON_VALUE,
+                objectMapper.writeValueAsBytes(request));
+        MockMultipartFile imagePart = new MockMultipartFile(
+                "images",
+                "post.png",
+                "image/png",
+                "image".getBytes());
+        UpdateCoursePostResponse response = UpdateCoursePostResponse.builder()
+                .postId(10L)
+                .title("수정된 제목")
+                .content("수정된 후기")
+                .imageUrls(List.of("https://example.com/post.png"))
+                .build();
+        given(postService.updateCoursePost(
+                eq(2L),
+                eq(10L),
+                any(UpdateCoursePostRequest.class),
+                any(List.class)))
+                .willReturn(response);
+
+        mockMvc.perform(multipart("/api/v1/community/courses/10")
+                        .file(requestPart)
+                        .file(imagePart)
+                        .with(requestBuilder -> {
+                            requestBuilder.setMethod("PATCH");
+                            return requestBuilder;
+                        }))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.postId").value(10L))
+                .andExpect(jsonPath("$.data.title").value("수정된 제목"))
+                .andExpect(jsonPath("$.data.content").value("수정된 후기"))
+                .andExpect(jsonPath("$.data.imageUrls[0]").value("https://example.com/post.png"));
     }
 
     @Test

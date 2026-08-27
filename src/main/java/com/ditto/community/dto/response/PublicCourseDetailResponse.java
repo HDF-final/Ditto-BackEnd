@@ -23,8 +23,23 @@ public class PublicCourseDetailResponse {
     @Schema(description = "게시글 제목", example = "내가 다녀온 K-MZ 코스")
     private String title;
 
+    @Schema(description = "작성자 ID", example = "1")
+    private Long writerId;
+
+    @Schema(description = "작성자 닉네임", example = "구본희")
+    private String writerNickname;
+
+    @Schema(description = "작성자 국가 코드", example = "KR")
+    private String country;
+
     @Schema(description = "게시글 본문", example = "추천 동선입니다.")
     private String content;
+
+    @Schema(description = "게시글 사진 조회 URL 목록")
+    private List<String> imageUrls;
+
+    @Schema(description = "게시글 사진 목록")
+    private List<PostImageResponse> images;
 
     @Schema(description = "연결된 코스 정보")
     private CourseInfo course;

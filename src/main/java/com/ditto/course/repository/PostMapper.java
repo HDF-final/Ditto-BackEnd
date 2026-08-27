@@ -26,9 +26,23 @@ public interface PostMapper {
 
     int softDelete(@Param("postId") Long postId, @Param("userId") Long userId);
 
-    List<PublicCourseResponse> findPublicCourses(@Param("offset") long offset, @Param("size") int size);
+    default List<PublicCourseResponse> findPublicCourses(long offset, int size) {
+        return findPublicCourses(offset, size, null, null);
+    }
 
-    long countPublicCourses();
+    List<PublicCourseResponse> findPublicCourses(
+            @Param("offset") long offset,
+            @Param("size") int size,
+            @Param("authorId") Long authorId,
+            @Param("author") String author);
+
+    default long countPublicCourses() {
+        return countPublicCourses(null, null);
+    }
+
+    long countPublicCourses(
+            @Param("authorId") Long authorId,
+            @Param("author") String author);
 
     Optional<PublicCourseDetailPostRow> findPublicCourseDetailById(@Param("postId") Long postId);
 
@@ -45,8 +59,18 @@ public interface PostMapper {
     @NoArgsConstructor
     @AllArgsConstructor
     class PublicCourseDetailPostRow {
+        public PublicCourseDetailPostRow(Long postId, Long courseId, String title, String content) {
+            this.postId = postId;
+            this.courseId = courseId;
+            this.title = title;
+            this.content = content;
+        }
+
         private Long postId;
         private Long courseId;
+        private Long writerId;
+        private String writerNickname;
+        private String country;
         private String title;
         private String content;
     }

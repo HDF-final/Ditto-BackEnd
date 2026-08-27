@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -13,8 +14,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.ditto.community.dto.request.CreateCommentRequest;
 import com.ditto.community.dto.request.CreateCoursePostRequest;
@@ -63,9 +66,17 @@ public class PostController {
             @RequestParam(defaultValue = "0") int page,
             @Parameter(description = "페이지 크기(1~100, 기본 10)", example = "10")
             @RequestParam(defaultValue = "10") int size,
+            @Parameter(description = "작성자 ID", example = "1")
+            @RequestParam(required = false) Long authorId,
+            @Parameter(description = "작성자 닉네임", example = "구본희")
+            @RequestParam(required = false) String author,
             @RequestHeader(name = HttpHeaders.ACCEPT_LANGUAGE, required = false) String acceptLanguage) {
-        return ApiResponse.success("성공", postService.getPublicCourses(
-                page, size, AcceptLanguageResolver.resolve(acceptLanguage)));
+        var language = AcceptLanguageResolver.resolve(acceptLanguage);
+        if (authorId == null && (author == null || author.isBlank())) {
+            return ApiResponse.success("성공", postService.getPublicCourses(page, size, language));
+        }
+        return ApiResponse.success("성공",
+                postService.getPublicCourses(page, size, authorId, author, language));
     }
 
     @Operation(
@@ -90,14 +101,19 @@ public class PostController {
                 postService.createCoursePost(SecurityUtils.requireUserId(), request));
     }
 
-    @Operation(summary = "코스 게시글 수정", description = "로그인한 사용자가 자신이 작성한 코스 게시글의 제목과 내용을 수정합니다.")
-    @PatchMapping("/{postId}")
+    @Operation(
+            summary = "코스 게시글 수정",
+            description = "로그인한 사용자가 자신이 작성한 코스 게시글의 제목, 후기, 사진만 수정합니다. "
+                    + "multipart/form-data의 request 파트에는 title, content, deleteImageIds, deleteAllImages를 담고, "
+                    + "images 파트는 사진 추가 시에만 전달합니다.")
+    @PatchMapping(value = "/{postId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.OK)
     public ApiResponse<UpdateCoursePostResponse> updateCoursePost(
             @PathVariable Long postId,
-            @Valid @RequestBody UpdateCoursePostRequest request) {
+            @Valid @RequestPart("request") UpdateCoursePostRequest request,
+            @RequestPart(value = "images", required = false) List<MultipartFile> images) {
         return ApiResponse.success("성공",
-                postService.updateCoursePost(SecurityUtils.requireUserId(), postId, request));
+                postService.updateCoursePost(SecurityUtils.requireUserId(), postId, request, images));
     }
 
     @Operation(summary = "코스 게시글 삭제", description = "로그인한 사용자가 자신이 작성한 코스 게시글을 소프트 삭제합니다.")

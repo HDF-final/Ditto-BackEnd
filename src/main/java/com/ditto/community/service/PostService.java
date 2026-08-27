@@ -5,13 +5,19 @@ import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.ditto.community.dto.request.CreateCoursePostRequest;
 import com.ditto.community.dto.request.UpdateCoursePostRequest;
 import com.ditto.community.dto.response.CreateCoursePostResponse;
+import com.ditto.community.dto.response.PostImageResponse;
 import com.ditto.community.dto.response.PublicCourseDetailResponse;
 import com.ditto.community.dto.response.PublicCourseResponse;
 import com.ditto.community.dto.response.UpdateCoursePostResponse;
+import com.ditto.community.repository.PostImageMapper;
+import com.ditto.community.repository.PostImageMapper.PostImageInsertCommand;
+import com.ditto.community.repository.PostImageMapper.PostImageRow;
 import com.ditto.course.domain.Course;
 import com.ditto.course.dto.response.CoursePlaceResponse;
 import com.ditto.course.repository.CourseMapper;
@@ -23,8 +29,12 @@ import com.ditto.course.repository.PostMapper.PublicCourseDetailPostRow;
 import com.ditto.global.common.response.PageResponse;
 import com.ditto.global.exception.BusinessException;
 import com.ditto.global.exception.ErrorCode;
-import com.ditto.global.i18n.ContentLanguage;
+import com.ditto.global.infrastructure.s3.S3Provider;
+import com.ditto.global.infrastructure.s3.S3UploadResult;
 import com.ditto.global.infrastructure.translation.ContentTranslationService;
+import com.ditto.global.i18n.ContentLanguage;
+import com.ditto.user.repository.UserMapper;
+import com.ditto.user.repository.UserRow;
 
 import lombok.RequiredArgsConstructor;
 
@@ -39,20 +49,44 @@ public class PostService {
     private final PostMapper postMapper;
     private final com.ditto.community.repository.PostCommentMapper postCommentMapper;
     private final ContentTranslationService contentTranslationService;
+    private final UserMapper userMapper;
+    private final S3Provider s3Provider;
+    private final PostImageMapper postImageMapper;
 
     /**
      * 커뮤니티에 공개된 코스 게시글 목록을 최신순으로 페이징 조회한다.
      */
     public PageResponse<PublicCourseResponse> getPublicCourses(int page, int size) {
+        return getPublicCourses(page, size, null, null);
+    }
+
+    public PageResponse<PublicCourseResponse> getPublicCourses(
+            int page,
+            int size,
+            Long authorId,
+            String author) {
         if (page < 0 || size < 1 || size > MAX_PAGE_SIZE) {
             throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
         }
 
+        String normalizedAuthor = normalizeAuthor(author);
         long offset = (long) page * size;
-        List<PublicCourseResponse> content = postMapper.findPublicCourses(offset, size);
-        long totalElements = postMapper.countPublicCourses();
+        boolean hasAuthorFilter = authorId != null || normalizedAuthor != null;
+        List<PublicCourseResponse> content = hasAuthorFilter
+                ? postMapper.findPublicCourses(offset, size, authorId, normalizedAuthor)
+                : postMapper.findPublicCourses(offset, size);
+        long totalElements = hasAuthorFilter
+                ? postMapper.countPublicCourses(authorId, normalizedAuthor)
+                : postMapper.countPublicCourses();
 
         return new PageResponse<>(content != null ? content : List.of(), page, totalElements);
+    }
+
+    private String normalizeAuthor(String author) {
+        if (author == null || author.isBlank()) {
+            return null;
+        }
+        return author.trim();
     }
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -60,7 +94,17 @@ public class PostService {
             int page,
             int size,
             ContentLanguage language) {
-        PageResponse<PublicCourseResponse> response = getPublicCourses(page, size);
+        return getPublicCourses(page, size, null, null, language);
+    }
+
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public PageResponse<PublicCourseResponse> getPublicCourses(
+            int page,
+            int size,
+            Long authorId,
+            String author,
+            ContentLanguage language) {
+        PageResponse<PublicCourseResponse> response = getPublicCourses(page, size, authorId, author);
         if (language == null || !language.requiresTranslation()) {
             return response;
         }
@@ -103,11 +147,17 @@ public class PostService {
                 .build();
 
         List<com.ditto.community.dto.response.CommentResponse> comments = postCommentMapper.findCommentsByPostId(postId);
+        List<PostImageRow> postImages = postImageMapper.findByPostId(postId);
 
         return PublicCourseDetailResponse.builder()
                 .postId(post.getPostId())
                 .title(post.getTitle())
+                .writerId(post.getWriterId())
+                .writerNickname(post.getWriterNickname())
+                .country(post.getCountry())
                 .content(post.getContent())
+                .imageUrls(resolveImageUrls(postImages))
+                .images(toImageResponses(postImages))
                 .course(courseInfo)
                 .comments(comments != null ? comments : List.of())
                 .build();
@@ -144,16 +194,33 @@ public class PostService {
                 .content(request.getContent().trim())
                 .build();
         postMapper.insert(command);
+        UserRow writer = userMapper.findActiveById(userId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
 
         return CreateCoursePostResponse.builder()
                 .postId(command.getPostId())
                 .courseId(command.getCourseId())
+                .writerId(writer.getUserId())
+                .writerNickname(writer.getName())
+                .country(writer.getCountryCode())
                 .title(command.getTitle())
                 .build();
     }
 
     @Transactional
-    public UpdateCoursePostResponse updateCoursePost(Long userId, Long postId, UpdateCoursePostRequest request) {
+    public UpdateCoursePostResponse updateCoursePost(
+            Long userId,
+            Long postId,
+            UpdateCoursePostRequest request) {
+        return updateCoursePost(userId, postId, request, List.of());
+    }
+
+    @Transactional
+    public UpdateCoursePostResponse updateCoursePost(
+            Long userId,
+            Long postId,
+            UpdateCoursePostRequest request,
+            List<MultipartFile> images) {
         PostRow post = postMapper.findActiveById(postId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.POST_NOT_FOUND));
 
@@ -163,6 +230,13 @@ public class PostService {
 
         String title = request.getTitle().trim();
         String content = request.getContent().trim();
+        if (!StringUtils.hasText(title) || !StringUtils.hasText(content)) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        Course course = courseMapper.findById(post.getCourseId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.COURSE_NOT_FOUND));
+
         PostUpdateCommand command = PostUpdateCommand.builder()
                 .postId(postId)
                 .userId(userId)
@@ -170,14 +244,101 @@ public class PostService {
                 .content(content)
                 .build();
 
+        if (courseMapper.updateInfo(post.getCourseId(), title, course.getDescription()) != 1) {
+            throw new BusinessException(ErrorCode.COURSE_NOT_FOUND);
+        }
         if (postMapper.update(command) != 1) {
             throw new BusinessException(ErrorCode.POST_NOT_FOUND);
         }
 
+        updateImages(postId, request, images);
+        List<PostImageRow> postImages = postImageMapper.findByPostId(postId);
+
         return UpdateCoursePostResponse.builder()
                 .postId(postId)
                 .title(title)
+                .content(content)
+                .imageUrls(resolveImageUrls(postImages))
+                .images(toImageResponses(postImages))
                 .build();
+    }
+
+    private void updateImages(
+            Long postId,
+            UpdateCoursePostRequest request,
+            List<MultipartFile> images) {
+        List<PostImageRow> deletedImages = deleteRequestedImages(postId, request);
+        for (PostImageRow deletedImage : deletedImages) {
+            s3Provider.deleteImage(deletedImage.getObjectKey());
+        }
+
+        List<MultipartFile> uploadImages = images == null
+                ? List.of()
+                : images.stream()
+                        .filter(image -> image != null && !image.isEmpty())
+                        .toList();
+        int nextSortOrder = postImageMapper.findMaxSortOrder(postId) + 1;
+        for (MultipartFile image : uploadImages) {
+            S3UploadResult uploadResult = s3Provider.uploadImage(image, "community/posts");
+            postImageMapper.insert(new PostImageInsertCommand(
+                    null,
+                    postId,
+                    uploadResult.getKey(),
+                    nextSortOrder++));
+        }
+    }
+
+    private List<PostImageRow> deleteRequestedImages(Long postId, UpdateCoursePostRequest request) {
+        if (Boolean.TRUE.equals(request.getDeleteAllImages())) {
+            List<PostImageRow> images = postImageMapper.findByPostId(postId);
+            postImageMapper.deleteByPostId(postId);
+            return images;
+        }
+
+        List<Long> deleteImageIds = request.getDeleteImageIds();
+        if (deleteImageIds == null || deleteImageIds.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> normalizedIds = deleteImageIds.stream()
+                .filter(imageId -> imageId != null && imageId > 0)
+                .distinct()
+                .toList();
+        if (normalizedIds.size() != deleteImageIds.size()) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+
+        List<PostImageRow> images = postImageMapper.findByPostIdAndIds(postId, normalizedIds);
+        if (images.size() != normalizedIds.size()) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE,
+                    "삭제할 사진을 찾을 수 없습니다.");
+        }
+        postImageMapper.deleteByIds(postId, normalizedIds);
+        return images;
+    }
+
+    private List<String> resolveImageUrls(List<PostImageRow> images) {
+        if (images == null || images.isEmpty()) {
+            return List.of();
+        }
+        return images.stream()
+                .map(PostImageRow::getObjectKey)
+                .map(s3Provider::resolveImageUrl)
+                .filter(StringUtils::hasText)
+                .toList();
+    }
+
+    private List<PostImageResponse> toImageResponses(List<PostImageRow> images) {
+        if (images == null || images.isEmpty()) {
+            return List.of();
+        }
+        return images.stream()
+                .map(image -> PostImageResponse.builder()
+                        .postImageId(image.getPostImageId())
+                        .imageUrl(s3Provider.resolveImageUrl(image.getObjectKey()))
+                        .sortOrder(image.getSortOrder())
+                        .build())
+                .toList();
     }
 
     @Transactional
