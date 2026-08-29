@@ -74,7 +74,12 @@
                c.name AS title,
                u.name AS writer_nickname,
                p.likes_count AS like_count,
-               p.save_count AS bookmark_count
+               p.save_count AS bookmark_count,
+               (
+                   SELECT COUNT(*)
+                     FROM post_comment pc
+                    WHERE pc.post_id = p.post_id
+               ) AS comment_count
           FROM post p
           JOIN course c
             ON c.course_id = p.course_id
