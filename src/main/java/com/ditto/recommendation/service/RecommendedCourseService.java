@@ -4,11 +4,15 @@ import java.util.List;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 
 import com.ditto.global.common.response.PageResponse;
+import com.ditto.global.i18n.ContentLanguage;
 import com.ditto.global.infrastructure.s3.S3Provider;
+import com.ditto.global.infrastructure.translation.ContentTranslationService;
 import com.ditto.recommendation.dto.response.RecommendedCourseResponse;
 import com.ditto.recommendation.repository.RecommendedCourseMapper;
+import com.ditto.recommendation.repository.RecommendedCourseMapper.PlaceRow;
 
 import lombok.RequiredArgsConstructor;
 
@@ -29,13 +33,17 @@ public class RecommendedCourseService {
 
     private final RecommendedCourseMapper mapper;
     private final S3Provider s3Provider;
+    private final ContentTranslationService contentTranslationService;
 
-    /**
-     * @param countryCode {@code COUNTRY.CODE} (KR·JP·CN·US). 비우면 나라를 안 보고 전부.
-     */
     @Transactional(readOnly = true)
     public PageResponse<RecommendedCourseResponse> getRecommended(
             int page, int size, String countryCode) {
+        return getRecommended(page, size, countryCode, ContentLanguage.KOREAN);
+    }
+
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public PageResponse<RecommendedCourseResponse> getRecommended(
+            int page, int size, String countryCode, ContentLanguage language) {
         int safePage = Math.max(page, 0);
         int safeSize = Math.min(Math.max(size, 1), 100);
         String country = (countryCode == null || countryCode.isBlank())
@@ -45,28 +53,52 @@ public class RecommendedCourseService {
         List<RecommendedCourseResponse> content = mapper
                 .findRecommended(country, (long) safePage * safeSize, safeSize)
                 .stream()
-                .map(this::toResponse)
+                .map(row -> toResponse(row, language))
                 .toList();
         return new PageResponse<>(content, safePage, total);
     }
 
-    private RecommendedCourseResponse toResponse(RecommendedCourseMapper.CourseRow row) {
-        List<String> names = mapper.findPlaceNames(row.getCourseId());
+    private RecommendedCourseResponse toResponse(
+            RecommendedCourseMapper.CourseRow row,
+            ContentLanguage language) {
+        String courseKey = String.valueOf(row.getCourseId());
+        List<String> names = mapper.findPlaces(row.getCourseId()).stream()
+                .limit(PLACE_CHIPS)
+                .map(place -> localizePlaceName(place, language))
+                .toList();
         return RecommendedCourseResponse.builder()
                 .courseId(row.getCourseId())
-                .name(row.getName())
-                .description(row.getDescription())
+                .name(localize("course", courseKey, "name", row.getName(), language))
+                .description(localize(
+                        "course", courseKey, "description", row.getDescription(), language))
                 .countryCodes(splitCountries(row.getCountryCodes()))
                 .placeCount(row.getPlaceCount())
-                .placeNames(names.size() > PLACE_CHIPS ? names.subList(0, PLACE_CHIPS) : names)
-                // DB 에는 `place-picture/…` 처럼 키만 들어 있다. 화면이 그대로 <img src> 로
-                // 쓸 수 있게 여기서 주소로 만든다 (`CourseService` 와 같은 방식).
-                // **어드민 카드와 같은 사진이다.** 관리자가 지정한 것 → 셀럽 사진 →
-                // 첫 자리 매장 사진 차례로 목록 SQL 이 이미 골라 준다(heroImageKey).
-                // 코스마다 findLeadImageKey 를 부르던 것을 걷어냈다 — 왕복이 코스 수만큼 들었다.
+                .placeNames(names)
                 .imageUrl(heroUrl(row.getHeroImageKey()))
                 .createdAt(row.getCreatedAt())
                 .build();
+    }
+
+    private String localizePlaceName(PlaceRow place, ContentLanguage language) {
+        return localize(
+                "place",
+                String.valueOf(place.getPlaceId()),
+                "name",
+                place.getName(),
+                language);
+    }
+
+    private String localize(
+            String sourceType,
+            String sourceKey,
+            String sourceField,
+            String sourceText,
+            ContentLanguage language) {
+        if (language == null || !language.requiresTranslation()) {
+            return sourceText;
+        }
+        return contentTranslationService.translate(
+                sourceType, sourceKey, sourceField, sourceText, language);
     }
 
     /**
