@@ -946,7 +946,8 @@ Windows PowerShell에서는 다음을 사용합니다.
 | --- | --- |
 | Swagger UI | http://localhost:8080/swagger-ui.html |
 | OpenAPI JSON | http://localhost:8080/v3/api-docs |
-| Health Check | http://localhost:8080/actuator/health |
+| Health Check (ALB/Docker) | http://localhost:8080/livez |
+| Actuator Health (상세) | http://localhost:8081/actuator/health |
 
 ## 환경 설정 예시
 
@@ -1128,8 +1129,9 @@ config.setAllowCredentials(true);
 
 ### Health Check
 
-- Spring Boot Actuator로 `GET /actuator/health`를 노출합니다.
-- 노출 엔드포인트는 `health`, `info`로 제한하고, 상세 정보는 인증된 사용자에게만 표시합니다(`show-details: when-authorized`).
+- Spring Boot Actuator는 `management.server.port: 8081`로 앱 포트(8080)와 분리되어 있습니다(`GET :8081/actuator/health`, `:8081/actuator/prometheus`; 8081은 ALB에 노출되지 않고 모니터링 SG에서만 접근합니다).
+- ALB/Docker 헬스체크는 액추에이터를 거치지 않고, `management.endpoint.health.probes.add-additional-paths`로 8080에 남겨둔 `GET /livez`, `GET /readyz`를 사용합니다.
+- 노출 엔드포인트는 `health`, `info`, `prometheus`로 제한하고, 상세 정보는 인증된 사용자에게만 표시합니다(`show-details: when-authorized`).
 
 ---
 

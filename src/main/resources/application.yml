@@ -88,4 +88,9 @@ management:
   endpoint:
     health:
       show-details: when-authorized
+      probes:
+        enabled: true
+        # management.server.port(8081)로 액추에이터가 분리되면 8080에는 /actuator/health가 남지 않는다.
+        # ALB/도커 헬스체크가 8080을 계속 보게 하려면 이 옵션으로 /livez, /readyz를 8080에도 남겨야 한다.
+        add-additional-paths: true
 

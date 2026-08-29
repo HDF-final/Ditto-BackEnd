@@ -53,7 +53,9 @@ GitHub Actions(dev push) → ECR push + ASG Instance Refresh
 - `micrometer-registry-prometheus` 의존성 추가.
 - `management.server.port: 8081`로 액추에이터를 앱 포트(8080)와 분리. 별도 내장 서버라 기존 `SecurityConfig`의 세션 인증 필터체인이 적용되지 않을 가능성이 높다 (구현 중 실측 필요). 인증 대신 **보안그룹으로만 접근을 제한**한다.
 - `management.endpoints.web.exposure.include: health, info, prometheus`
-- ALB 타겟그룹은 그대로 8080만 봐서 변경 없음.
+- **정정(2026-08-29 실측):** `management.server.port`를 분리하면 8080에는 `/actuator/health`를 포함해 액추에이터 엔드포인트가 전혀 남지 않는다(개별 엔드포인트를 포트별로 나눠 남길 방법이 없다). 8080에서 기존처럼 200을 받던 헬스체크가 전부 500(C004, 매핑 없음 → 미처리 예외)으로 깨진다.
+  - `management.endpoint.health.probes.enabled/add-additional-paths: true`로 8080에 `/livez`, `/readyz`를 남기고, `SecurityConfig`의 공개 경로에도 추가했다.
+  - ALB 타겟그룹은 포트(8080)는 그대로지만 **헬스체크 경로를 `/actuator/health` → `/livez`로 콘솔/CLI에서 수동 변경해야 한다.** 이걸 안 하면 ASG Instance Refresh(`MinHealthyPercentage: 100`)가 새 인스턴스를 계속 unhealthy로 보고 멈춘다.
 
 ### 2. Prometheus 서비스 디스커버리
 
