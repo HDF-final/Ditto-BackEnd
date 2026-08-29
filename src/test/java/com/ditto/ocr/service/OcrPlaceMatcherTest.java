@@ -286,4 +286,67 @@ class OcrPlaceMatcherTest {
 
         assertThat(result).extracting(OcrCandidateResponse::getPlaceId).containsExactly(43L);
     }
+
+    @Test
+    @DisplayName("DB에 프라다·프라다뷰티가 둘 다 있고 간판이 프라다면 분기로 사용자가 고른다")
+    void pradaAndBeautyBothInCatalogRequireSelection() {
+        OcrPlaceMatcher matcher = matcherWith(row(50L, "프라다"), row(51L, "프라다뷰티"));
+
+        OcrPlaceMatcher.MatchResult result = matcher.resolve(
+                words(new RecognizedWord("프라다", 0.95, 3000)), 5);
+
+        assertThat(result.isRequiresSelection()).isTrue();
+        assertThat(result.getCandidates()).extracting(OcrCandidateResponse::getPlaceId)
+                .containsExactlyInAnyOrder(50L, 51L);
+    }
+
+    @Test
+    @DisplayName("DB에 뷰티 변형이 없으면 프라다 간판은 분기 없이 바로 답이 된다")
+    void pradaWithoutBeautyVariantAnswersDirectly() {
+        OcrPlaceMatcher matcher = matcherWith(row(50L, "프라다"));
+
+        OcrPlaceMatcher.MatchResult result = matcher.resolve(
+                words(new RecognizedWord("프라다", 0.95, 3000)), 5);
+
+        assertThat(result.isRequiresSelection()).isFalse();
+        assertThat(result.getCandidates()).extracting(OcrCandidateResponse::getPlaceId)
+                .containsExactly(50L);
+    }
+
+    @Test
+    @DisplayName("간판이 프라다뷰티면 프라다도 DB에 있어도 프라다뷰티로 바로 확정한다")
+    void beautySignResolvesToBeautyWithoutSelection() {
+        OcrPlaceMatcher matcher = matcherWith(row(50L, "프라다"), row(51L, "프라다뷰티"));
+
+        OcrPlaceMatcher.MatchResult result = matcher.resolve(
+                words(new RecognizedWord("프라다뷰티", 0.95, 3000)), 5);
+
+        assertThat(result.isRequiresSelection()).isFalse();
+        assertThat(result.getCandidates().get(0).getPlaceId()).isEqualTo(51L);
+    }
+
+    @Test
+    @DisplayName("영어 간판(PRADA)도 DB에 프라다·프라다뷰티가 둘 다 있으면 분기가 된다")
+    void englishPradaSignRequiresSelectionViaAlias() {
+        OcrPlaceMatcher matcher = matcherWith(row(50L, "프라다"), row(51L, "프라다뷰티"));
+
+        OcrPlaceMatcher.MatchResult result = matcher.resolve(
+                words(new RecognizedWord("PRADA", 0.95, 3000)), 5);
+
+        assertThat(result.isRequiresSelection()).isTrue();
+        assertThat(result.getCandidates()).extracting(OcrCandidateResponse::getPlaceId)
+                .containsExactlyInAnyOrder(50L, 51L);
+    }
+
+    @Test
+    @DisplayName("단일 확정 매칭은 분기가 아니다")
+    void singleMatchDoesNotRequireSelection() {
+        OcrPlaceMatcher matcher = matcherWith(row(20L, "TAMBURINS"));
+
+        OcrPlaceMatcher.MatchResult result = matcher.resolve(
+                words(new RecognizedWord("TAMBURINS", 0.92, 3000)), 5);
+
+        assertThat(result.isRequiresSelection()).isFalse();
+        assertThat(result.getCandidates()).hasSize(1);
+    }
 }
