@@ -1,7 +1,7 @@
 #!/bin/bash
 # AWS SSM Grafana Port Forwarding Tunnel Script
 
-PROFILE="HDF-ko"
+PROFILE="HDF-an"
 REGION="ap-northeast-2"
 TARGET_INSTANCE="i-059f356b8fbcb152c"
 GRAFANA_HOST="10.0.142.75"
