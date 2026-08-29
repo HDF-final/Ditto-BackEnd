@@ -97,6 +97,17 @@ public class NewsFeedService {
                                 feed.getSummaries().get(index),
                                 language))
                         .toList();
+        List<String> keywords = feed.getKeywords() == null
+                ? null
+                : IntStream.range(0, feed.getKeywords().size())
+                        .mapToObj(index -> contentTranslationService.translate(
+                                "news_feed",
+                                sourceKey,
+                                "keyword_" + index,
+                                feed.getKeywords().get(index),
+                                language))
+                        .toList();
+
 
         return NewsFeed.builder()
                 .newsFeedId(feed.getNewsFeedId())
@@ -107,7 +118,7 @@ public class NewsFeedService {
                 .body(contentTranslationService.translate(
                         "news_feed", sourceKey, "body", feed.getBody(), language))
                 .summaries(summaries)
-                .keywords(feed.getKeywords())
+                .keywords(keywords)
                 .createdAt(feed.getCreatedAt())
                 .deletedAt(feed.getDeletedAt())
                 .build();

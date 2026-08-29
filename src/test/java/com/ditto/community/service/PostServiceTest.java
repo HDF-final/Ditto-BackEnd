@@ -451,6 +451,7 @@ class PostServiceTest {
                 .postId(1L)
                 .courseId(3L)
                 .title("내가 다녀온 K-MZ 코스")
+                .content("전시와 팝업을 함께 둘러보기 좋았어요.")
                 .writerNickname("Yuki_T")
                 .likeCount(12L)
                 .bookmarkCount(4L)
@@ -468,6 +469,7 @@ class PostServiceTest {
         assertThat(contentItem.getPostId()).isEqualTo(1L);
         assertThat(contentItem.getCourseId()).isEqualTo(3L);
         assertThat(contentItem.getTitle()).isEqualTo("내가 다녀온 K-MZ 코스");
+        assertThat(contentItem.getContent()).isEqualTo("전시와 팝업을 함께 둘러보기 좋았어요.");
         assertThat(contentItem.getWriterNickname()).isEqualTo("Yuki_T");
         assertThat(contentItem.getLikeCount()).isEqualTo(12L);
         assertThat(contentItem.getBookmarkCount()).isEqualTo(4L);
@@ -477,22 +479,28 @@ class PostServiceTest {
     }
 
     @Test
-    @DisplayName("영어 요청이면 공개 코스 제목을 번역한다")
+    @DisplayName("영어 요청이면 공개 코스 제목과 작성자 후기를 번역한다")
     void translatesPublicCourseTitle() {
         PublicCourseResponse item = PublicCourseResponse.builder()
                 .postId(1L)
                 .title("에스파 브랜드 투어")
+                .content("전시를 본 뒤 팝업까지 둘러봤어요.")
                 .build();
         given(postMapper.findPublicCourses(0L, 10)).willReturn(List.of(item));
         given(postMapper.countPublicCourses()).willReturn(1L);
         given(contentTranslationService.translate(
                 "community_post", "1", "title", "에스파 브랜드 투어", ContentLanguage.ENGLISH))
                 .willReturn("aespa brand tour");
+        given(contentTranslationService.translate(
+                "community_post", "1", "content", "전시를 본 뒤 팝업까지 둘러봤어요.", ContentLanguage.ENGLISH))
+                .willReturn("I visited the pop-up after the exhibition.");
 
         PageResponse<PublicCourseResponse> response = postService.getPublicCourses(
                 0, 10, ContentLanguage.ENGLISH);
 
         assertThat(response.getContent().get(0).getTitle()).isEqualTo("aespa brand tour");
+        assertThat(response.getContent().get(0).getContent())
+                .isEqualTo("I visited the pop-up after the exhibition.");
     }
 
     @Test

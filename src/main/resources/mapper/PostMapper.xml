@@ -72,6 +72,7 @@
         SELECT p.post_id,
                p.course_id,
                c.name AS title,
+               p.content,
                u.name AS writer_nickname,
                p.likes_count AS like_count,
                p.save_count AS bookmark_count,
