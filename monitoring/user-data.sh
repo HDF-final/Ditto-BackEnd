@@ -62,7 +62,7 @@ cat << 'DASH_JSON_EOF' > "$APP_DIR/grafana-provisioning/dashboards/ditto-backend
   "title": "Ditto Backend Overview",
   "timezone": "browser",
   "schemaVersion": 39,
-  "version": 1,
+  "version": 2,
   "refresh": "30s",
   "time": { "from": "now-1h", "to": "now" },
   "panels": [
@@ -140,6 +140,67 @@ cat << 'DASH_JSON_EOF' > "$APP_DIR/grafana-provisioning/dashboards/ditto-backend
         }
       ],
       "fieldConfig": { "defaults": { "unit": "ms" } }
+    },
+    {
+      "id": 7,
+      "title": "DB Connection Pool (Hikari)",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 12, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "sum(hikaricp_connections_active{job=\"ditto-backend\"})", "legendFormat": "active" },
+        { "expr": "sum(hikaricp_connections_idle{job=\"ditto-backend\"})", "legendFormat": "idle" },
+        { "expr": "sum(hikaricp_connections_pending{job=\"ditto-backend\"})", "legendFormat": "pending (대기)" },
+        { "expr": "sum(hikaricp_connections_max{job=\"ditto-backend\"})", "legendFormat": "max (풀 크기)" }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "Heap Memory Trend (누수 추적)",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 12, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "sum(jvm_memory_used_bytes{job=\"ditto-backend\",area=\"heap\"}) / 1024 / 1024", "legendFormat": "used (사용중)" },
+        { "expr": "sum(jvm_memory_committed_bytes{job=\"ditto-backend\",area=\"heap\"}) / 1024 / 1024", "legendFormat": "committed (할당)" },
+        { "expr": "sum(jvm_memory_max_bytes{job=\"ditto-backend\",area=\"heap\"}) / 1024 / 1024", "legendFormat": "max (한계)" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "decmbytes" } },
+      "description": "GC 이후에도 used가 매번 더 높은 바닥에서 시작하며 우상향하면 누수 의심. committed/max에 붙으면 OOM 위험."
+    },
+    {
+      "id": 9,
+      "title": "API별 요청률 Top 10 (req/s)",
+      "type": "table",
+      "gridPos": { "x": 0, "y": 20, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "topk(10, sum by (method, uri) (rate(http_server_requests_seconds_count{job=\"ditto-backend\"}[5m])))",
+          "format": "table",
+          "instant": true
+        }
+      ],
+      "transformations": [
+        { "id": "organize", "options": { "excludeByName": { "Time": true, "job": true, "instance": true, "ec2_name": true } } }
+      ]
+    },
+    {
+      "id": 10,
+      "title": "API별 평균 지연 Top 10 (ms)",
+      "type": "table",
+      "gridPos": { "x": 12, "y": 20, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "topk(10, 1000 * sum by (uri) (rate(http_server_requests_seconds_sum{job=\"ditto-backend\"}[5m])) / sum by (uri) (rate(http_server_requests_seconds_count{job=\"ditto-backend\"}[5m])))",
+          "format": "table",
+          "instant": true
+        }
+      ],
+      "transformations": [
+        { "id": "organize", "options": { "excludeByName": { "Time": true, "job": true, "instance": true, "ec2_name": true } } }
+      ]
     }
   ]
 }
