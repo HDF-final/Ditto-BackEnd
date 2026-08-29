@@ -1,7 +1,6 @@
 #!/bin/bash
 # AWS SSM Grafana Port Forwarding Tunnel Script
 
-PROFILE="HDF-an"
 REGION="ap-northeast-2"
 TARGET_INSTANCE="i-059f356b8fbcb152c"
 GRAFANA_HOST="10.0.142.75"
@@ -18,7 +17,6 @@ echo " (Press Ctrl+C to stop the tunnel)"
 echo ""
 
 aws ssm start-session \
-  --profile "${PROFILE}" \
   --region "${REGION}" \
   --target "${TARGET_INSTANCE}" \
   --document-name AWS-StartPortForwardingSessionToRemoteHost \
