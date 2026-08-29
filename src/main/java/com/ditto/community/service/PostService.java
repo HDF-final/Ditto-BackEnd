@@ -116,11 +116,18 @@ public class PostService {
         }
 
         for (PublicCourseResponse post : response.getContent()) {
+            String sourceKey = String.valueOf(post.getPostId());
             post.setTitle(contentTranslationService.translate(
                     "community_post",
-                    String.valueOf(post.getPostId()),
+                    sourceKey,
                     "title",
                     post.getTitle(),
+                    language));
+            post.setContent(contentTranslationService.translate(
+                    "community_post",
+                    sourceKey,
+                    "content",
+                    post.getContent(),
                     language));
         }
         return response;

@@ -26,6 +26,9 @@ public class PublicCourseResponse {
     @Schema(description = "게시글 제목", example = "내가 다녀온 K-MZ 코스")
     private String title;
 
+    @Schema(description = "작성자가 남긴 코스 후기", example = "전시를 본 뒤 같은 층 팝업까지 이어서 둘러보기 좋았어요.")
+    private String content;
+
     @Schema(description = "작성자 닉네임", example = "Yuki_T")
     private String writerNickname;
 
