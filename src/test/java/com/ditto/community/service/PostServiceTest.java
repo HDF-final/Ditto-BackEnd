@@ -8,6 +8,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 import org.junit.jupiter.api.DisplayName;
@@ -378,6 +379,8 @@ class PostServiceTest {
                 .build();
         given(postMapper.findPublicCourses(0L, 10)).willReturn(List.of(item));
         given(postMapper.countPublicCourses()).willReturn(1L);
+        given(courseMapper.findPlacesByCourseId(3L))
+                .willReturn(List.of(new CoursePlaceResponse(11L, "탬버린즈", null, "1F", 1, null, null, null)));
 
         PageResponse<PublicCourseResponse> response = postService.getPublicCourses(0, 10);
 
@@ -392,9 +395,14 @@ class PostServiceTest {
         assertThat(contentItem.getWriterNickname()).isEqualTo("Yuki_T");
         assertThat(contentItem.getLikeCount()).isEqualTo(12L);
         assertThat(contentItem.getBookmarkCount()).isEqualTo(4L);
+        assertThat(contentItem.getPlaces()).hasSize(1);
+        assertThat(contentItem.getPlaces().get(0).getPlaceId()).isEqualTo(11L);
+        assertThat(contentItem.getPlaces().get(0).getName()).isEqualTo("탬버린즈");
+        assertThat(contentItem.getPlaces().get(0).getFloor()).isEqualTo("1F");
 
         verify(postMapper).findPublicCourses(0L, 10);
         verify(postMapper).countPublicCourses();
+        verify(courseMapper).findPlacesByCourseId(3L);
     }
 
     @Test
@@ -497,7 +505,9 @@ class PostServiceTest {
     @Test
     @DisplayName("공개 코스 게시글 상세와 장소 목록을 정상 조회한다")
     void getPublicCourseSuccess() {
-        PublicCourseDetailPostRow postRow = new PublicCourseDetailPostRow(1L, 3L, "내가 다녀온 K-MZ 코스", "추천 동선입니다.");
+        LocalDateTime createdAt = LocalDateTime.of(2026, 3, 2, 12, 0);
+        PublicCourseDetailPostRow postRow = new PublicCourseDetailPostRow(
+                1L, 3L, "내가 다녀온 K-MZ 코스", "추천 동선입니다.", 3L, 1L, createdAt);
         CoursePlaceResponse place1 = new CoursePlaceResponse(11L, "더현대 서울", null, "1F", 1, null, null, null);
         CoursePlaceResponse place2 = new CoursePlaceResponse(22L, "IFC 몰", null, "B1", 2, null, null, null);
 
@@ -510,12 +520,19 @@ class PostServiceTest {
         assertThat(response.getPostId()).isEqualTo(1L);
         assertThat(response.getTitle()).isEqualTo("내가 다녀온 K-MZ 코스");
         assertThat(response.getContent()).isEqualTo("추천 동선입니다.");
+        assertThat(response.getLikeCount()).isEqualTo(3L);
+        assertThat(response.getBookmarkCount()).isEqualTo(1L);
+        assertThat(response.getCreatedAt()).isEqualTo(createdAt);
         assertThat(response.getCourse()).isNotNull();
         assertThat(response.getCourse().getCourseId()).isEqualTo(3L);
         assertThat(response.getCourse().getPlaces()).hasSize(2);
         assertThat(response.getCourse().getPlaces().get(0).getPlaceId()).isEqualTo(11L);
+        assertThat(response.getCourse().getPlaces().get(0).getName()).isEqualTo("더현대 서울");
+        assertThat(response.getCourse().getPlaces().get(0).getFloor()).isEqualTo("1F");
         assertThat(response.getCourse().getPlaces().get(0).getOrder()).isEqualTo(1);
         assertThat(response.getCourse().getPlaces().get(1).getPlaceId()).isEqualTo(22L);
+        assertThat(response.getCourse().getPlaces().get(1).getName()).isEqualTo("IFC 몰");
+        assertThat(response.getCourse().getPlaces().get(1).getFloor()).isEqualTo("B1");
         assertThat(response.getCourse().getPlaces().get(1).getOrder()).isEqualTo(2);
         assertThat(response.getComments()).isEmpty();
 
@@ -528,7 +545,7 @@ class PostServiceTest {
     @DisplayName("영어 요청이면 게시글 제목과 본문만 번역한다")
     void translatesPublicCourseDetail() {
         PublicCourseDetailPostRow postRow = new PublicCourseDetailPostRow(
-                1L, 3L, "에스파 브랜드 투어", "추천 동선입니다.");
+                1L, 3L, "에스파 브랜드 투어", "추천 동선입니다.", 0L, 0L, LocalDateTime.now());
         given(postMapper.findPublicCourseDetailById(1L)).willReturn(Optional.of(postRow));
         given(courseMapper.findPlacesByCourseId(3L)).willReturn(List.of());
         given(postCommentMapper.findCommentsByPostId(1L)).willReturn(List.of());
@@ -549,7 +566,8 @@ class PostServiceTest {
     @Test
     @DisplayName("코스에 장소가 없으면 places 빈 배열을 반환한다")
     void getPublicCourseWithoutPlaces() {
-        PublicCourseDetailPostRow postRow = new PublicCourseDetailPostRow(1L, 3L, "내가 다녀온 K-MZ 코스", "추천 동선입니다.");
+        PublicCourseDetailPostRow postRow = new PublicCourseDetailPostRow(
+                1L, 3L, "내가 다녀온 K-MZ 코스", "추천 동선입니다.", 0L, 0L, LocalDateTime.now());
 
         given(postMapper.findPublicCourseDetailById(1L)).willReturn(Optional.of(postRow));
         given(courseMapper.findPlacesByCourseId(3L)).willReturn(List.of());

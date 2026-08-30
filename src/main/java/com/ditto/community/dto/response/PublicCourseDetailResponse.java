@@ -1,5 +1,6 @@
 package com.ditto.community.dto.response;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -25,6 +26,15 @@ public class PublicCourseDetailResponse {
 
     @Schema(description = "게시글 본문", example = "추천 동선입니다.")
     private String content;
+
+    @Schema(description = "좋아요 수", example = "12")
+    private Long likeCount;
+
+    @Schema(description = "북마크(저장) 수", example = "4")
+    private Long bookmarkCount;
+
+    @Schema(description = "게시글 생성 일시")
+    private LocalDateTime createdAt;
 
     @Schema(description = "게시글에 첨부된 사진 조회 URL 목록(정렬 순, 없으면 빈 배열)")
     private List<String> imageUrls;
@@ -58,6 +68,12 @@ public class PublicCourseDetailResponse {
     public static class PlaceInfo {
         @Schema(description = "장소 ID", example = "11")
         private Long placeId;
+
+        @Schema(description = "장소명", example = "탬버린즈")
+        private String name;
+
+        @Schema(description = "층 정보", example = "1F")
+        private String floor;
 
         @Schema(description = "방문 순서", example = "1")
         private Integer order;

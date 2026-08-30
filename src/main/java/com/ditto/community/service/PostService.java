@@ -65,7 +65,19 @@ public class PostService {
         }
 
         attachImageUrls(content);
+        attachPlaces(content);
         return new PageResponse<>(content, page, totalElements);
+    }
+
+    /** 목록에서 인기 매장 집계를 바로 할 수 있도록 각 게시글의 코스 장소를 붙인다. */
+    private void attachPlaces(List<PublicCourseResponse> content) {
+        for (PublicCourseResponse post : content) {
+            if (post.getCourseId() == null) {
+                post.setPlaces(List.of());
+                continue;
+            }
+            post.setPlaces(toPublicPlaceInfos(courseMapper.findPlacesByCourseId(post.getCourseId())));
+        }
     }
 
     /**
@@ -78,7 +90,8 @@ public class PostService {
                 .toList();
 
         Map<Long, List<String>> urlsByPostId = new LinkedHashMap<>();
-        for (PostImageKeyRow row : postImageMapper.findKeysByPostIds(postIds)) {
+        List<PostImageKeyRow> imageRows = postImageMapper.findKeysByPostIds(postIds);
+        for (PostImageKeyRow row : imageRows != null ? imageRows : List.<PostImageKeyRow>of()) {
             // 저장값은 S3 object key다. 버킷이 공개 읽기라 셀럽 사진(course/*)과 같은 버킷 직통 URL로 내려준다.
             // images/* 는 CloudFront behavior가 없어 resolveImageUrl로는 프로덕션에서 301로 튕긴다.
             String url = s3Provider.resolveDirectImageUrl(row.getImageKey());
@@ -131,15 +144,8 @@ public class PostService {
         PublicCourseDetailPostRow post = postMapper.findPublicCourseDetailById(postId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.POST_NOT_FOUND));
 
-        List<CoursePlaceResponse> placeRows = courseMapper.findPlacesByCourseId(post.getCourseId());
-        List<PublicCourseDetailResponse.PlaceInfo> places = (placeRows == null)
-                ? List.of()
-                : placeRows.stream()
-                        .map(p -> PublicCourseDetailResponse.PlaceInfo.builder()
-                                .placeId(p.getPlaceId())
-                                .order(p.getVisitOrder())
-                                .build())
-                        .toList();
+        List<PublicCourseDetailResponse.PlaceInfo> places = toPublicPlaceInfos(
+                courseMapper.findPlacesByCourseId(post.getCourseId()));
 
         PublicCourseDetailResponse.CourseInfo courseInfo = PublicCourseDetailResponse.CourseInfo.builder()
                 .courseId(post.getCourseId())
@@ -152,10 +158,27 @@ public class PostService {
                 .postId(post.getPostId())
                 .title(post.getTitle())
                 .content(post.getContent())
+                .likeCount(post.getLikeCount())
+                .bookmarkCount(post.getBookmarkCount())
+                .createdAt(post.getCreatedAt())
                 .imageUrls(resolveImageUrls(post.getPostId()))
                 .course(courseInfo)
                 .comments(comments != null ? comments : List.of())
                 .build();
+    }
+
+    private List<PublicCourseDetailResponse.PlaceInfo> toPublicPlaceInfos(List<CoursePlaceResponse> placeRows) {
+        if (placeRows == null) {
+            return List.of();
+        }
+        return placeRows.stream()
+                .map(p -> PublicCourseDetailResponse.PlaceInfo.builder()
+                        .placeId(p.getPlaceId())
+                        .name(p.getName())
+                        .floor(p.getFloorCode())
+                        .order(p.getVisitOrder())
+                        .build())
+                .toList();
     }
 
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
