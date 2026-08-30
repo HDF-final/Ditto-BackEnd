@@ -62,10 +62,11 @@ class NewsFeedServiceTest {
     }
 
     @Test
-    @DisplayName("요청 언어에 맞춰 뉴스 제목·본문·요약을 번역한다")
+    @DisplayName("요청 언어에 맞춰 뉴스 제목·본문·요약·키워드를 번역한다")
     void localizesNewsFeedFields() {
         NewsFeed feed = NewsFeed.builder()
                 .newsFeedId(1L)
+                .keywords(List.of("제니 김", "블랙핑크"))
                 .title("제목")
                 .body("본문")
                 .summaries(List.of("요약"))
@@ -80,12 +81,19 @@ class NewsFeedServiceTest {
         given(contentTranslationService.translate(
                 "news_feed", "1", "summary_0", "요약", ContentLanguage.ENGLISH))
                 .willReturn("Summary");
+        given(contentTranslationService.translate(
+                "news_feed", "1", "keyword_0", "제니 김", ContentLanguage.ENGLISH))
+                .willReturn("Jennie Kim");
+        given(contentTranslationService.translate(
+                "news_feed", "1", "keyword_1", "블랙핑크", ContentLanguage.ENGLISH))
+                .willReturn("BLACKPINK");
 
         NewsFeed result = newsFeedService.getNewsFeedById(1L, ContentLanguage.ENGLISH);
 
         assertThat(result.getTitle()).isEqualTo("Title");
         assertThat(result.getBody()).isEqualTo("Body");
         assertThat(result.getSummaries()).containsExactly("Summary");
+        assertThat(result.getKeywords()).containsExactly("Jennie Kim", "BLACKPINK");
     }
 
     @Test

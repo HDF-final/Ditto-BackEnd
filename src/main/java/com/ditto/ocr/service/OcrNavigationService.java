@@ -105,6 +105,7 @@ public class OcrNavigationService {
         return OcrRecognitionResponse.builder()
                 .recognitionId(recognitionId)
                 .recognizedBrandName(matched.getRecognizedBrandName())
+                .requiresSelection(matched.isRequiresSelection())
                 .candidates(matched.getCandidates())
                 .build();
     }

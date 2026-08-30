@@ -71,6 +71,15 @@ public class OcrProperties {
 
         /** 응답에 올릴 최소 matchScore. OCR 신뢰도({@code confidence})와는 별개다. */
         private double minMatchScore = 0.8;
+
+        /**
+         * 분기(선택) 판단에 쓰는 최상위 점수와의 허용 격차.
+         *
+         * <p>최상위 matchScore 와의 차이가 이 값 이하인 후보들을 "같은 점수"로 보고,
+         * 그런 후보가 서로 다른 매장으로 2개 이상이면 사용자가 고르도록 {@code requiresSelection}
+         * 을 켠다(예: 프라다 vs 프라다뷰티). 0.0 이면 완전 동점만 분기로 본다.
+         */
+        private double selectionScoreDelta = 0.0;
     }
 
     /** 네이버 CLOVA OCR(General) 접속 설정. */

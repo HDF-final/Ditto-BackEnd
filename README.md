@@ -606,8 +606,9 @@ HTTP로 호출하고 응답을 `ApiResponse`로 감싸 돌려줄 뿐입니다. �
 1. **이미지 전처리** — 긴 변 1600px·약 1MB로 줄여 CLOVA 업로드/인식 latency를 낮춘다.
 2. **bbox 후처리** — 층수·가격·할인율처럼 상호가 될 수 없는 형태와 너무 작은 글자만 버리고, 같은 줄의 분리 단어(`POP`+`MART`)를 붙인다. `SALE`·`세일중`은 여기서 지우지 않는다.
 3. **인메모리 엔티티 매칭** — 카탈로그를 한 번에 읽어 exact / alias / fuzzy로 고른다. 프로모 문구는 단어 리스트가 아니라, 매장과 점수가 안 나오면 후보에서 떨어진다. SQL `LIKE`는 오타를 못 견딘다.
+4. **분기 판단** — 카탈로그(DB)에 같은 점수로 걸린 서로 다른 매장이 여럿이면 `requiresSelection`을 켠다. `프라다`·`프라다뷰티`가 둘 다 있고 간판이 "프라다" 뿐이면 어느 쪽인지 알 수 없으니 사용자가 고른다. 간판이 이미 `프라다뷰티`처럼 구체적이거나 DB에 뷰티 변형이 없으면 후보가 하나라 바로 답이 된다.
 
-후보 응답에서 `confidence`는 CLOVA가 글자를 읽은 신뢰도이고, `matchScore`는 그 글자가 카탈로그 상호와 얼마나 맞는기다. 둘을 한 점수로 섞지 않는다.
+후보 응답에서 `confidence`는 CLOVA가 글자를 읽은 신뢰도이고, `matchScore`는 그 글자가 카탈로그 상호와 얼마나 맞는기다. 둘을 한 점수로 섞지 않는다. `requiresSelection`이 `true`면 `candidates`는 사용자가 고를 분기 선택지이고, `false`면 `candidates[0]`이 확정 답이다.
 
 | 기능 | Method | Endpoint | 인증 |
 | --- | --- | --- | --- |
@@ -945,7 +946,8 @@ Windows PowerShell에서는 다음을 사용합니다.
 | --- | --- |
 | Swagger UI | http://localhost:8080/swagger-ui.html |
 | OpenAPI JSON | http://localhost:8080/v3/api-docs |
-| Health Check | http://localhost:8080/actuator/health |
+| Health Check (ALB/Docker) | http://localhost:8080/livez |
+| Actuator Health (상세) | http://localhost:8081/actuator/health |
 
 ## 환경 설정 예시
 
@@ -1127,8 +1129,9 @@ config.setAllowCredentials(true);
 
 ### Health Check
 
-- Spring Boot Actuator로 `GET /actuator/health`를 노출합니다.
-- 노출 엔드포인트는 `health`, `info`로 제한하고, 상세 정보는 인증된 사용자에게만 표시합니다(`show-details: when-authorized`).
+- Spring Boot Actuator는 `management.server.port: 8081`로 앱 포트(8080)와 분리되어 있습니다(`GET :8081/actuator/health`, `:8081/actuator/prometheus`; 8081은 ALB에 노출되지 않고 모니터링 SG에서만 접근합니다).
+- ALB/Docker 헬스체크는 액추에이터를 거치지 않고, `management.endpoint.health.probes.add-additional-paths`로 8080에 남겨둔 `GET /livez`, `GET /readyz`를 사용합니다.
+- 노출 엔드포인트는 `health`, `info`, `prometheus`로 제한하고, 상세 정보는 인증된 사용자에게만 표시합니다(`show-details: when-authorized`).
 
 ---
 

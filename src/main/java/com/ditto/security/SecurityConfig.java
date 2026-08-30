@@ -50,7 +50,13 @@ public class SecurityConfig {
             "/swagger-ui/**",
             "/v3/api-docs",
             "/v3/api-docs/**",
-            "/actuator/health"
+            "/actuator/health",
+            // 액추에이터가 8081로 분리되어 8080엔 남지 않는다. ALB/도커 헬스체크용으로
+            // management.endpoint.health.probes.add-additional-paths 가 8080에 남겨두는 경로.
+            "/livez",
+            "/readyz",
+            // 8081은 보안그룹으로 모니터링 인스턴스만 접근 가능하니 인증 없이 연다.
+            "/actuator/prometheus"
     };
 
     @Bean

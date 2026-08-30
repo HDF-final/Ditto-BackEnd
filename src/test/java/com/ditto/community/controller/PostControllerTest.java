@@ -69,6 +69,7 @@ class PostControllerTest {
                 .postId(1L)
                 .courseId(3L)
                 .title("내가 다녀온 K-MZ 코스")
+                .content("전시와 팝업을 함께 둘러보기 좋았어요.")
                 .writerNickname("Yuki_T")
                 .likeCount(12L)
                 .bookmarkCount(4L)
@@ -88,6 +89,7 @@ class PostControllerTest {
                 .andExpect(jsonPath("$.data.content[0].postId").value(1L))
                 .andExpect(jsonPath("$.data.content[0].courseId").value(3L))
                 .andExpect(jsonPath("$.data.content[0].title").value("내가 다녀온 K-MZ 코스"))
+                .andExpect(jsonPath("$.data.content[0].content").value("전시와 팝업을 함께 둘러보기 좋았어요."))
                 .andExpect(jsonPath("$.data.content[0].writerNickname").value("Yuki_T"))
                 .andExpect(jsonPath("$.data.content[0].likeCount").value(12L))
                 .andExpect(jsonPath("$.data.content[0].bookmarkCount").value(4L));
