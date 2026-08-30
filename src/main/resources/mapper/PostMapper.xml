@@ -107,6 +107,44 @@
            AND c.creation_type &lt;&gt; 'SYSTEM'
     </select>
 
+    <select id="findPopularPublicCoursePlaces"
+            resultType="com.ditto.community.dto.response.PopularPlaceResponse">
+        SELECT place_rank AS rank,
+               place_id AS placeId,
+               name,
+               floor_code AS floor,
+               post_count AS postCount
+          FROM (
+                SELECT ROW_NUMBER() OVER (
+                           ORDER BY COUNT(DISTINCT p.post_id) DESC,
+                                    pl.name ASC,
+                                    pl.place_id ASC
+                       ) AS place_rank,
+                       pl.place_id,
+                       pl.name,
+                       f.floor_code,
+                       COUNT(DISTINCT p.post_id) AS post_count
+                  FROM post p
+                  JOIN course c
+                    ON c.course_id = p.course_id
+                  JOIN course_place cp
+                    ON cp.course_id = c.course_id
+                  JOIN place pl
+                    ON pl.place_id = cp.place_id
+                  LEFT JOIN floor f
+                    ON f.floor_id = pl.floor_id
+                 WHERE p.deleted_at IS NULL
+                   AND p.course_id IS NOT NULL
+                   AND c.deleted_at IS NULL
+                   AND c.creation_type &lt;&gt; 'SYSTEM'
+                 GROUP BY pl.place_id,
+                          pl.name,
+                          f.floor_code
+          )
+         WHERE place_rank &lt;= #{limit}
+         ORDER BY place_rank ASC
+    </select>
+
     <select id="findPublicCourseDetailById"
             resultType="com.ditto.course.repository.PostMapper$PublicCourseDetailPostRow">
         SELECT p.post_id AS postId,

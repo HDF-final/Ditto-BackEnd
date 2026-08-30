@@ -14,6 +14,7 @@ import org.springframework.web.multipart.MultipartFile;
 import com.ditto.community.dto.request.CreateCoursePostRequest;
 import com.ditto.community.dto.request.UpdateCoursePostRequest;
 import com.ditto.community.dto.response.CreateCoursePostResponse;
+import com.ditto.community.dto.response.PopularPlaceResponse;
 import com.ditto.community.dto.response.PostImageResponse;
 import com.ditto.community.dto.response.PublicCourseDetailResponse;
 import com.ditto.community.dto.response.PublicCourseResponse;
@@ -72,6 +73,13 @@ public class PostService {
 
         attachImageUrls(content);
         return new PageResponse<>(content, page, totalElements);
+    }
+
+    /**
+     * 커뮤니티에 공개된 모든 사용자 게시글의 코스 장소를 합산해 많이 등장한 장소 TOP3를 조회한다.
+     */
+    public List<PopularPlaceResponse> getPopularPlaces() {
+        return postMapper.findPopularPublicCoursePlaces(3);
     }
 
     /**
