@@ -10,6 +10,7 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -70,6 +71,14 @@ public class GlobalExceptionHandler {
     protected ResponseEntity<ErrorResponse> handleMethodNotSupported(HttpRequestMethodNotSupportedException e) {
         return ResponseEntity.status(ErrorCode.METHOD_NOT_ALLOWED.getStatus())
                 .body(ErrorResponse.of(ErrorCode.METHOD_NOT_ALLOWED));
+    }
+
+    /** 업로드 용량 초과 (multipart 상한). 컨트롤러 진입 전에 잘려 여기서 413 으로 변환한다. */
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    protected ResponseEntity<ErrorResponse> handleMaxUploadSize(MaxUploadSizeExceededException e) {
+        log.warn("[MaxUploadSizeExceeded] {}", e.getMessage());
+        return ResponseEntity.status(ErrorCode.IMAGE_SIZE_EXCEEDED.getStatus())
+                .body(ErrorResponse.of(ErrorCode.IMAGE_SIZE_EXCEEDED));
     }
 
     /** 인가 실패 (Spring Security) */

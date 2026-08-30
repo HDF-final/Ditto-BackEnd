@@ -1,9 +1,12 @@
 package com.ditto.ocr.service;
 
 import java.util.Collections;
+import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.ditto.global.exception.BusinessException;
@@ -36,6 +39,17 @@ import lombok.extern.slf4j.Slf4j;
 @Service
 @RequiredArgsConstructor
 public class OcrNavigationService {
+
+    /**
+     * 업로드 용량 상한. 핸드폰 원본 사진(평균 4.61MB, 고화질은 그 이상)을 그대로 수용하도록
+     * 넉넉히 잡되, 전역 multipart 상한(10MB)과 정합을 맞춘다. 축소는 뒤 전처리가 한다.
+     */
+    private static final long MAX_IMAGE_BYTES = 10L * 1024 * 1024;
+
+    /** CLOVA 로 보내기 전에 받아들일 이미지 MIME. 폰 카메라(HEIC 포함) 표기를 넓게 허용한다. */
+    private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
+            "image/jpeg", "image/jpg", "image/pjpeg", "image/png",
+            "image/webp", "image/heic", "image/heif", "image/bmp");
 
     private final OcrSessionStore sessionStore;
     private final OcrPlaceMapper ocrPlaceMapper;
@@ -110,10 +124,29 @@ public class OcrNavigationService {
                 .build();
     }
 
+    /**
+     * CLOVA 호출 전에 이미지 요청을 사전 검증한다. 빈 파일·과대 용량·지원하지 않는 형식을
+     * 여기서 걸러, 외부 유료 API 왕복 없이 즉시 명확한 에러(413/415)로 응답한다.
+     */
     private void validateImage(MultipartFile image) {
         if (image == null || image.isEmpty()) {
             throw new BusinessException(ErrorCode.INVALID_IMAGE_FILE);
         }
+        if (image.getSize() > MAX_IMAGE_BYTES) {
+            throw new BusinessException(ErrorCode.IMAGE_SIZE_EXCEEDED);
+        }
+        if (!isSupportedImageType(image.getContentType())) {
+            throw new BusinessException(ErrorCode.UNSUPPORTED_IMAGE_TYPE);
+        }
+    }
+
+    /** content-type 이 허용 이미지 MIME 인지. 파라미터(;charset=…)는 떼고 대소문자 무시로 본다. */
+    private boolean isSupportedImageType(String contentType) {
+        if (!StringUtils.hasText(contentType)) {
+            return false;
+        }
+        String normalized = contentType.split(";", 2)[0].trim().toLowerCase(Locale.ROOT);
+        return ALLOWED_CONTENT_TYPES.contains(normalized);
     }
 
     private byte[] readBytes(MultipartFile image) {
