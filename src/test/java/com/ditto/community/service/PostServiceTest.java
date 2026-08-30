@@ -40,6 +40,7 @@ import java.util.List;
 
 import com.ditto.community.dto.response.PublicCourseDetailResponse;
 import com.ditto.community.dto.response.PublicCourseResponse;
+import com.ditto.community.dto.response.PopularPlaceResponse;
 import com.ditto.course.dto.response.CoursePlaceResponse;
 import com.ditto.course.repository.PostMapper.PublicCourseDetailPostRow;
 import com.ditto.global.common.response.PageResponse;
@@ -579,6 +580,26 @@ class PostServiceTest {
                 .isEqualTo(ErrorCode.INVALID_INPUT_VALUE);
 
         verify(postMapper, never()).findPublicCourses(any(Long.class), any(Integer.class));
+    }
+
+    @Test
+    @DisplayName("커뮤니티 공개 게시글의 장소를 합산한 인기 장소 TOP3를 조회한다")
+    void getPopularPlaces() {
+        List<PopularPlaceResponse> places = List.of(
+                new PopularPlaceResponse(1, 11L, "탬버린즈", "1F", 3L),
+                new PopularPlaceResponse(2, 22L, "프라다", "1F", 2L),
+                new PopularPlaceResponse(3, 33L, "애플 스토어", "5F", 1L));
+        given(postMapper.findPopularPublicCoursePlaces(3)).willReturn(places);
+
+        List<PopularPlaceResponse> response = postService.getPopularPlaces();
+
+        assertThat(response).hasSize(3);
+        assertThat(response.get(0).getRank()).isEqualTo(1);
+        assertThat(response.get(0).getName()).isEqualTo("탬버린즈");
+        assertThat(response.get(0).getPostCount()).isEqualTo(3L);
+        assertThat(response.get(1).getName()).isEqualTo("프라다");
+        assertThat(response.get(2).getName()).isEqualTo("애플 스토어");
+        verify(postMapper).findPopularPublicCoursePlaces(3);
     }
 
     @Test

@@ -26,6 +26,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import com.ditto.community.dto.request.CreateCommentRequest;
 import com.ditto.community.dto.response.CommentResponse;
+import com.ditto.community.dto.response.PopularPlaceResponse;
 import com.ditto.community.dto.response.PublicCourseDetailResponse;
 import com.ditto.community.dto.response.PublicCourseResponse;
 import com.ditto.community.service.PostCommentService;
@@ -145,6 +146,28 @@ class PostControllerTest {
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.code").value("C001"))
                 .andExpect(jsonPath("$.message").value("입력값이 올바르지 않습니다."));
+    }
+
+    @Test
+    @DisplayName("커뮤니티 인기 장소 TOP3 조회 성공 시 순위와 장소명을 반환한다")
+    void getPopularPlacesSuccess() throws Exception {
+        given(postService.getPopularPlaces()).willReturn(List.of(
+                new PopularPlaceResponse(1, 11L, "탬버린즈", "1F", 3L),
+                new PopularPlaceResponse(2, 22L, "프라다", "1F", 2L),
+                new PopularPlaceResponse(3, 33L, "애플 스토어", "5F", 1L)));
+
+        mockMvc.perform(get("/api/v1/community/courses/popular-places"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.code").value("SUCCESS"))
+                .andExpect(jsonPath("$.message").value("성공"))
+                .andExpect(jsonPath("$.data[0].rank").value(1))
+                .andExpect(jsonPath("$.data[0].name").value("탬버린즈"))
+                .andExpect(jsonPath("$.data[0].postCount").value(3))
+                .andExpect(jsonPath("$.data[1].name").value("프라다"))
+                .andExpect(jsonPath("$.data[2].name").value("애플 스토어"));
+
+        verify(postService).getPopularPlaces();
     }
 
     @Test

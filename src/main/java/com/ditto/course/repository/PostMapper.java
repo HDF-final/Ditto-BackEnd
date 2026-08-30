@@ -7,6 +7,7 @@ import java.util.Optional;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
+import com.ditto.community.dto.response.PopularPlaceResponse;
 import com.ditto.community.dto.response.PublicCourseResponse;
 
 import lombok.AllArgsConstructor;
@@ -29,6 +30,8 @@ public interface PostMapper {
     List<PublicCourseResponse> findPublicCourses(@Param("offset") long offset, @Param("size") int size);
 
     long countPublicCourses();
+
+    List<PopularPlaceResponse> findPopularPublicCoursePlaces(@Param("limit") int limit);
 
     Optional<PublicCourseDetailPostRow> findPublicCourseDetailById(@Param("postId") Long postId);
 
