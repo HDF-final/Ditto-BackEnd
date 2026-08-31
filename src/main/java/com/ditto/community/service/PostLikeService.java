@@ -1,5 +1,7 @@
 package com.ditto.community.service;
 
+import java.util.List;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -7,8 +9,10 @@ import com.ditto.community.dto.response.LikeResponse;
 import com.ditto.community.repository.PostLikeMapper;
 import com.ditto.course.repository.PostMapper;
 import com.ditto.course.repository.PostMapper.PostRow;
+import com.ditto.global.common.response.PageResponse;
 import com.ditto.global.exception.BusinessException;
 import com.ditto.global.exception.ErrorCode;
+import com.ditto.user.dto.response.UserLikeResponse;
 
 import lombok.RequiredArgsConstructor;
 
@@ -77,5 +81,21 @@ public class PostLikeService {
                 .likesCount(updatedLikesCount)
                 .isLiked(false)
                 .build();
+    }
+
+    /**
+     * 현재 로그인한 사용자의 좋아요한 코스 게시글 목록을 조회한다. (ROLE_CUSTOMER 전용)
+     */
+    public PageResponse<UserLikeResponse> getMyLikes(Long userId, int page, int size) {
+        if (page < 0) {
+            throw new BusinessException(ErrorCode.INVALID_INPUT_VALUE);
+        }
+        int validSize = (size <= 0 || size > 100) ? 10 : size;
+        long offset = (long) page * validSize;
+
+        List<UserLikeResponse> items = postLikeMapper.findLikesByUserId(userId, offset, validSize);
+        long totalElements = postLikeMapper.countLikesByUserId(userId);
+
+        return new PageResponse<>(items != null ? items : List.of(), page, totalElements);
     }
 }

@@ -25,6 +25,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.ditto.community.service.PostBookmarkService;
+import com.ditto.community.service.PostLikeService;
+import com.ditto.course.service.CourseService;
 import com.ditto.global.common.response.PageResponse;
 import com.ditto.security.AuthUser;
 import com.ditto.user.dto.request.UpdatePersonaRequest;
@@ -32,8 +34,10 @@ import com.ditto.user.dto.request.UpdateUserPreferencesRequest;
 import com.ditto.user.dto.request.UpdateUserProfileRequest;
 import com.ditto.user.dto.response.PersonaResponse;
 import com.ditto.user.dto.response.UserBookmarkResponse;
+import com.ditto.user.dto.response.UserLikeResponse;
 import com.ditto.user.dto.response.UserPreferencesResponse;
 import com.ditto.user.dto.response.UserProfileResponse;
+import com.ditto.user.dto.response.UserSavedCourseResponse;
 import com.ditto.user.service.UserService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -49,6 +53,12 @@ class UserControllerTest {
 
     @MockBean
     private PostBookmarkService postBookmarkService;
+
+    @MockBean
+    private PostLikeService postLikeService;
+
+    @MockBean
+    private CourseService courseService;
 
     @MockBean
     private UserService userService;
@@ -202,6 +212,76 @@ class UserControllerTest {
                 .andExpect(jsonPath("$.data.totalElements").value(1L));
 
         verify(postBookmarkService).getMyBookmarks(1L, 0, 10);
+    }
+
+    @Test
+    @DisplayName("내 좋아요 목록 조회 성공 시 ApiResponse와 PageResponse 형태로 반환한다")
+    void getMyLikesSuccess() throws Exception {
+        AuthUser principal = new AuthUser(1L, "yuki@example.com", "ROLE_CUSTOMER");
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(principal, null, List.of(new SimpleGrantedAuthority("ROLE_CUSTOMER"))));
+
+        UserLikeResponse item = UserLikeResponse.builder()
+                .postId(23L)
+                .courseId(23L)
+                .title("K-POP 팝업스토어 & 한식 맛집 코스")
+                .likeCount(77L)
+                .bookmarkCount(34L)
+                .commentCount(2L)
+                .likedAt(LocalDateTime.of(2026, 8, 18, 14, 20, 0))
+                .build();
+        PageResponse<UserLikeResponse> pageResponse = new PageResponse<>(List.of(item), 0, 1L);
+
+        given(postLikeService.getMyLikes(1L, 0, 10)).willReturn(pageResponse);
+
+        mockMvc.perform(get("/api/v1/users/me/likes")
+                        .param("page", "0")
+                        .param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.code").value("SUCCESS"))
+                .andExpect(jsonPath("$.message").value("성공"))
+                .andExpect(jsonPath("$.data.content[0].postId").value(23L))
+                .andExpect(jsonPath("$.data.content[0].title").value("K-POP 팝업스토어 & 한식 맛집 코스"))
+                .andExpect(jsonPath("$.data.content[0].likeCount").value(77L))
+                .andExpect(jsonPath("$.data.content[0].bookmarkCount").value(34L))
+                .andExpect(jsonPath("$.data.content[0].commentCount").value(2L))
+                .andExpect(jsonPath("$.data.totalElements").value(1L));
+
+        verify(postLikeService).getMyLikes(1L, 0, 10);
+    }
+
+    @Test
+    @DisplayName("내 저장한 추천 코스 목록 조회 성공 시 ApiResponse와 PageResponse 형태로 반환한다")
+    void getMySavedCoursesSuccess() throws Exception {
+        AuthUser principal = new AuthUser(1L, "yuki@example.com", "ROLE_CUSTOMER");
+        SecurityContextHolder.getContext().setAuthentication(
+                new UsernamePasswordAuthenticationToken(principal, null, List.of(new SimpleGrantedAuthority("ROLE_CUSTOMER"))));
+
+        UserSavedCourseResponse item = UserSavedCourseResponse.builder()
+                .courseId(188L)
+                .title("에스파 브랜드 코스")
+                .description("에스파 멤버들이 앰버서더로 활동하는 브랜드 중심 코스입니다.")
+                .imageUrl("https://cdn.example.com/course/aespa.jpg")
+                .placeCount(5)
+                .bookmarkedAt(LocalDateTime.of(2026, 8, 31, 0, 22, 0))
+                .build();
+        PageResponse<UserSavedCourseResponse> pageResponse = new PageResponse<>(List.of(item), 0, 1L);
+
+        given(courseService.getMySavedCourses(1L, 0, 10)).willReturn(pageResponse);
+
+        mockMvc.perform(get("/api/v1/users/me/saved-courses")
+                        .param("page", "0")
+                        .param("size", "10"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.code").value("SUCCESS"))
+                .andExpect(jsonPath("$.data.content[0].courseId").value(188L))
+                .andExpect(jsonPath("$.data.content[0].title").value("에스파 브랜드 코스"))
+                .andExpect(jsonPath("$.data.content[0].placeCount").value(5))
+                .andExpect(jsonPath("$.data.totalElements").value(1L));
+
+        verify(courseService).getMySavedCourses(1L, 0, 10);
     }
 
     @Test
