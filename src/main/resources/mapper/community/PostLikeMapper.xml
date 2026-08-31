@@ -34,4 +34,37 @@
          WHERE post_id = #{postId,jdbcType=NUMERIC}
     </select>
 
+    <select id="findLikesByUserId" resultType="com.ditto.user.dto.response.UserLikeResponse">
+        SELECT p.post_id AS postId,
+               p.course_id AS courseId,
+               c.name AS title,
+               p.likes_count AS likeCount,
+               p.save_count AS bookmarkCount,
+               (
+                   SELECT COUNT(*)
+                     FROM post_comment pc
+                    WHERE pc.post_id = p.post_id
+               ) AS commentCount,
+               l.created_at AS likedAt
+          FROM post_like l
+          JOIN post p ON p.post_id = l.post_id
+          JOIN course c ON c.course_id = p.course_id
+         WHERE l.user_id = #{userId,jdbcType=NUMERIC}
+           AND p.deleted_at IS NULL
+           AND c.deleted_at IS NULL
+         ORDER BY l.created_at DESC, l.post_id DESC
+        OFFSET #{offset} ROWS
+        FETCH NEXT #{size} ROWS ONLY
+    </select>
+
+    <select id="countLikesByUserId" resultType="long">
+        SELECT COUNT(*)
+          FROM post_like l
+          JOIN post p ON p.post_id = l.post_id
+          JOIN course c ON c.course_id = p.course_id
+         WHERE l.user_id = #{userId,jdbcType=NUMERIC}
+           AND p.deleted_at IS NULL
+           AND c.deleted_at IS NULL
+    </select>
+
 </mapper>

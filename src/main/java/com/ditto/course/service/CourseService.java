@@ -20,11 +20,13 @@ import com.ditto.course.dto.response.AddCoursePlaceResponse;
 import com.ditto.course.dto.response.CopyCourseResponse;
 import com.ditto.course.dto.request.UpdateCourseRequest;
 import com.ditto.course.dto.response.CourseDetailResponse;
+import com.ditto.course.dto.response.CourseBookmarkResponse;
 import com.ditto.course.dto.response.CoursePlaceResponse;
 import com.ditto.course.dto.response.CreateCourseResponse;
 import com.ditto.course.dto.response.CreateCourseResponse.PlaceOrderResponse;
 import com.ditto.course.dto.response.MyCourseSummaryResponse;
 import com.ditto.course.dto.response.UpdateCourseResponse;
+import com.ditto.course.repository.CourseBookmarkMapper;
 import com.ditto.course.repository.CourseMapper;
 import com.ditto.course.repository.CourseMapper.CourseInsertCommand;
 import com.ditto.course.repository.CourseMapper.CoursePlaceInsertCommand;
@@ -35,6 +37,7 @@ import com.ditto.global.exception.ErrorCode;
 import com.ditto.global.infrastructure.s3.S3Provider;
 import com.ditto.global.i18n.ContentLanguage;
 import com.ditto.global.infrastructure.translation.ContentTranslationService;
+import com.ditto.user.dto.response.UserSavedCourseResponse;
 
 import lombok.RequiredArgsConstructor;
 
@@ -48,6 +51,7 @@ public class CourseService {
     private static final int MAX_PAGE_SIZE = 100;
 
     private final CourseMapper courseMapper;
+    private final CourseBookmarkMapper courseBookmarkMapper;
     private final PlaceMapper placeMapper;
     private final S3Provider s3Provider;
     private final ContentTranslationService contentTranslationService;
@@ -70,6 +74,24 @@ public class CourseService {
 
         List<MyCourseSummaryResponse> content = courseMapper.findSummariesByUserId(userId, offset, safeSize);
         long totalElements = courseMapper.countByUserId(userId);
+        return new PageResponse<>(content, safePage, totalElements);
+    }
+
+    /**
+     * 로그인 사용자가 저장 버튼으로 담은 추천/공개 코스 목록을 조회한다.
+     * 코스 복사(COPIED)와 별개라서 내 코스 목록과 섞지 않는다.
+     */
+    public PageResponse<UserSavedCourseResponse> getMySavedCourses(Long userId, int page, int size) {
+        int safePage = Math.max(page, 0);
+        int safeSize = (size <= 0) ? DEFAULT_PAGE_SIZE : Math.min(size, MAX_PAGE_SIZE);
+        int offset = safePage * safeSize;
+
+        List<UserSavedCourseResponse> content = courseBookmarkMapper.findSavedCoursesByUserId(
+                userId, offset, safeSize);
+        for (UserSavedCourseResponse course : content) {
+            course.setImageUrl(s3Provider.resolveImageUrlByPrefix(course.getImageUrl()));
+        }
+        long totalElements = courseBookmarkMapper.countSavedCoursesByUserId(userId);
         return new PageResponse<>(content, safePage, totalElements);
     }
 
@@ -245,6 +267,31 @@ public class CourseService {
                 .sourceCourseId(sourceCourseId)
                 .createdCourseId(command.getCourseId())
                 .name(copiedName)
+                .build();
+    }
+
+    @Transactional
+    public CourseBookmarkResponse bookmarkCourse(Long userId, Long courseId) {
+        Course course = requireCourse(courseId);
+        validatePublicCourse(course);
+        if (courseBookmarkMapper.existsByCourseIdAndUserId(courseId, userId)) {
+            throw new BusinessException(ErrorCode.ALREADY_BOOKMARKED);
+        }
+
+        courseBookmarkMapper.insertBookmark(courseId, userId);
+        return CourseBookmarkResponse.builder()
+                .courseId(courseId)
+                .isBookmarked(true)
+                .build();
+    }
+
+    @Transactional
+    public CourseBookmarkResponse unbookmarkCourse(Long userId, Long courseId) {
+        requireCourse(courseId);
+        courseBookmarkMapper.deleteBookmark(courseId, userId);
+        return CourseBookmarkResponse.builder()
+                .courseId(courseId)
+                .isBookmarked(false)
                 .build();
     }
 

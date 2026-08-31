@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ditto.course.repository.CourseBookmarkMapper">
+
+    <resultMap id="UserSavedCourseResponseMap"
+               type="com.ditto.user.dto.response.UserSavedCourseResponse">
+        <id column="courseId" property="courseId"/>
+        <result column="title" property="title"/>
+        <result column="description" property="description"/>
+        <result column="heroImageKey" property="imageUrl"/>
+        <result column="placeCount" property="placeCount"/>
+        <result column="bookmarkedAt" property="bookmarkedAt"/>
+    </resultMap>
+
+    <insert id="insertBookmark">
+        INSERT INTO course_bookmark (
+            course_id,
+            user_id,
+            created_at
+        ) VALUES (
+            #{courseId,jdbcType=NUMERIC},
+            #{userId,jdbcType=NUMERIC},
+            SYSTIMESTAMP
+        )
+    </insert>
+
+    <delete id="deleteBookmark">
+        DELETE FROM course_bookmark
+         WHERE course_id = #{courseId,jdbcType=NUMERIC}
+           AND user_id = #{userId,jdbcType=NUMERIC}
+    </delete>
+
+    <select id="existsByCourseIdAndUserId" resultType="boolean">
+        SELECT CASE WHEN COUNT(*) > 0 THEN 1 ELSE 0 END
+          FROM course_bookmark
+         WHERE course_id = #{courseId,jdbcType=NUMERIC}
+           AND user_id = #{userId,jdbcType=NUMERIC}
+    </select>
+
+    <select id="findSavedCoursesByUserId" resultMap="UserSavedCourseResponseMap">
+        SELECT c.course_id AS courseId,
+               c.name AS title,
+               c.description AS description,
+               <include refid="com.ditto.recommendation.repository.RecommendedCourseMapper.heroImageKey"/>,
+               (SELECT COUNT(*)
+                  FROM course_place cp
+                 WHERE cp.course_id = c.course_id) AS placeCount,
+               cb.created_at AS bookmarkedAt
+          FROM course_bookmark cb
+          JOIN course c ON c.course_id = cb.course_id
+         WHERE cb.user_id = #{userId,jdbcType=NUMERIC}
+           AND c.deleted_at IS NULL
+         ORDER BY cb.created_at DESC, cb.course_bookmark_id DESC
+        OFFSET #{offset} ROWS
+        FETCH NEXT #{size} ROWS ONLY
+    </select>
+
+    <select id="countSavedCoursesByUserId" resultType="long">
+        SELECT COUNT(*)
+          FROM course_bookmark cb
+          JOIN course c ON c.course_id = cb.course_id
+         WHERE cb.user_id = #{userId,jdbcType=NUMERIC}
+           AND c.deleted_at IS NULL
+    </select>
+</mapper>

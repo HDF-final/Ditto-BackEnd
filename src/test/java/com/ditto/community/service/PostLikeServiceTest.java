@@ -8,6 +8,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import org.junit.jupiter.api.DisplayName;
@@ -21,8 +22,10 @@ import com.ditto.community.dto.response.LikeResponse;
 import com.ditto.community.repository.PostLikeMapper;
 import com.ditto.course.repository.PostMapper;
 import com.ditto.course.repository.PostMapper.PostRow;
+import com.ditto.global.common.response.PageResponse;
 import com.ditto.global.exception.BusinessException;
 import com.ditto.global.exception.ErrorCode;
+import com.ditto.user.dto.response.UserLikeResponse;
 
 @ExtendWith(MockitoExtension.class)
 class PostLikeServiceTest {
@@ -108,5 +111,31 @@ class PostLikeServiceTest {
 
         verify(postLikeMapper).deleteLike(POST_ID, USER_ID);
         verify(postMapper).decrementLikesCount(POST_ID);
+    }
+
+    @Test
+    @DisplayName("내 좋아요 목록을 페이징하여 정상 조회한다")
+    void getMyLikesSuccess() {
+        UserLikeResponse item = UserLikeResponse.builder()
+                .postId(POST_ID)
+                .courseId(23L)
+                .title("K-POP 팝업스토어 & 한식 맛집 코스")
+                .likeCount(78L)
+                .bookmarkCount(34L)
+                .commentCount(2L)
+                .likedAt(LocalDateTime.now())
+                .build();
+
+        given(postLikeMapper.findLikesByUserId(USER_ID, 0L, 10)).willReturn(List.of(item));
+        given(postLikeMapper.countLikesByUserId(USER_ID)).willReturn(1L);
+
+        PageResponse<UserLikeResponse> response = postLikeService.getMyLikes(USER_ID, 0, 10);
+
+        assertThat(response).isNotNull();
+        assertThat(response.getContent()).hasSize(1);
+        assertThat(response.getContent().get(0).getPostId()).isEqualTo(POST_ID);
+        assertThat(response.getContent().get(0).getTitle()).isEqualTo("K-POP 팝업스토어 & 한식 맛집 코스");
+        assertThat(response.getContent().get(0).getCommentCount()).isEqualTo(2L);
+        assertThat(response.getTotalElements()).isEqualTo(1L);
     }
 }

@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.ditto.course.dto.request.AddCoursePlaceRequest;
 import com.ditto.course.dto.request.CreateCourseRequest;
 import com.ditto.course.dto.response.AddCoursePlaceResponse;
+import com.ditto.course.dto.response.CourseBookmarkResponse;
 import com.ditto.course.dto.response.CopyCourseResponse;
 import com.ditto.course.dto.request.UpdateCourseRequest;
 import com.ditto.course.dto.response.CourseDetailResponse;
@@ -135,6 +136,29 @@ public class CourseController {
             @Parameter(description = "복사할 공개 코스 ID", example = "3")
             @PathVariable Long courseId) {
         return ApiResponse.success("성공", courseService.copyPublicCourse(SecurityUtils.requireUserId(), courseId));
+    }
+
+    @Operation(
+            summary = "추천 코스 저장",
+            description = "로그인한 사용자가 추천/공개 코스를 마이페이지 '저장한 코스'에 담습니다. "
+                    + "복사해서 내 코스로 만드는 동작과 별개입니다.")
+    @PostMapping("/{courseId}/bookmarks")
+    @ResponseStatus(HttpStatus.OK)
+    public ApiResponse<CourseBookmarkResponse> bookmark(
+            @Parameter(description = "저장할 코스 ID", example = "188")
+            @PathVariable Long courseId) {
+        return ApiResponse.success("성공", courseService.bookmarkCourse(SecurityUtils.requireUserId(), courseId));
+    }
+
+    @Operation(
+            summary = "추천 코스 저장 취소",
+            description = "로그인한 사용자가 마이페이지 '저장한 코스'에 담은 추천/공개 코스를 제거합니다.")
+    @DeleteMapping("/{courseId}/bookmarks")
+    @ResponseStatus(HttpStatus.OK)
+    public ApiResponse<CourseBookmarkResponse> unbookmark(
+            @Parameter(description = "저장 취소할 코스 ID", example = "188")
+            @PathVariable Long courseId) {
+        return ApiResponse.success("성공", courseService.unbookmarkCourse(SecurityUtils.requireUserId(), courseId));
     }
 
     @Operation(

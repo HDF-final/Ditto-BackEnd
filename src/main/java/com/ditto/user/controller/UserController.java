@@ -10,6 +10,8 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.ditto.community.service.PostBookmarkService;
+import com.ditto.community.service.PostLikeService;
+import com.ditto.course.service.CourseService;
 import com.ditto.global.common.response.ApiResponse;
 import com.ditto.global.common.response.PageResponse;
 import com.ditto.security.SecurityUtils;
@@ -18,8 +20,10 @@ import com.ditto.user.dto.request.UpdateUserPreferencesRequest;
 import com.ditto.user.dto.request.UpdateUserProfileRequest;
 import com.ditto.user.dto.response.PersonaResponse;
 import com.ditto.user.dto.response.UserBookmarkResponse;
+import com.ditto.user.dto.response.UserLikeResponse;
 import com.ditto.user.dto.response.UserPreferencesResponse;
 import com.ditto.user.dto.response.UserProfileResponse;
+import com.ditto.user.dto.response.UserSavedCourseResponse;
 import com.ditto.user.service.UserService;
 
 import io.swagger.v3.oas.annotations.Operation;
@@ -35,6 +39,8 @@ import lombok.RequiredArgsConstructor;
 public class UserController {
 
     private final PostBookmarkService postBookmarkService;
+    private final PostLikeService postLikeService;
+    private final CourseService courseService;
     private final UserService userService;
 
     @Operation(
@@ -81,6 +87,34 @@ public class UserController {
             @RequestParam(defaultValue = "10") int size) {
         return ApiResponse.success("성공",
                 postBookmarkService.getMyBookmarks(SecurityUtils.requireUserId(), page, size));
+    }
+
+    @Operation(
+            summary = "내 좋아요 목록 조회",
+            description = "로그인한 고객(ROLE_CUSTOMER)이 좋아요한 코스 게시글 목록을 최신순으로 페이징 조회합니다.")
+    @GetMapping("/likes")
+    @ResponseStatus(HttpStatus.OK)
+    public ApiResponse<PageResponse<UserLikeResponse>> getMyLikes(
+            @Parameter(description = "페이지 번호(0부터 시작, 기본 0)", example = "0")
+            @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "페이지 크기(1~100, 기본 10)", example = "10")
+            @RequestParam(defaultValue = "10") int size) {
+        return ApiResponse.success("성공",
+                postLikeService.getMyLikes(SecurityUtils.requireUserId(), page, size));
+    }
+
+    @Operation(
+            summary = "내 저장한 추천 코스 목록 조회",
+            description = "로그인한 고객(ROLE_CUSTOMER)이 코스 추천 상세에서 저장한 추천/공개 코스 목록을 최신순으로 페이징 조회합니다.")
+    @GetMapping("/saved-courses")
+    @ResponseStatus(HttpStatus.OK)
+    public ApiResponse<PageResponse<UserSavedCourseResponse>> getMySavedCourses(
+            @Parameter(description = "페이지 번호(0부터 시작, 기본 0)", example = "0")
+            @RequestParam(defaultValue = "0") int page,
+            @Parameter(description = "페이지 크기(1~100, 기본 10)", example = "10")
+            @RequestParam(defaultValue = "10") int size) {
+        return ApiResponse.success("성공",
+                courseService.getMySavedCourses(SecurityUtils.requireUserId(), page, size));
     }
 
     @Operation(

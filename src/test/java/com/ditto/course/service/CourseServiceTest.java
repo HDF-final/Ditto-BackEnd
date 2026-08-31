@@ -34,6 +34,7 @@ import com.ditto.course.dto.response.CoursePlaceResponse;
 import com.ditto.course.dto.response.CreateCourseResponse;
 import com.ditto.course.dto.response.MyCourseSummaryResponse;
 import com.ditto.course.dto.response.UpdateCourseResponse;
+import com.ditto.course.repository.CourseBookmarkMapper;
 import com.ditto.course.repository.CourseMapper;
 import com.ditto.course.repository.CourseMapper.CourseInsertCommand;
 import com.ditto.course.repository.CourseMapper.CoursePlaceInsertCommand;
@@ -44,6 +45,7 @@ import com.ditto.global.infrastructure.translation.ContentTranslationService;
 import com.ditto.global.i18n.ContentLanguage;
 import com.ditto.global.exception.BusinessException;
 import com.ditto.global.exception.ErrorCode;
+import com.ditto.user.dto.response.UserSavedCourseResponse;
 
 @ExtendWith(MockitoExtension.class)
 class CourseServiceTest {
@@ -52,6 +54,9 @@ class CourseServiceTest {
 
     @Mock
     private CourseMapper courseMapper;
+
+    @Mock
+    private CourseBookmarkMapper courseBookmarkMapper;
 
     @Mock
     private PlaceMapper placeMapper;
@@ -170,6 +175,61 @@ class CourseServiceTest {
         assertThat(response.getPage()).isEqualTo(2);
         assertThat(response.getContent()).isEmpty();
         verify(courseMapper).findSummariesByUserId(USER_ID, 40, 20);
+    }
+
+    @Test
+    @DisplayName("저장한 추천 코스 목록은 course_bookmark 기준으로 조회하고 대표 이미지를 URL로 변환한다")
+    void getMySavedCourses() {
+        UserSavedCourseResponse item = UserSavedCourseResponse.builder()
+                .courseId(188L)
+                .title("에스파 브랜드 코스")
+                .description("브랜드 중심 코스")
+                .imageUrl("course/AESPA/1.jpg")
+                .placeCount(5)
+                .bookmarkedAt(LocalDateTime.of(2026, 8, 31, 0, 22, 0))
+                .build();
+        given(courseBookmarkMapper.findSavedCoursesByUserId(USER_ID, 0, 20)).willReturn(List.of(item));
+        given(courseBookmarkMapper.countSavedCoursesByUserId(USER_ID)).willReturn(1L);
+        given(s3Provider.resolveImageUrlByPrefix("course/AESPA/1.jpg"))
+                .willReturn("https://bucket.example.com/course/AESPA/1.jpg");
+
+        PageResponse<UserSavedCourseResponse> response = courseService.getMySavedCourses(USER_ID, 0, 20);
+
+        assertThat(response.getPage()).isZero();
+        assertThat(response.getTotalElements()).isEqualTo(1L);
+        assertThat(response.getContent()).hasSize(1);
+        assertThat(response.getContent().get(0).getCourseId()).isEqualTo(188L);
+        assertThat(response.getContent().get(0).getImageUrl())
+                .isEqualTo("https://bucket.example.com/course/AESPA/1.jpg");
+    }
+
+    @Test
+    @DisplayName("추천 코스를 저장하면 course_bookmark에만 저장하고 COPIED 코스는 만들지 않는다")
+    void bookmarkCourseStoresBookmarkOnly() {
+        Course course = Course.of(188L, null, null, "에스파 브랜드 코스", null, CourseCreationType.SYSTEM.name());
+        given(courseMapper.findById(188L)).willReturn(Optional.of(course));
+        given(courseBookmarkMapper.existsByCourseIdAndUserId(188L, USER_ID)).willReturn(false);
+
+        var response = courseService.bookmarkCourse(USER_ID, 188L);
+
+        assertThat(response.getCourseId()).isEqualTo(188L);
+        assertThat(response.getIsBookmarked()).isTrue();
+        verify(courseBookmarkMapper).insertBookmark(188L, USER_ID);
+        verify(courseMapper, never()).insert(any());
+    }
+
+    @Test
+    @DisplayName("이미 저장한 추천 코스를 다시 저장하면 ALREADY_BOOKMARKED 예외가 발생한다")
+    void bookmarkCourseRejectsDuplicatedBookmark() {
+        Course course = Course.of(188L, null, null, "에스파 브랜드 코스", null, CourseCreationType.SYSTEM.name());
+        given(courseMapper.findById(188L)).willReturn(Optional.of(course));
+        given(courseBookmarkMapper.existsByCourseIdAndUserId(188L, USER_ID)).willReturn(true);
+
+        assertThatThrownBy(() -> courseService.bookmarkCourse(USER_ID, 188L))
+                .isInstanceOf(BusinessException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.ALREADY_BOOKMARKED);
+
+        verify(courseBookmarkMapper, never()).insertBookmark(188L, USER_ID);
     }
 
     @Test
