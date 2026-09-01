@@ -27,7 +27,7 @@ public class AiEngineProperties {
     /** HTTP 모드 전용. 대화 요청 경로 */
     private String chatPath = "/chat";
 
-    /** LAMBDA 모드 전용. 호출할 함수 이름 또는 ARN. 예: {@code ditto-chat-v2} */
+    /** LAMBDA 모드 전용. 호출할 함수 이름 또는 ARN. 예: {@code ditto-chat-v3} */
     private String functionName;
 
     /**
