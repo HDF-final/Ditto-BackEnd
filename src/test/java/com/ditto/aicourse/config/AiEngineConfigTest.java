@@ -30,14 +30,14 @@ class AiEngineConfigTest {
     void lambdaMode() {
         runner.withPropertyValues(
                         "ditto.ai-engine.mode=lambda",
-                        "ditto.ai-engine.function-name=ditto-chat-v2",
+                        "ditto.ai-engine.function-name=ditto-chat-v3",
                         "ditto.ai-engine.region=ap-northeast-2")
                 .run(context -> {
                     assertThat(context).hasNotFailed();
                     assertThat(context.getBean(AiEngineClient.class))
                             .isInstanceOf(LambdaAiEngineClient.class);
                     assertThat(context.getBean(AiEngineProperties.class).getFunctionName())
-                            .isEqualTo("ditto-chat-v2");
+                            .isEqualTo("ditto-chat-v3");
                 });
     }
 
@@ -48,7 +48,7 @@ class AiEngineConfigTest {
         // 이게 그대로 나가면 엔진이 "tavily 아님"으로 읽어 builtin 으로 돌아간다.
         runner.withPropertyValues(
                         "ditto.ai-engine.mode=lambda",
-                        "ditto.ai-engine.function-name=ditto-chat-v2",
+                        "ditto.ai-engine.function-name=ditto-chat-v3",
                         "ditto.ai-engine.engine=")
                 .run(context -> assertThat(
                         context.getBean(AiEngineProperties.class).getEngine()).isEmpty());
