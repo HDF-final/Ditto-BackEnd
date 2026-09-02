@@ -26,8 +26,10 @@ import org.springframework.test.web.servlet.MockMvc;
 import com.ditto.aicourse.dto.request.CourseChatRequest;
 import com.ditto.aicourse.dto.response.CourseChatResponse;
 import com.ditto.aicourse.dto.response.PlaceProductImageResponse;
+import com.ditto.aicourse.dto.response.PlaceReservationResponse;
 import com.ditto.aicourse.service.AiCourseRecommendationService;
 import com.ditto.aicourse.service.PlaceProductImageService;
+import com.ditto.aicourse.service.PlaceReservationService;
 import com.ditto.global.i18n.ContentLanguage;
 import com.ditto.security.AuthUser;
 
@@ -43,6 +45,9 @@ class AiCourseRecommendationControllerTest {
 
     @MockBean
     private PlaceProductImageService placeProductImageService;
+
+    @MockBean
+    private PlaceReservationService placeReservationService;
 
     @Test
     @DisplayName("Accept-Language를 AI 추천 서비스 언어로 전달한다")
@@ -94,5 +99,37 @@ class AiCourseRecommendationControllerTest {
                 .andExpect(jsonPath("$.data[0].productUrl").value("https://www.nbkorea.com/product/574"));
 
         verify(placeProductImageService).getProductImages("B2_STORE_0012", 3);
+    }
+
+    @Test
+    @DisplayName("navigationKey로 장소의 캐치테이블 예약 링크를 조회한다")
+    void getsPlaceReservation() throws Exception {
+        given(placeReservationService.getReservation("B2_STORE_0049"))
+                .willReturn(PlaceReservationResponse.builder()
+                        .provider("CATCH_TABLE")
+                        .placeName("ETF 베이커리")
+                        .reservationUrl("https://www.catchtable.net/shop/etfbakerthehyundai")
+                        .build());
+
+        mockMvc.perform(get("/api/v1/ai/course-recommendations/places/B2_STORE_0049/reservation"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.provider").value("CATCH_TABLE"))
+                .andExpect(jsonPath("$.data.placeName").value("ETF 베이커리"))
+                .andExpect(jsonPath("$.data.reservationUrl")
+                        .value("https://www.catchtable.net/shop/etfbakerthehyundai"));
+
+        verify(placeReservationService).getReservation("B2_STORE_0049");
+    }
+
+    @Test
+    @DisplayName("예약 링크가 없는 장소는 data가 null이다")
+    void getsPlaceReservationNull() throws Exception {
+        given(placeReservationService.getReservation("6F_STORE_0001")).willReturn(null);
+
+        mockMvc.perform(get("/api/v1/ai/course-recommendations/places/6F_STORE_0001/reservation"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data").doesNotExist());
+
+        verify(placeReservationService).getReservation("6F_STORE_0001");
     }
 }

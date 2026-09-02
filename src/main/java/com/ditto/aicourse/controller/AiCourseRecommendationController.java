@@ -17,8 +17,10 @@ import org.springframework.web.bind.annotation.RestController;
 import com.ditto.aicourse.dto.request.CourseChatRequest;
 import com.ditto.aicourse.dto.response.CourseChatResponse;
 import com.ditto.aicourse.dto.response.PlaceProductImageResponse;
+import com.ditto.aicourse.dto.response.PlaceReservationResponse;
 import com.ditto.aicourse.service.AiCourseRecommendationService;
 import com.ditto.aicourse.service.PlaceProductImageService;
+import com.ditto.aicourse.service.PlaceReservationService;
 import com.ditto.global.common.response.ApiResponse;
 import com.ditto.global.i18n.AcceptLanguageResolver;
 import com.ditto.security.SecurityUtils;
@@ -38,6 +40,7 @@ public class AiCourseRecommendationController {
 
     private final AiCourseRecommendationService aiCourseRecommendationService;
     private final PlaceProductImageService placeProductImageService;
+    private final PlaceReservationService placeReservationService;
 
     @Operation(
             summary = "AI 코스 추천 대화 (맞춤 생성·재추천 포함)",
@@ -93,5 +96,23 @@ public class AiCourseRecommendationController {
             @RequestParam(required = false) Integer limit) {
         return ApiResponse.success("성공",
                 placeProductImageService.getProductImages(navigationKey, limit));
+    }
+
+    @Operation(
+            summary = "AI 추천 장소의 캐치테이블 예약 링크 조회",
+            description = """
+                    추천 코스 장소의 navigationKey 로 연결된 장소를 찾고, 해당 장소에 등록된 \
+                    캐치테이블 예약 링크를 반환합니다.
+
+                    프론트는 상품 바로가기 섹션과 같은 방식으로, 응답의 `reservationUrl` 이 있을 때만 \
+                    '캐치테이블 예약하기' 섹션을 노출하고 버튼 클릭 시 해당 URL 로 이동시키면 됩니다. \
+                    예약 링크가 없는 장소는 `data` 가 `null` 로 내려옵니다.
+                    """)
+    @GetMapping("/places/{navigationKey}/reservation")
+    public ApiResponse<PlaceReservationResponse> getPlaceReservation(
+            @Parameter(description = "AI 추천 장소의 navigationKey", example = "B2_STORE_0012")
+            @PathVariable String navigationKey) {
+        return ApiResponse.success("성공",
+                placeReservationService.getReservation(navigationKey));
     }
 }
