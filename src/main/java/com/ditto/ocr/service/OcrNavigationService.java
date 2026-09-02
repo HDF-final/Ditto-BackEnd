@@ -19,6 +19,7 @@ import com.ditto.ocr.dto.request.OcrSessionStartRequest;
 import com.ditto.ocr.dto.response.OcrRecognitionResponse;
 import com.ditto.ocr.dto.response.OcrSessionStartResponse;
 import com.ditto.ocr.repository.OcrPlaceMapper;
+import com.ditto.ocr.support.OcrConcurrencyGuard;
 import com.ditto.ocr.support.OcrImagePreprocessor;
 import com.ditto.ocr.support.OcrWordPostProcessor;
 import com.ditto.ocr.support.PreprocessedImage;
@@ -57,6 +58,7 @@ public class OcrNavigationService {
     private final OcrPlaceMatcher placeMatcher;
     private final OcrImagePreprocessor imagePreprocessor;
     private final OcrWordPostProcessor wordPostProcessor;
+    private final OcrConcurrencyGuard ocrConcurrencyGuard;
     private final OcrProperties properties;
 
     /** 세션을 시작하고 시작 장소의 길찾기 식별자를 함께 돌려준다. */
@@ -95,8 +97,18 @@ public class OcrNavigationService {
         validateImage(image);
 
         String originalFormat = formatOf(image);
-        PreprocessedImage processed = imagePreprocessor.process(readBytes(image), originalFormat);
-        String fileName = processed.isTransformed() ? "ocr.jpg" : image.getOriginalFilename();
+        byte[] bytes = readBytes(image);
+        String originalFileName = image.getOriginalFilename();
+
+        // 스레드를 오래 붙잡는 디코딩+CLOVA 구간만 벌크헤드로 감싼다.
+        // 입력 검증/파일 읽기는 밖에 둬, 반려 시 워커 스레드를 즉시 반납한다.
+        return ocrConcurrencyGuard.call(() -> recognizeBounded(bytes, originalFormat, originalFileName));
+    }
+
+    /** 벌크헤드 안에서 실행되는 무거운 인식 구간(이미지 전처리 → CLOVA → 후처리 → 매칭). */
+    private OcrRecognitionResponse recognizeBounded(byte[] bytes, String originalFormat, String originalFileName) {
+        PreprocessedImage processed = imagePreprocessor.process(bytes, originalFormat);
+        String fileName = processed.isTransformed() ? "ocr.jpg" : originalFileName;
 
         ClovaOcrResult raw = clovaOcrClient.recognize(
                 processed.getBytes(), processed.getFormat(), fileName);
