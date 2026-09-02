@@ -214,10 +214,26 @@ jobs:
             --query 'InstanceRefreshes[0].Status' \
             --output text 2>/dev/null || echo "None")
 
-          if [ "$EXISTING_STATUS" = "InProgress" ] || [ "$EXISTING_STATUS" = "Pending" ]; then
+          if [ "$EXISTING_STATUS" = "InProgress" ] || [ "$EXISTING_STATUS" = "Pending" ] || [ "$EXISTING_STATUS" = "Cancelling" ]; then
             echo "Cancelling previous in-progress refresh..."
             aws autoscaling cancel-instance-refresh --auto-scaling-group-name "${TARGET_ASG}" || true
-            sleep 10
+
+            # 취소는 InProgress -> Cancelling -> Cancelled 를 거친다. 고정 sleep 으로는
+            # 다 끝나기 전에 다음 refresh 를 시작해 InstanceRefreshInProgress 로 막힌다.
+            echo "Waiting for previous refresh to fully terminate..."
+            while true; do
+              CHECK_STATUS=$(aws autoscaling describe-instance-refreshes \
+                --auto-scaling-group-name "${TARGET_ASG}" \
+                --query 'InstanceRefreshes[0].Status' \
+                --output text 2>/dev/null || echo "None")
+
+              if [ "$CHECK_STATUS" != "InProgress" ] && [ "$CHECK_STATUS" != "Pending" ] && [ "$CHECK_STATUS" != "Cancelling" ]; then
+                echo "Previous refresh terminated with status: ${CHECK_STATUS}"
+                break
+              fi
+              echo "Current status: ${CHECK_STATUS} ... waiting 5s"
+              sleep 5
+            done
           fi
 
           echo "Starting Instance Refresh for ASG: ${TARGET_ASG}..."
