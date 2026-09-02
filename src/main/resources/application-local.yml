@@ -120,6 +120,11 @@ ditto:
     concurrency:
       max-concurrent: 20
       acquire-timeout: 200ms
+    # IP 단위 레이트 리밋. CLOVA 유료 호출 남용 방어.
+    rate-limit:
+      enabled: true
+      limit: 10          # 윈도우당 허용 요청 수
+      window: 1m         # 윈도우 길이 (IP당 1분에 10회)
 
 # ===== MyBatis =====
 mybatis:

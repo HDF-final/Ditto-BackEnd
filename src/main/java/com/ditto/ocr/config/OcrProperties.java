@@ -38,6 +38,8 @@ public class OcrProperties {
 
     private final Concurrency concurrency = new Concurrency();
 
+    private final RateLimit rateLimit = new RateLimit();
+
     /**
      * CLOVA 호출 전 이미지 축소. 스마트폰 원본(수 MB·수천 px)을 그대로 보내면
      * 업로드+인식 latency 가 커진다.
@@ -131,5 +133,26 @@ public class OcrProperties {
          * 짧게 잡아야 초과 요청이 워커 스레드를 오래 붙잡지 않는다.
          */
         private Duration acquireTimeout = Duration.ofMillis(200);
+    }
+
+    /**
+     * OCR 인식 엔드포인트 레이트 리밋(IP 단위 고정 윈도우).
+     *
+     * <p>벌크헤드가 서버 붕괴를 막는다면, 레이트 리밋은 한 클라이언트가 유료 CLOVA 호출을
+     * 반복 남용하는 것을 막는다. 인메모리 단일 인스턴스 기준이며, 다중 인스턴스로 확장 시
+     * Redis 등으로 교체한다.
+     */
+    @Getter
+    @Setter
+    public static class RateLimit {
+
+        /** 레이트 리밋 사용 여부. */
+        private boolean enabled = true;
+
+        /** 윈도우당 허용 요청 수. */
+        private int limit = 10;
+
+        /** 윈도우 길이. 이 시간 동안 limit 회까지 허용한다. */
+        private Duration window = Duration.ofMinutes(1);
     }
 }
