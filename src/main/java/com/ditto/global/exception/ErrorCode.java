@@ -86,6 +86,7 @@ public enum ErrorCode {
     AI_SERVICE_ERROR(HttpStatus.BAD_GATEWAY, "E001", "AI 서비스 처리 중 오류가 발생했습니다."),
     OCR_SERVICE_ERROR(HttpStatus.BAD_GATEWAY, "E002", "OCR 처리 중 오류가 발생했습니다."),
     OCR_SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, "E003", "OCR 세션을 찾을 수 없거나 만료되었습니다."),
+    OCR_TOO_MANY_REQUESTS(HttpStatus.SERVICE_UNAVAILABLE, "E004", "OCR 요청이 많아 잠시 후 다시 시도해주세요."),
 
     // ===== News =====
     NEWS_CRAWLING_FAILED(HttpStatus.BAD_GATEWAY, "NW001", "뉴스 기사 크롤링에 실패했습니다."),

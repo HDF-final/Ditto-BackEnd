@@ -16,7 +16,7 @@ import com.ditto.global.exception.ErrorCode;
 class OcrNavigationServiceTest {
 
     private final OcrNavigationService service =
-            new OcrNavigationService(null, null, null, null, null, null, null);
+            new OcrNavigationService(null, null, null, null, null, null, null, null);
 
     @Test
     @DisplayName("빈 이미지는 INVALID_IMAGE_FILE 로 사전 차단된다")

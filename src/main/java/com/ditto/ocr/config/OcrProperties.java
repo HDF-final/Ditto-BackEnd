@@ -36,6 +36,8 @@ public class OcrProperties {
 
     private final Clova clova = new Clova();
 
+    private final Concurrency concurrency = new Concurrency();
+
     /**
      * CLOVA 호출 전 이미지 축소. 스마트폰 원본(수 MB·수천 px)을 그대로 보내면
      * 업로드+인식 latency 가 커진다.
@@ -54,6 +56,16 @@ public class OcrProperties {
 
         /** JPEG 품질(0~1). */
         private float jpegQuality = 0.82f;
+
+        /**
+         * 디코딩을 허용하는 최대 픽셀 수(width×height). 디컴프레션 밤 방어용.
+         *
+         * <p>업로드 바이트가 작아도 디코딩하면 거대한 이미지로 풀리는 공격을 막는다.
+         * ImageIO 로 전체를 읽기 전에 헤더 크기를 먼저 검사해 초과 시 거절한다.
+         * TYPE_INT_RGB 는 픽셀당 4바이트라 24MP ≈ 96MB/장 —
+         * {@code concurrency.maxConcurrent} 와 곱해 최악 힙 사용량을 가늠한다.
+         */
+        private long maxDecodePixels = 24_000_000L;
     }
 
     /**
@@ -96,5 +108,28 @@ public class OcrProperties {
         private Duration connectTimeout = Duration.ofSeconds(5);
 
         private Duration readTimeout = Duration.ofSeconds(30);
+    }
+
+    /**
+     * OCR 무거운 구간(이미지 디코딩 + CLOVA 호출) 동시 처리 제한(벌크헤드).
+     *
+     * <p>외부 호출은 요청 스레드를 수 초 붙잡는다. 동시 진입 수를 Tomcat 워커 풀보다
+     * 작게 묶어, 폭주 시에도 OCR 이 전체 스레드를 먹고 앱 전체를 멈추게 하는 일을 막는다.
+     */
+    @Getter
+    @Setter
+    public static class Concurrency {
+
+        /**
+         * 동시에 OCR 무거운 구간에 들어갈 수 있는 최대 요청 수.
+         * Tomcat max-threads(기본 200)보다 훨씬 작게 잡아 스레드 독점을 막는다.
+         */
+        private int maxConcurrent = 20;
+
+        /**
+         * 허가 대기 최대 시간. 이 시간 안에 슬롯을 못 얻으면 즉시 503.
+         * 짧게 잡아야 초과 요청이 워커 스레드를 오래 붙잡지 않는다.
+         */
+        private Duration acquireTimeout = Duration.ofMillis(200);
     }
 }

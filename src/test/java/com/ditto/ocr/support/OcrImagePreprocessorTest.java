@@ -1,6 +1,7 @@
 package com.ditto.ocr.support;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.awt.Color;
 import java.awt.Graphics2D;
@@ -13,6 +14,8 @@ import javax.imageio.ImageIO;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import com.ditto.global.exception.BusinessException;
+import com.ditto.global.exception.ErrorCode;
 import com.ditto.ocr.config.OcrProperties;
 
 class OcrImagePreprocessorTest {
@@ -68,6 +71,31 @@ class OcrImagePreprocessorTest {
         assertThat(processed.isTransformed()).isFalse();
         assertThat(processed.getBytes()).isEqualTo(original);
         assertThat(processed.getFormat()).isEqualTo("png");
+    }
+
+    @Test
+    @DisplayName("픽셀 수가 상한을 넘으면 디코딩하지 않고 거절한다 (디컴프레션 밤 방어)")
+    void rejectsImageExceedingPixelLimit() throws Exception {
+        OcrProperties properties = new OcrProperties();
+        properties.getPreprocess().setMaxDecodePixels(1_000_000L); // 1MP 상한
+        byte[] original = jpeg(2000, 2000); // 4MP → 초과
+
+        assertThatThrownBy(() -> preprocessor(properties).process(original, "jpg"))
+                .isInstanceOf(BusinessException.class)
+                .extracting(e -> ((BusinessException) e).getErrorCode())
+                .isEqualTo(ErrorCode.IMAGE_SIZE_EXCEEDED);
+    }
+
+    @Test
+    @DisplayName("픽셀 상한 이내면 정상 처리한다")
+    void allowsImageWithinPixelLimit() throws Exception {
+        OcrProperties properties = new OcrProperties();
+        properties.getPreprocess().setMaxDecodePixels(10_000_000L); // 10MP 상한
+        byte[] original = jpeg(2000, 2000); // 4MP → 통과
+
+        PreprocessedImage processed = preprocessor(properties).process(original, "jpg");
+
+        assertThat(processed.isTransformed()).isTrue();
     }
 
     @Test
