@@ -57,9 +57,11 @@ dependencies {
     // SpringDoc OpenAPI 3 (Swagger UI)
     implementation "org.springdoc:springdoc-openapi-starter-webmvc-ui:${springdocVersion}"
 
-    // 세션 저장소 (선택): 서버 스케일아웃 시 세션 공유용. 단일 인스턴스 개발 단계에서는 불필요.
-    // implementation 'org.springframework.session:spring-session-data-redis'
-    // implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+    // 세션 저장소: 인스턴스가 둘 이상이면 세션이 한 JVM 메모리에만 남아선 안 된다.
+    // SESSION_STORE_TYPE=redis 일 때만 켜진다. 기본값(none)에서는 예전처럼
+    // 서블릿 컨테이너 메모리를 쓰므로 Redis 없는 로컬 개발도 그대로 돈다.
+    implementation 'org.springframework.session:spring-session-data-redis'
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
 
     // Lombok
     compileOnly 'org.projectlombok:lombok'

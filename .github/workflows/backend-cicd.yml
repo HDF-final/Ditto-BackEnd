@@ -82,11 +82,21 @@ jobs:
           ENV_CONTENT: ${{ secrets.ENV_FILE_CONTENT }}
           TRANSLATE_ENABLED: ${{ vars.AWS_TRANSLATE_ENABLED }}
           TRANSLATE_REGION: ${{ vars.AWS_TRANSLATE_REGION }}
+          SESSION_STORE_TYPE: ${{ vars.SESSION_STORE_TYPE }}
+          REDIS_HOST: ${{ vars.REDIS_HOST }}
+          REDIS_PORT: ${{ vars.REDIS_PORT }}
+          REDIS_DATABASE: ${{ vars.REDIS_DATABASE }}
         shell: bash
         run: |
           ENV_B64=$(echo -n "$ENV_CONTENT" | base64 -w 0)
           TRANSLATE_ENABLED=${TRANSLATE_ENABLED:-false}
           TRANSLATE_REGION=${TRANSLATE_REGION:-ap-northeast-2}
+          # 인스턴스가 둘이라 세션은 Redis 에 둔다. 저장소 주소는 비밀이 아니라
+          # VPC 안에서만 열리는 ElastiCache 엔드포인트다.
+          SESSION_STORE_TYPE=${SESSION_STORE_TYPE:-redis}
+          REDIS_HOST=${REDIS_HOST:-ditto-celeb-cache.2ngzzz.0001.apn2.cache.amazonaws.com}
+          REDIS_PORT=${REDIS_PORT:-6379}
+          REDIS_DATABASE=${REDIS_DATABASE:-1}
 
           cat << EOF > /tmp/user_data.sh
           #!/bin/bash
@@ -151,6 +161,22 @@ jobs:
 
           grep -Fqx "AWS_TRANSLATE_ENABLED=${TRANSLATE_ENABLED}" "\$APP_DIR/.env"
           grep -Fqx "AWS_TRANSLATE_REGION=${TRANSLATE_REGION}" "\$APP_DIR/.env"
+
+          sed -i \
+            -e '/^SESSION_STORE_TYPE=/d' \
+            -e '/^REDIS_HOST=/d' \
+            -e '/^REDIS_PORT=/d' \
+            -e '/^REDIS_DATABASE=/d' \
+            "\$APP_DIR/.env"
+          cat << 'SESSION_ENV_EOF' >> "\$APP_DIR/.env"
+          SESSION_STORE_TYPE=${SESSION_STORE_TYPE}
+          REDIS_HOST=${REDIS_HOST}
+          REDIS_PORT=${REDIS_PORT}
+          REDIS_DATABASE=${REDIS_DATABASE}
+          SESSION_ENV_EOF
+
+          grep -Fqx "SESSION_STORE_TYPE=${SESSION_STORE_TYPE}" "\$APP_DIR/.env"
+          grep -Fqx "REDIS_HOST=${REDIS_HOST}" "\$APP_DIR/.env"
 
           /usr/local/bin/aws ecr get-login-password --region "\$AWS_REGION" | docker login --username AWS --password-stdin "\$ECR_REGISTRY"
           docker compose -f "\$APP_DIR/docker-compose.yml" pull

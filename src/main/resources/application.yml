@@ -22,6 +22,25 @@ spring:
     multipart:
       max-file-size: 10MB
       max-request-size: 10MB
+
+  # ===== 세션 저장소 =====
+  # 서버가 두 대 이상이면 ALB 가 요청을 나눠 보내는데, 세션이 한쪽 JVM 메모리에만
+  # 있으면 다른 쪽으로 간 요청은 로그인을 모른다. Redis 에 두면 어느 쪽이 받든 읽는다.
+  # 기본값 none 은 예전 동작(서블릿 컨테이너 메모리)이라 로컬 개발은 Redis 가 없어도 된다.
+  session:
+    store-type: ${SESSION_STORE_TYPE:none}
+    redis:
+      # ElastiCache 는 CONFIG SET 을 막아 키스페이스 알림을 켤 수 없다.
+      # indexed 는 그 알림을 요구해서 기동이 깨진다. default 는 알림 없이 도는
+      # 대신 세션 만료 이벤트를 발행하지 않는데, 여기선 쓰는 곳이 없다.
+      repository-type: default
+      namespace: ditto:session
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      # 0 번은 셀럽 캐시(ditto-celeb-warm)가 쓴다. 세션은 1 번으로 갈라 둔다.
+      database: ${REDIS_DATABASE:1}
   # RAG 빈이 붙기 전까지 Bedrock 임베딩·pgvector 자동설정을 끈다.
   # bedrock 스타터가 Titan + Cohere EmbeddingModel 을 동시에 만들면
   # PgVectorStore 가 어느 쪽을 쓸지 못 고르고 기동이 실패한다.
