@@ -1069,18 +1069,24 @@ String imageUrl = s3Provider.getImageUrl(imageKey); // API 응답 시 URL로 변
 
 ### 동적 콘텐츠 다국어 번역
 
-뉴스, 코스, 길찾기 장소 조회 API는 `Accept-Language`를 읽어 `ko`, `zh`, `ja`, `en`을 지원합니다.
-헤더가 없거나 값이 잘못됐거나 지원하지 않는 언어이면 기존 한국어 원문을 반환합니다.
+뉴스, 코스, 커뮤니티 게시글, 길찾기 장소 조회 API는 `Accept-Language`를 읽어
+`ko`, `zh`, `ja`, `en`을 지원합니다. 헤더가 없거나 값이 잘못됐거나 지원하지 않는
+언어이면 한국어를 대상 언어로 사용합니다.
 
 | 응답 영역 | 번역 필드 |
 | --- | --- |
 | 뉴스피드 | 제목, 본문, 요약 |
 | 코스 | 코스명, 코스 설명, 장소명, 추천 이유 |
+| 커뮤니티 게시글 | 원문 언어를 판별한 제목, 작성자 후기 |
 | 길찾기 장소 | 장소명, 장소 설명 |
 
 번역을 활성화하기 전에 Oracle에
 [`database/oracle/V20260820_01__create_translation_cache.sql`](./database/oracle/V20260820_01__create_translation_cache.sql)을
 한 번 적용합니다. MyBatis는 자동 DDL을 실행하지 않으므로 배포 파이프라인 또는 DBA 절차에서 명시적으로 실행해야 합니다.
+기존 번역 캐시 테이블에는 한국어 대상 번역을 허용하는
+[`database/oracle/V20260903_01__allow_korean_translation_cache.sql`](./database/oracle/V20260903_01__allow_korean_translation_cache.sql)도
+적용합니다. 적용 전에도 인스턴스 내 제한 캐시로 번역 결과를 제공하지만, 재시작 간 캐시를
+유지하려면 이 스크립트가 필요합니다.
 
 ```bash
 AWS_TRANSLATE_ENABLED=true
@@ -1089,7 +1095,8 @@ AWS_TRANSLATE_REGION=ap-northeast-2
 
 동작 원칙은 다음과 같습니다.
 
-1. 한국어 원문의 SHA-256 해시와 대상 언어로 Oracle 캐시를 조회합니다.
+1. 원문의 SHA-256 해시와 대상 언어로 Oracle 캐시를 조회합니다.
+   커뮤니티 게시글은 한·중·일·영 원문 언어를 먼저 판별해 같은 언어면 번역하지 않습니다.
 2. 같은 원문은 저장된 번역을 반환하고 Amazon Translate를 다시 호출하지 않습니다.
 3. 원문이 바뀌면 해시 불일치로 감지해 새 번역으로 캐시를 갱신합니다.
 4. 실패는 빈 문자열이나 0으로 저장하지 않습니다. 재시도 시각까지 한국어 원문을 반환합니다.

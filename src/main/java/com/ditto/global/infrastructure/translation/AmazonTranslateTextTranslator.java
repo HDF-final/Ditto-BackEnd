@@ -17,10 +17,18 @@ public class AmazonTranslateTextTranslator implements TextTranslator {
 
     @Override
     public String translate(String sourceText, ContentLanguage targetLanguage) {
+        return translate(sourceText, ContentLanguage.KOREAN, targetLanguage);
+    }
+
+    @Override
+    public String translate(
+            String sourceText,
+            ContentLanguage sourceLanguage,
+            ContentLanguage targetLanguage) {
         StringBuilder translated = new StringBuilder();
         for (String chunk : textChunker.split(sourceText)) {
             TranslateTextRequest request = TranslateTextRequest.builder()
-                    .sourceLanguageCode(ContentLanguage.KOREAN.getCode())
+                    .sourceLanguageCode(sourceLanguage.getCode())
                     .targetLanguageCode(targetLanguage.getCode())
                     .text(chunk)
                     .build();
