@@ -489,11 +489,11 @@ class PostServiceTest {
                 .build();
         given(postMapper.findPublicCourses(0L, 10)).willReturn(List.of(item));
         given(postMapper.countPublicCourses()).willReturn(1L);
-        given(contentTranslationService.translate(
-                "community_post", "1", "title", "에스파 브랜드 투어", ContentLanguage.ENGLISH))
+        given(contentTranslationService.translateMultilingualSource(
+                "community_post_multilingual", "1", "title", "에스파 브랜드 투어", ContentLanguage.ENGLISH))
                 .willReturn("aespa brand tour");
-        given(contentTranslationService.translate(
-                "community_post", "1", "content", "전시를 본 뒤 팝업까지 둘러봤어요.", ContentLanguage.ENGLISH))
+        given(contentTranslationService.translateMultilingualSource(
+                "community_post_multilingual", "1", "content", "전시를 본 뒤 팝업까지 둘러봤어요.", ContentLanguage.ENGLISH))
                 .willReturn("I visited the pop-up after the exhibition.");
 
         PageResponse<PublicCourseResponse> response = postService.getPublicCourses(
@@ -502,6 +502,40 @@ class PostServiceTest {
         assertThat(response.getContent().get(0).getTitle()).isEqualTo("aespa brand tour");
         assertThat(response.getContent().get(0).getContent())
                 .isEqualTo("I visited the pop-up after the exhibition.");
+    }
+
+    @Test
+    @DisplayName("한국어 요청이면 중국어로 작성한 공개 코스 제목과 후기를 번역한다")
+    void translatesChinesePublicCourseIntoKorean() {
+        PublicCourseResponse item = PublicCourseResponse.builder()
+                .postId(148L)
+                .title("弘大潮流打卡路线")
+                .content("今天在 The Hyundai Seoul 走了一条潮流路线。")
+                .build();
+        given(postMapper.findPublicCourses(0L, 10)).willReturn(List.of(item));
+        given(postMapper.countPublicCourses()).willReturn(1L);
+        given(contentTranslationService.translateMultilingualSource(
+                "community_post_multilingual",
+                "148",
+                "title",
+                "弘大潮流打卡路线",
+                ContentLanguage.KOREAN))
+                .willReturn("홍대 트렌드 인증 코스");
+        given(contentTranslationService.translateMultilingualSource(
+                "community_post_multilingual",
+                "148",
+                "content",
+                "今天在 The Hyundai Seoul 走了一条潮流路线。",
+                ContentLanguage.KOREAN))
+                .willReturn("오늘 더현대 서울에서 트렌드 코스를 다녀왔어요.");
+
+        PageResponse<PublicCourseResponse> response = postService.getPublicCourses(
+                0, 10, ContentLanguage.KOREAN);
+
+        assertThat(response.getContent().get(0).getTitle())
+                .isEqualTo("홍대 트렌드 인증 코스");
+        assertThat(response.getContent().get(0).getContent())
+                .isEqualTo("오늘 더현대 서울에서 트렌드 코스를 다녀왔어요.");
     }
 
     @Test
@@ -640,11 +674,11 @@ class PostServiceTest {
         given(postMapper.findPublicCourseDetailById(1L)).willReturn(Optional.of(postRow));
         given(courseMapper.findPlacesByCourseId(3L)).willReturn(List.of());
         given(postCommentMapper.findCommentsByPostId(1L)).willReturn(List.of());
-        given(contentTranslationService.translate(
-                "community_post", "1", "title", "에스파 브랜드 투어", ContentLanguage.ENGLISH))
+        given(contentTranslationService.translateMultilingualSource(
+                "community_post_multilingual", "1", "title", "에스파 브랜드 투어", ContentLanguage.ENGLISH))
                 .willReturn("aespa brand tour");
-        given(contentTranslationService.translate(
-                "community_post", "1", "content", "추천 동선입니다.", ContentLanguage.ENGLISH))
+        given(contentTranslationService.translateMultilingualSource(
+                "community_post_multilingual", "1", "content", "추천 동선입니다.", ContentLanguage.ENGLISH))
                 .willReturn("This is the recommended route.");
 
         PublicCourseDetailResponse response = postService.getPublicCourse(

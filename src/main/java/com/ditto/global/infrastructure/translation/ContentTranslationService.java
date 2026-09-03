@@ -6,13 +6,18 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.HexFormat;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.function.Supplier;
 
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import com.ditto.global.i18n.ContentLanguage;
+import com.ditto.global.i18n.ContentLanguageDetector;
 import com.ditto.global.infrastructure.translation.repository.TranslationCacheEntry;
 import com.ditto.global.infrastructure.translation.repository.TranslationCacheMapper;
 
@@ -23,11 +28,19 @@ import lombok.extern.slf4j.Slf4j;
 public class ContentTranslationService {
 
     private static final int MAX_ERROR_LENGTH = 500;
+    private static final int FALLBACK_CACHE_MAX_ENTRIES = 1_000;
 
     private final TranslationCacheMapper translationCacheMapper;
     private final TextTranslator textTranslator;
     private final TranslationProperties properties;
     private final Clock clock;
+    private final Map<String, String> fallbackTranslations = Collections.synchronizedMap(
+            new LinkedHashMap<>(128, 0.75f, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<String, String> eldest) {
+                    return size() > FALLBACK_CACHE_MAX_ENTRIES;
+                }
+            });
 
     public ContentTranslationService(
             TranslationCacheMapper translationCacheMapper,
@@ -53,7 +66,62 @@ public class ContentTranslationService {
             return sourceText;
         }
 
+        return translateWithCache(
+                sourceType,
+                sourceKey,
+                sourceField,
+                sourceText,
+                targetLanguage,
+                () -> textTranslator.translate(sourceText, targetLanguage));
+    }
+
+    public String translateMultilingualSource(
+            String sourceType,
+            String sourceKey,
+            String sourceField,
+            String sourceText,
+            ContentLanguage targetLanguage) {
+        if (!properties.isEnabled()
+                || targetLanguage == null
+                || !StringUtils.hasText(sourceText)) {
+            return sourceText;
+        }
+
+        ContentLanguage sourceLanguage = ContentLanguageDetector.detect(sourceText);
+        if (sourceLanguage == null || sourceLanguage == targetLanguage) {
+            return sourceText;
+        }
+
+        return translateWithCache(
+                sourceType,
+                sourceKey,
+                sourceField,
+                sourceText,
+                targetLanguage,
+                () -> textTranslator.translate(sourceText, sourceLanguage, targetLanguage));
+    }
+
+    private String translateWithCache(
+            String sourceType,
+            String sourceKey,
+            String sourceField,
+            String sourceText,
+            ContentLanguage targetLanguage,
+            Supplier<String> translationRequest) {
+
         String sourceHash = hash(sourceText);
+        String fallbackCacheKey = String.join(
+                "\u0000",
+                sourceType,
+                sourceKey,
+                sourceField,
+                targetLanguage.getCode(),
+                sourceHash);
+        String fallbackTranslation = fallbackTranslations.get(fallbackCacheKey);
+        if (fallbackTranslation != null) {
+            return fallbackTranslation;
+        }
+
         LocalDateTime now = LocalDateTime.now(clock);
         TranslationCacheEntry cached = null;
         boolean claimed = false;
@@ -86,16 +154,50 @@ public class ContentTranslationService {
                         ? refreshed.getTranslatedText()
                         : sourceText;
             }
+        } catch (Exception exception) {
+            log.warn(
+                    "번역 캐시 접근 실패. 메모리 캐시로 대체합니다. sourceType={}, sourceKey={}, sourceField={}, targetLanguage={}, cause={}",
+                    sourceType,
+                    sourceKey,
+                    sourceField,
+                    targetLanguage.getCode(),
+                    exception.getClass().getSimpleName());
+            return translateWithFallbackCache(
+                    fallbackCacheKey,
+                    sourceType,
+                    sourceKey,
+                    sourceField,
+                    sourceText,
+                    targetLanguage,
+                    translationRequest);
+        }
 
-            String translatedText = textTranslator.translate(sourceText, targetLanguage);
-            if (!StringUtils.hasText(translatedText)) {
-                markFailure(
-                        sourceType, sourceKey, sourceField, targetLanguage, sourceHash,
-                        nextRetryAt(now, previousFailureCount(cached, sourceHash)),
-                        "EMPTY_TRANSLATION_RESULT");
-                return sourceText;
-            }
+        String translatedText;
+        try {
+            translatedText = translationRequest.get();
+        } catch (Exception exception) {
+            safelyMarkFailure(
+                    sourceType,
+                    sourceKey,
+                    sourceField,
+                    targetLanguage,
+                    sourceHash,
+                    nextRetryAt(now, previousFailureCount(cached, sourceHash)),
+                    exception.getClass().getSimpleName());
+            logTranslationFailure(
+                    sourceType, sourceKey, sourceField, targetLanguage, exception);
+            return sourceText;
+        }
 
+        if (!StringUtils.hasText(translatedText)) {
+            safelyMarkFailure(
+                    sourceType, sourceKey, sourceField, targetLanguage, sourceHash,
+                    nextRetryAt(now, previousFailureCount(cached, sourceHash)),
+                    "EMPTY_TRANSLATION_RESULT");
+            return sourceText;
+        }
+
+        try {
             translationCacheMapper.markSuccess(
                     sourceType,
                     sourceKey,
@@ -103,27 +205,59 @@ public class ContentTranslationService {
                     targetLanguage.getCode(),
                     sourceHash,
                     translatedText);
-            return translatedText;
         } catch (Exception exception) {
-            if (claimed) {
-                safelyMarkFailure(
-                        sourceType,
-                        sourceKey,
-                        sourceField,
-                        targetLanguage,
-                        sourceHash,
-                        nextRetryAt(now, previousFailureCount(cached, sourceHash)),
-                        exception.getClass().getSimpleName());
-            }
+            fallbackTranslations.put(fallbackCacheKey, translatedText);
             log.warn(
-                    "동적 콘텐츠 번역 실패. sourceType={}, sourceKey={}, sourceField={}, targetLanguage={}, cause={}",
+                    "번역 결과 캐시 저장 실패. 메모리 캐시에 보관합니다. sourceType={}, sourceKey={}, sourceField={}, targetLanguage={}, cause={}",
                     sourceType,
                     sourceKey,
                     sourceField,
                     targetLanguage.getCode(),
                     exception.getClass().getSimpleName());
+        }
+        return translatedText;
+    }
+
+    private String translateWithFallbackCache(
+            String fallbackCacheKey,
+            String sourceType,
+            String sourceKey,
+            String sourceField,
+            String sourceText,
+            ContentLanguage targetLanguage,
+            Supplier<String> translationRequest) {
+        String cached = fallbackTranslations.get(fallbackCacheKey);
+        if (cached != null) {
+            return cached;
+        }
+
+        try {
+            String translatedText = translationRequest.get();
+            if (!StringUtils.hasText(translatedText)) {
+                return sourceText;
+            }
+            fallbackTranslations.put(fallbackCacheKey, translatedText);
+            return translatedText;
+        } catch (Exception exception) {
+            logTranslationFailure(
+                    sourceType, sourceKey, sourceField, targetLanguage, exception);
             return sourceText;
         }
+    }
+
+    private void logTranslationFailure(
+            String sourceType,
+            String sourceKey,
+            String sourceField,
+            ContentLanguage targetLanguage,
+            Exception exception) {
+        log.warn(
+                "동적 콘텐츠 번역 실패. sourceType={}, sourceKey={}, sourceField={}, targetLanguage={}, cause={}",
+                sourceType,
+                sourceKey,
+                sourceField,
+                targetLanguage.getCode(),
+                exception.getClass().getSimpleName());
     }
 
     private void safelyMarkFailure(

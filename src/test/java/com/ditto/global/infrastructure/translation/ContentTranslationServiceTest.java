@@ -154,6 +154,84 @@ class ContentTranslationServiceTest {
                 anyString(), anyString(), anyString(), anyString());
     }
 
+    @Test
+    void translatesChineseCommunitySourceIntoKorean() {
+        when(translationCacheMapper.find(
+                "community_post_multilingual", "148", "title", "ko"))
+                .thenReturn(null);
+        when(translationCacheMapper.claim(
+                anyString(), anyString(), anyString(), anyString(), anyString(), anyLong()))
+                .thenReturn(1);
+        when(textTranslator.translate(
+                "弘大潮流打卡路线",
+                ContentLanguage.CHINESE,
+                ContentLanguage.KOREAN))
+                .thenReturn("홍대 트렌드 인증 코스");
+
+        String result = service.translateMultilingualSource(
+                "community_post_multilingual",
+                "148",
+                "title",
+                "弘大潮流打卡路线",
+                ContentLanguage.KOREAN);
+
+        assertThat(result).isEqualTo("홍대 트렌드 인증 코스");
+        verify(textTranslator).translate(
+                "弘大潮流打卡路线",
+                ContentLanguage.CHINESE,
+                ContentLanguage.KOREAN);
+    }
+
+    @Test
+    void doesNotRetranslateCommunitySourceAlreadyInTargetLanguage() {
+        String result = service.translateMultilingualSource(
+                "community_post_multilingual",
+                "146",
+                "title",
+                "Seoul Trend Starter!",
+                ContentLanguage.ENGLISH);
+
+        assertThat(result).isEqualTo("Seoul Trend Starter!");
+        verify(translationCacheMapper, never()).find(
+                anyString(), anyString(), anyString(), anyString());
+        verify(textTranslator, never()).translate(
+                anyString(), any(ContentLanguage.class), any(ContentLanguage.class));
+    }
+
+    @Test
+    void fallsBackToBoundedMemoryCacheWhenKoreanCacheSchemaIsNotUpdatedYet() {
+        when(translationCacheMapper.find(
+                "community_post_multilingual", "148", "title", "ko"))
+                .thenThrow(new IllegalStateException("ko constraint not migrated"));
+        when(textTranslator.translate(
+                "弘大潮流打卡路线",
+                ContentLanguage.CHINESE,
+                ContentLanguage.KOREAN))
+                .thenReturn("홍대 트렌드 인증 코스");
+
+        String first = service.translateMultilingualSource(
+                "community_post_multilingual",
+                "148",
+                "title",
+                "弘大潮流打卡路线",
+                ContentLanguage.KOREAN);
+        String second = service.translateMultilingualSource(
+                "community_post_multilingual",
+                "148",
+                "title",
+                "弘大潮流打卡路线",
+                ContentLanguage.KOREAN);
+
+        assertThat(first).isEqualTo("홍대 트렌드 인증 코스");
+        assertThat(second).isEqualTo(first);
+        verify(translationCacheMapper).find(
+                "community_post_multilingual", "148", "title", "ko");
+        verify(textTranslator).translate(
+                "弘大潮流打卡路线",
+                ContentLanguage.CHINESE,
+                ContentLanguage.KOREAN);
+    }
+
     private String hashOf(String value) {
         try {
             byte[] digest = java.security.MessageDigest.getInstance("SHA-256")

@@ -46,6 +46,9 @@ import lombok.RequiredArgsConstructor;
 @Transactional(readOnly = true)
 public class PostService {
 
+    private static final String COMMUNITY_TRANSLATION_SOURCE_TYPE =
+            "community_post_multilingual";
+
     private static final int MAX_PAGE_SIZE = 100;
     /** 커뮤니티 인기 장소는 프론트가 두 단(1~3위, 4~6위)으로 펼치므로 6개까지 내려준다. */
     private static final int POPULAR_PLACE_LIMIT = 6;
@@ -121,20 +124,20 @@ public class PostService {
             int size,
             ContentLanguage language) {
         PageResponse<PublicCourseResponse> response = getPublicCourses(page, size);
-        if (language == null || !language.requiresTranslation()) {
+        if (language == null) {
             return response;
         }
 
         for (PublicCourseResponse post : response.getContent()) {
             String sourceKey = String.valueOf(post.getPostId());
-            post.setTitle(contentTranslationService.translate(
-                    "community_post",
+            post.setTitle(contentTranslationService.translateMultilingualSource(
+                    COMMUNITY_TRANSLATION_SOURCE_TYPE,
                     sourceKey,
                     "title",
                     post.getTitle(),
                     language));
-            post.setContent(contentTranslationService.translate(
-                    "community_post",
+            post.setContent(contentTranslationService.translateMultilingualSource(
+                    COMMUNITY_TRANSLATION_SOURCE_TYPE,
                     sourceKey,
                     "content",
                     post.getContent(),
@@ -186,15 +189,23 @@ public class PostService {
     @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public PublicCourseDetailResponse getPublicCourse(Long postId, ContentLanguage language) {
         PublicCourseDetailResponse response = getPublicCourse(postId);
-        if (language == null || !language.requiresTranslation()) {
+        if (language == null) {
             return response;
         }
 
         String sourceKey = String.valueOf(response.getPostId());
-        response.setTitle(contentTranslationService.translate(
-                "community_post", sourceKey, "title", response.getTitle(), language));
-        response.setContent(contentTranslationService.translate(
-                "community_post", sourceKey, "content", response.getContent(), language));
+        response.setTitle(contentTranslationService.translateMultilingualSource(
+                COMMUNITY_TRANSLATION_SOURCE_TYPE,
+                sourceKey,
+                "title",
+                response.getTitle(),
+                language));
+        response.setContent(contentTranslationService.translateMultilingualSource(
+                COMMUNITY_TRANSLATION_SOURCE_TYPE,
+                sourceKey,
+                "content",
+                response.getContent(),
+                language));
         return response;
     }
 
