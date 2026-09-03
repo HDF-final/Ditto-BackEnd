@@ -583,13 +583,13 @@ class PostServiceTest {
     }
 
     @Test
-    @DisplayName("커뮤니티 공개 게시글의 장소를 합산한 인기 장소 TOP3를 조회한다")
+    @DisplayName("커뮤니티 공개 게시글의 장소를 합산한 인기 장소 TOP6를 조회한다")
     void getPopularPlaces() {
         List<PopularPlaceResponse> places = List.of(
                 new PopularPlaceResponse(1, 11L, "탬버린즈", "1F", 3L),
                 new PopularPlaceResponse(2, 22L, "프라다", "1F", 2L),
                 new PopularPlaceResponse(3, 33L, "애플 스토어", "5F", 1L));
-        given(postMapper.findPopularPublicCoursePlaces(3)).willReturn(places);
+        given(postMapper.findPopularPublicCoursePlaces(6)).willReturn(places);
 
         List<PopularPlaceResponse> response = postService.getPopularPlaces();
 
@@ -599,7 +599,7 @@ class PostServiceTest {
         assertThat(response.get(0).getPostCount()).isEqualTo(3L);
         assertThat(response.get(1).getName()).isEqualTo("프라다");
         assertThat(response.get(2).getName()).isEqualTo("애플 스토어");
-        verify(postMapper).findPopularPublicCoursePlaces(3);
+        verify(postMapper).findPopularPublicCoursePlaces(6);
     }
 
     @Test

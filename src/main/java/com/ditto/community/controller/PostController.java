@@ -76,8 +76,8 @@ public class PostController {
     }
 
     @Operation(
-            summary = "커뮤니티 인기 장소 TOP3 조회",
-            description = "커뮤니티에 공개된 사용자 코스 게시글의 장소를 합산해 많이 등장한 장소 3개를 조회합니다.")
+            summary = "커뮤니티 인기 장소 TOP6 조회",
+            description = "커뮤니티에 공개된 사용자 코스 게시글의 장소를 합산해 많이 등장한 장소 6개를 조회합니다.")
     @GetMapping("/popular-places")
     @ResponseStatus(HttpStatus.OK)
     public ApiResponse<List<PopularPlaceResponse>> getPopularPlaces() {

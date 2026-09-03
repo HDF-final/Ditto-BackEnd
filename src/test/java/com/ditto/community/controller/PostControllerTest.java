@@ -149,7 +149,7 @@ class PostControllerTest {
     }
 
     @Test
-    @DisplayName("커뮤니티 인기 장소 TOP3 조회 성공 시 순위와 장소명을 반환한다")
+    @DisplayName("커뮤니티 인기 장소 TOP6 조회 성공 시 순위와 장소명을 반환한다")
     void getPopularPlacesSuccess() throws Exception {
         given(postService.getPopularPlaces()).willReturn(List.of(
                 new PopularPlaceResponse(1, 11L, "탬버린즈", "1F", 3L),
