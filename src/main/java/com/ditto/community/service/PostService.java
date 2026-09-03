@@ -47,6 +47,8 @@ import lombok.RequiredArgsConstructor;
 public class PostService {
 
     private static final int MAX_PAGE_SIZE = 100;
+    /** 커뮤니티 인기 장소는 프론트가 두 단(1~3위, 4~6위)으로 펼치므로 6개까지 내려준다. */
+    private static final int POPULAR_PLACE_LIMIT = 6;
 
     private final CourseMapper courseMapper;
     private final PostMapper postMapper;
@@ -76,10 +78,10 @@ public class PostService {
     }
 
     /**
-     * 커뮤니티에 공개된 모든 사용자 게시글의 코스 장소를 합산해 많이 등장한 장소 TOP3를 조회한다.
+     * 커뮤니티에 공개된 모든 사용자 게시글의 코스 장소를 합산해 많이 등장한 장소 TOP6를 조회한다.
      */
     public List<PopularPlaceResponse> getPopularPlaces() {
-        return postMapper.findPopularPublicCoursePlaces(3);
+        return postMapper.findPopularPublicCoursePlaces(POPULAR_PLACE_LIMIT);
     }
 
     /**
