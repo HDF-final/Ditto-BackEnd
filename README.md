@@ -1,8 +1,172 @@
+![Hi, Ditto!](docs/images/01-cover.jpg)
+
+<div align="center">
+
 # DITTO BackEnd
 
-중국·일본·미국 관광객이 국가별 K-컬처 트렌드를 탐색하고, AI로 맞춤 코스를 만든 뒤 코스 커스텀·모바일 실내 길찾기·여행자 커뮤니티로 경험을 이어가는 관광 플랫폼 DITTO의 백엔드입니다.
+**국가 트렌드 분석부터 코스 추천까지, 백화점 외국인 방문객을 위한 AI 쇼핑 메이트**
 
-현재 문서는 **백엔드 초기 개발 환경 안내서**입니다. 비즈니스 로직이 완성되면 최종 서비스 설명, 도메인 모델, 아키텍처 및 배포 안내를 포함한 문서로 교체합니다.
+`Java 17` · `Spring Boot 3.3` · `MyBatis` · `Oracle` · `PostgreSQL + pgvector` · `Redis` · `AWS Lambda`
+
+**HI-FO! 3팀**
+
+| 팀장 | 부팀장 | 팀원 | 팀원 |
+|:---:|:---:|:---:|:---:|
+| **도건우** | **공희진** | **안의찬** | **안정민** |
+| [@woodgeon](https://github.com/woodgeon) | [@heejinkong](https://github.com/heejinkong) | [@Ui-chan](https://github.com/Ui-chan) | [@Dev-Anniee](https://github.com/Dev-Anniee) |
+
+</div>
+
+---
+
+## 목차
+
+**[프로젝트 소개](#프로젝트-소개)** · **[무엇을 서빙하나](#무엇을-서빙하나)** · **[백엔드가 푸는 문제](#백엔드가-푸는-문제)** · **[개발 가이드](#개발-가이드)**
+
+---
+
+## 프로젝트 소개
+
+### 왜 만들었나
+
+![한국 관심 계기](docs/images/05-kculture-motivation.jpg)
+
+외국인이 한국에 관심을 갖게 된 계기 1위는 **한류 콘텐츠 38.3%**(K-POP · DRAMA · K-BEAUTY · K-FOOD)입니다.
+그런데 그 관심을 실제 쇼핑으로 옮기려면 정보가 판매처 · 영상 콘텐츠 · SNS · 후기로 **전부 흩어져 있습니다.**
+
+![정보 탐색과 선택 부담](docs/images/07-decision-fatigue.jpg)
+
+`SNS에서 탐색` → `운영 정보 확인` → `후기 비교` → `매장 정보 대조` → `일정·동선 재구성`.
+다섯 단계를 매번 반복해야 합니다. **선택지가 많아질수록 불확실성은 커지고, 결정은 늦어집니다.**
+
+### DITTO — 흩어진 관심을 하나의 코스로
+
+![DITTO 서비스 개요](docs/images/08-ditto-overview.jpg)
+
+> **네가 해봤으니, 나도.**
+
+| | | |
+|---|---|---|
+| **01 DISCOVER** 발견 | **02 PLAN** 계획 | **03 NAVIGATE** 이동 |
+| 국가별 Trend Map으로 K-트렌드를 골라 담는다 | 요청을 반영한 AI 맞춤형 코스를 만든다 | 3D 지도와 실내 길찾기로 실제 이동까지 안내한다 |
+
+이 저장소는 그 **세 단계를 데이터와 API로 떠받치는 곳**입니다.
+
+---
+
+## 무엇을 서빙하나
+
+### DISCOVER — 국가별 Trend Map
+
+![국가별 Trend Map](docs/images/09-discover-trend-map.jpg)
+
+4개국의 관심 콘텐츠와 브랜드를 분석해 기본 코스를 추천합니다.
+국가·브랜드·장소 원장은 Oracle이 원본이고, 응답 언어는 `Accept-Language` 로 갈립니다.
+
+### PLAN — AI 맞춤형 코스 생성
+
+![AI 맞춤형 코스 생성](docs/images/10-plan-ai-course.jpg)
+
+`/api/v1/ai`. 생성된 코스는 `/api/v1/courses` 로 저장하고, `/api/v1/courses/public` 과
+`/api/v1/community` 로 공유됩니다.
+
+### NAVIGATE — 3D 코스와 실내 길찾기
+
+![3D 코스와 실내 길찾기](docs/images/11-navigate-3d.jpg)
+
+`/api/v1/navigation`. 8개 층의 층 그래프와 장소 원장 147곳을 서빙하고,
+`GET /api/v1/places/navigation/assets` 가 프론트와 **같은 CDN 주소**를 돌려줍니다.
+
+### BONI — 더현대 안내 캐릭터
+
+![BONI](docs/images/12-boni.jpg)
+
+발견 · 계획 · 이동 전 과정을 함께하는 친구.
+
+---
+
+## 백엔드가 푸는 문제
+
+### AI 판단은 전부 람다에 위임한다
+
+![보니 동작 과정](docs/images/15-boni-flow-celeb.jpg)
+
+코스를 만드는 판단(인물 추출 → 셀럽 조사 → 코스 조립 → 추천 이유 → 근거 사진)은
+백엔드가 하지 않습니다. **AWS SDK 로 람다를 IAM invoke** 할 뿐입니다.
+
+| 무엇 | 어디로 |
+|---|---|
+| AI 코스 추천 | `ditto-chat-v2` |
+| 승인 대기 코스 초안 조회 | `ditto-celeb-warm-2` (`CelebDraftClient`) |
+| 초안 승인 · 캐시 · 내리기 | `ditto-celeb-approve` (`CelebApproveClient`) |
+
+**Function URL 은 열지 않습니다.** 액세스 키도 두지 않고 AWS profile 또는 EC2 인스턴스 역할의
+`lambda:InvokeFunction` 권한을 씁니다 — 브라우저가 SigV4 를 안전하게 못 하고,
+한 번 부를 때마다 실제 요금이 나가기 때문입니다.
+백엔드는 `ditto-celeb-publish` 를 **직접 부르지 못합니다.** 부르는 것은 `ditto-celeb-approve` 뿐이고,
+그것도 비동기입니다. 의도된 설계입니다.
+
+### 생성 책임과 조회 책임을 갈랐다
+
+![인프라 개선](docs/images/23-infra-improvements.jpg)
+
+뉴스는 원래 로컬 Selenium + 백엔드에서 만들었습니다. **RSS + 서버리스 Lambda 로 분리**해
+백엔드는 조회·관리에 집중하고 AI 생성 작업은 Lambda 가 담당합니다.
+임베딩 모델(BGE-M3 2.3GB)도 서버 상주에서 람다로 옮겨 **메모리 −100%, 콜드 스타트 27초 → 0.25초**가 됐습니다.
+
+### 간판 하나로 매장을 특정한다
+
+![OCR 최적화](docs/images/22-ocr-optimization.jpg)
+
+`/api/v1/ocr`. 네이버 CLOVA OCR 로 간판을 읽고, **매장 분기 로직**으로 정확한 매장을 고릅니다.
+
+| 간판 인식 결과 | DB 검색 결과 | 처리 방식 | 사용자 선택 |
+|---|---|---|---|
+| 프라다 | 프라다 · 프라다 뷰티 | 두 매장 중 직접 선택 | 필요 |
+| 프라다 뷰티 | 프라다 · 프라다 뷰티 | 프라다 뷰티 바로 연결 | 불필요 |
+
+업로드 전 전처리로 평균 용량이 **−85.0%**(4.61MB → 696KB), 응답 시간이 −25.0%(1.60초 → 1.20초) 줄었습니다.
+
+### 두 개의 데이터베이스
+
+관계형 데이터는 **Oracle**, 추천용 벡터는 **PostgreSQL + pgvector** 가 맡습니다.
+세션은 Redis 에 두어 인스턴스를 늘려도 로그인 상태가 유지됩니다.
+동적 콘텐츠(뉴스 · 커뮤니티 게시글 · 코스명)의 번역은 **Amazon Translate** 가 처리합니다.
+
+### 전체 구조 안에서 이곳
+
+![기술 스택](docs/images/24-tech-stack.jpg)
+
+![클라우드 아키텍처](docs/images/25-cloud-architecture.jpg)
+
+```
+브라우저 ──HTTPS:443──▶ ALB ──▶ Next.js (Frontend ASG)
+                                   │ rewrites: /api/* → ALB:80
+                                   ▼
+                        ALB:80 ──▶ Spring Boot (Backend ASG)   ← 이 저장소
+                                   │  Oracle(MyBatis) · Redis · Amazon Translate
+                                   ▼
+                             AI 람다 (IAM invoke)
+```
+
+Multi-AZ 대칭 배포 · ALB · RDS Multi-AZ 복제로 고가용성을, 계층별 EC2 수평 확장 ·
+CloudFront CDN · 서버리스 구조로 확장성을 확보했습니다.
+
+DITTO는 저장소 셋에 걸쳐 있습니다.
+
+| 저장소 | 무엇 |
+|---|---|
+| **[Ditto-BackEnd](https://github.com/HDF-final/Ditto-BackEnd)** (여기) | Spring Boot 3 · Java 17 · MyBatis · Oracle |
+| [Ditto-FrontEnd](https://github.com/HDF-final/Ditto-FrontEnd) | Next.js 16 App Router · Three.js 3D 지도 · PWA |
+| Ditto-AI | 람다 8종 · RAG 추천 파이프라인 · Azure OpenAI · Tavily |
+
+![더현대 서울을 디토한다](docs/images/32-slogan.jpg)
+
+> **Ditto** / ˈdɪt.oʊ / — 따라하다, 나도(me too). 모두가 따라하고 싶은 것.
+
+---
+
+# 개발 가이드
 
 ## 핵심 사용자 흐름
 
@@ -30,6 +194,9 @@
 | Docs | SpringDoc OpenAPI 3 | Swagger UI, API 문서 자동화 |
 | Convenience | Lombok | 보일러플레이트 제거 |
 | Build | Gradle | 빌드, 의존성 관리 |
+| Session | Spring Session + Redis | 인스턴스를 늘려도 유지되는 세션 로그인 |
+| AWS | AWS SDK (Lambda · S3 · Translate) | AI 람다 호출, 이미지 저장, 동적 콘텐츠 번역 |
+| Monitoring | Actuator + Micrometer(Prometheus) | 헬스체크·메트릭 |
 | Database | Oracle (메인) / PostgreSQL + pgvector (RAG) | 관계형 데이터 · 벡터 저장 |
 
 설치된 정확한 버전은 [build.gradle](./build.gradle)을 기준으로 합니다.
